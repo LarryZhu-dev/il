@@ -1,0 +1,100 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "Wrapped",
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [
+    {
+      "entity_id": "Wrapped",
+      "kind": "result",
+      "parameters": [
+        "I64",
+        "Bool"
+      ],
+      "layout": "inferred"
+    }
+  ],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "Wrapped",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.answer.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.answer",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 42
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.wrap",
+              "opcode": "variant",
+              "inputs": [
+                "main.answer"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.wrapped",
+                  "type": "Wrapped"
+                }
+              ],
+              "attributes": {
+                "type_id": "Wrapped",
+                "variant": "Ok"
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [
+              "main.wrapped"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

@@ -1,0 +1,143 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "Point",
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [
+    {
+      "entity_id": "Point",
+      "kind": "record",
+      "parameters": [],
+      "layout": "inferred",
+      "fields": [
+        {
+          "name": "x",
+          "type": "I64"
+        },
+        {
+          "name": "y",
+          "type": "I64"
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.x.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.x",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 20
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.y.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.y",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 22
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.record",
+              "opcode": "record",
+              "inputs": [
+                "main.x",
+                "main.y"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.point",
+                  "type": "Point"
+                }
+              ],
+              "attributes": {
+                "type_id": "Point"
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.field",
+              "opcode": "field",
+              "inputs": [
+                "main.point"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.result",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "field": "x"
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [
+              "main.result"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

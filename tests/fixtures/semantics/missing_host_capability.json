@@ -1,0 +1,59 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "Unit",
+      "effects": [
+        "clock"
+      ],
+      "capabilities": [
+        "host.clock"
+      ],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [
+    {
+      "entity_id": "host.clock",
+      "kind": "ClockRead",
+      "scope": null
+    }
+  ],
+  "packages": [],
+  "contracts": []
+}

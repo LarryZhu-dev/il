@@ -1,0 +1,104 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.left.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.left",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 20
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.right.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.right",
+                  "type": "U64"
+                }
+              ],
+              "attributes": {
+                "value": 22
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.add",
+              "opcode": "add",
+              "inputs": [
+                "main.left",
+                "main.right"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.sum",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {},
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [
+              "main.sum"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

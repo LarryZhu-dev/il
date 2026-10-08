@@ -1,0 +1,177 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "Choice",
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [
+    {
+      "entity_id": "Choice",
+      "kind": "sum",
+      "parameters": [],
+      "layout": "inferred",
+      "variants": [
+        {
+          "name": "Left",
+          "fields": []
+        },
+        {
+          "name": "Right",
+          "fields": []
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [
+        {
+          "entity_id": "main.choice",
+          "name": "choice",
+          "type": "Choice"
+        }
+      ],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [],
+          "terminator": {
+            "entity_id": "main.switch",
+            "opcode": "switch",
+            "inputs": [
+              "main.choice"
+            ],
+            "outputs": [],
+            "attributes": {
+              "cases": [
+                {
+                  "tag": "Left",
+                  "target": "main.left",
+                  "arguments": []
+                },
+                {
+                  "tag": "Right",
+                  "target": "main.right",
+                  "arguments": []
+                }
+              ],
+              "default": "main.invalid",
+              "default_arguments": []
+            },
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        },
+        {
+          "entity_id": "main.left",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.left_value.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.left_value",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 1
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.left_return",
+            "opcode": "return",
+            "inputs": [
+              "main.left_value"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        },
+        {
+          "entity_id": "main.right",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.right_value.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.right_value",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 2
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.right_return",
+            "opcode": "return",
+            "inputs": [
+              "main.right_value"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        },
+        {
+          "entity_id": "main.invalid",
+          "arguments": [],
+          "operations": [],
+          "terminator": {
+            "entity_id": "main.trap",
+            "opcode": "trap",
+            "inputs": [],
+            "outputs": [],
+            "attributes": {
+              "code": "E_SCHEMA_INVALID"
+            },
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

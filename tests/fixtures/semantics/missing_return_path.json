@@ -1,0 +1,33 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

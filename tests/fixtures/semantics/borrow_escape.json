@@ -1,0 +1,75 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [
+        {
+          "entity_id": "main.source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "result": "String",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.borrow",
+              "opcode": "borrow",
+              "inputs": [
+                "main.source"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.view",
+                  "type": "String"
+                }
+              ],
+              "attributes": {},
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [
+              "main.view"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

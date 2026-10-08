@@ -1,0 +1,123 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "identity",
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "identity",
+      "name": "identity",
+      "parameters": [
+        {
+          "entity_id": "identity.value",
+          "name": "value",
+          "type": "I64"
+        }
+      ],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "identity.entry",
+          "arguments": [],
+          "operations": [],
+          "terminator": {
+            "entity_id": "identity.return",
+            "opcode": "return",
+            "inputs": [
+              "identity.value"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    },
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.answer.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.answer",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 42
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.call",
+              "opcode": "call",
+              "inputs": [
+                "main.answer"
+              ],
+              "outputs": [
+                {
+                  "entity_id": "main.result",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "callee": "identity"
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [
+              "main.result"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

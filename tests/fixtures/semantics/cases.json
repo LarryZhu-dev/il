@@ -1,0 +1,220 @@
+{
+  "suite": "p03_static_semantics",
+  "checks": [
+    "schema",
+    "names",
+    "types",
+    "ownership",
+    "effects",
+    "capabilities",
+    "contracts"
+  ],
+  "cases": [
+    {
+      "id": "valid_integer_return",
+      "file": "valid_integer_return.json",
+      "valid": true,
+      "reason": "A fixed-width integer constant matches the declared return type."
+    },
+    {
+      "id": "valid_integer_add",
+      "file": "valid_integer_add.json",
+      "valid": true,
+      "reason": "Arithmetic operands and result have exactly matching integer types."
+    },
+    {
+      "id": "valid_typed_call",
+      "file": "valid_typed_call.json",
+      "valid": true,
+      "reason": "Direct call arguments and results match a declared function signature."
+    },
+    {
+      "id": "valid_record_and_field",
+      "file": "valid_record_and_field.json",
+      "valid": true,
+      "reason": "A record of copy fields is copy; construction and projection preserve field types."
+    },
+    {
+      "id": "valid_conditional_block_arguments",
+      "file": "valid_conditional_block_arguments.json",
+      "valid": true,
+      "reason": "Each conditional edge supplies the declared typed target-block arguments."
+    },
+    {
+      "id": "valid_owned_move_return",
+      "file": "valid_owned_move_return.json",
+      "valid": true,
+      "reason": "An owned parameter is moved exactly once and the new owner is returned explicitly."
+    },
+    {
+      "id": "valid_lexical_borrow",
+      "file": "valid_lexical_borrow.json",
+      "valid": true,
+      "reason": "Ending a shared lexical borrow restores the owner for an owned return."
+    },
+    {
+      "id": "wrong_return_type",
+      "file": "wrong_return_type.json",
+      "valid": false,
+      "reason": "No implicit numeric-to-boolean return conversion is allowed.",
+      "diagnostic_code": "E_TYPE_MISMATCH"
+    },
+    {
+      "id": "mixed_integer_add",
+      "file": "mixed_integer_add.json",
+      "valid": false,
+      "reason": "Signed and unsigned integers cannot be added implicitly.",
+      "diagnostic_code": "E_TYPE_MISMATCH"
+    },
+    {
+      "id": "missing_return_path",
+      "file": "missing_return_path.json",
+      "valid": false,
+      "reason": "A function without an entry/return path is invalid.",
+      "diagnostic_code": "E_MISSING_RETURN"
+    },
+    {
+      "id": "use_after_move",
+      "file": "use_after_move.json",
+      "valid": false,
+      "reason": "Returning the old owner after a move is forbidden.",
+      "diagnostic_code": "E_USE_AFTER_MOVE"
+    },
+    {
+      "id": "borrow_escape",
+      "file": "borrow_escape.json",
+      "valid": false,
+      "reason": "Returning a lexical borrow must be rejected even when its underlying type matches.",
+      "diagnostic_code": "E_BORROW_ESCAPE"
+    },
+    {
+      "id": "double_drop",
+      "file": "double_drop.json",
+      "valid": false,
+      "reason": "A second explicit drop is a resource lifecycle error.",
+      "diagnostic_code": "E_DOUBLE_DROP"
+    },
+    {
+      "id": "undeclared_callee_effect",
+      "file": "undeclared_callee_effect.json",
+      "valid": false,
+      "reason": "A caller must declare every transitive callee effect.",
+      "diagnostic_code": "E_EFFECT_UNDECLARED"
+    },
+    {
+      "id": "missing_host_capability",
+      "file": "missing_host_capability.json",
+      "valid": false,
+      "reason": "A declared capability requirement is not a host-injected capability grant.",
+      "diagnostic_code": "E_CAPABILITY_MISSING"
+    },
+    {
+      "id": "unknown_value",
+      "file": "unknown_value.json",
+      "valid": false,
+      "reason": "Value references must resolve to a visible definition.",
+      "diagnostic_code": "E_NAME_NOT_FOUND"
+    },
+    {
+      "id": "wrong_branch_argument",
+      "file": "wrong_branch_argument.json",
+      "valid": false,
+      "reason": "Branch argument types must match the destination block exactly.",
+      "diagnostic_code": "E_TYPE_MISMATCH"
+    },
+    {
+      "id": "return_contract_mismatch",
+      "file": "return_contract_mismatch.json",
+      "valid": false,
+      "reason": "A function result must satisfy its declared return-type contract.",
+      "diagnostic_code": "E_TYPE_MISMATCH"
+    },
+    {
+      "id": "integer_literal_out_of_range",
+      "file": "integer_literal_out_of_range.json",
+      "valid": false,
+      "reason": "An integer constant must fit its declared fixed-width type before lowering.",
+      "diagnostic_code": "E_INTEGER_OVERFLOW"
+    },
+    {
+      "id": "valid_exhaustive_sum_switch",
+      "file": "valid_exhaustive_sum_switch.json",
+      "valid": true,
+      "reason": "All sum variants are listed explicitly; default handles impossible invalid discriminants only."
+    },
+    {
+      "id": "non_exhaustive_sum_switch",
+      "file": "non_exhaustive_sum_switch.json",
+      "valid": false,
+      "reason": "A trap default is not a substitute for a missing declared sum variant.",
+      "diagnostic_code": "E_NON_EXHAUSTIVE_MATCH"
+    },
+    {
+      "id": "valid_option_constructor",
+      "file": "valid_option_constructor.json",
+      "valid": true,
+      "reason": "The built-in parameterized variant preserves its declared payload type."
+    },
+    {
+      "id": "valid_result_constructor",
+      "file": "valid_result_constructor.json",
+      "valid": true,
+      "reason": "The built-in parameterized variant preserves its declared payload type."
+    },
+    {
+      "id": "valid_declared_callee_effect",
+      "file": "valid_declared_callee_effect.json",
+      "valid": true,
+      "reason": "Explicit caller effects cover the callee effect declaration."
+    },
+    {
+      "id": "wrong_call_argument",
+      "file": "wrong_call_argument.json",
+      "valid": false,
+      "reason": "Call arguments do not receive implicit conversion to the callee parameter type.",
+      "diagnostic_code": "E_TYPE_MISMATCH"
+    },
+    {
+      "id": "schema_integer_null",
+      "file": "schema_integer_null.json",
+      "valid": false,
+      "reason": "An optional integer layout accepts omission, not an explicit JSON null.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    },
+    {
+      "id": "schema_empty_package_strings",
+      "file": "schema_empty_package_strings.json",
+      "valid": false,
+      "reason": "Package name and version have nonempty string constraints.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    },
+    {
+      "id": "schema_empty_trap_code",
+      "file": "schema_empty_trap_code.json",
+      "valid": false,
+      "reason": "A trap must carry a nonempty diagnostic code.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    },
+    {
+      "id": "schema_parameter_name",
+      "file": "schema_parameter_name.json",
+      "valid": false,
+      "reason": "Parameter names must satisfy the declared identifier grammar.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    },
+    {
+      "id": "schema_missing_capability_scope",
+      "file": "schema_missing_capability_scope.json",
+      "valid": false,
+      "reason": "ClockRead scope is required and nullable; omission is not null.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    },
+    {
+      "id": "schema_duplicate_package_modules",
+      "file": "schema_duplicate_package_modules.json",
+      "valid": false,
+      "reason": "Package module references are unique even when both resolve.",
+      "diagnostic_code": "E_SCHEMA_INVALID"
+    }
+  ]
+}

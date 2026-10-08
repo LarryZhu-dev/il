@@ -1,0 +1,156 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "I64",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.condition.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.condition",
+                  "type": "Bool"
+                }
+              ],
+              "attributes": {
+                "value": true
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.left.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.left",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 20
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            },
+            {
+              "entity_id": "main.right.op",
+              "opcode": "const",
+              "inputs": [],
+              "outputs": [
+                {
+                  "entity_id": "main.right",
+                  "type": "I64"
+                }
+              ],
+              "attributes": {
+                "value": 22
+              },
+              "effects": [],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.choose",
+            "opcode": "cond_branch",
+            "inputs": [
+              "main.condition"
+            ],
+            "outputs": [],
+            "attributes": {
+              "then_block": "main.left_block",
+              "else_block": "main.right_block",
+              "then_arguments": [
+                "main.left"
+              ],
+              "else_arguments": [
+                "main.right"
+              ]
+            },
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        },
+        {
+          "entity_id": "main.left_block",
+          "arguments": [
+            {
+              "entity_id": "main.left_value",
+              "type": "I64"
+            }
+          ],
+          "operations": [],
+          "terminator": {
+            "entity_id": "main.left_return",
+            "opcode": "return",
+            "inputs": [
+              "main.left_value"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        },
+        {
+          "entity_id": "main.right_block",
+          "arguments": [
+            {
+              "entity_id": "main.right_value",
+              "type": "I64"
+            }
+          ],
+          "operations": [],
+          "terminator": {
+            "entity_id": "main.right_return",
+            "opcode": "return",
+            "inputs": [
+              "main.right_value"
+            ],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

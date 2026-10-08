@@ -41,5 +41,10 @@ stable_codes:
   - E_INVALID_SHIFT
   - E_INVALID_SCOPE
   - E_CONTEXT_INSUFFICIENT
+  - E_OWNERSHIP_METADATA
+  - E_OWNERSHIP_JOIN
+  - E_BORROW_CONFLICT
+  - E_UNREACHABLE_BLOCK
+  - E_COMMIT_DURABILITY_UNCERTAIN
 retryable_false: stop_automatic_retry_and_set_DESIGN_REQUIRED_or_BLOCKED
 diagnostic_identity: deterministic_revision_stage_entity_code_and_ordinal

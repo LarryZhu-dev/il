@@ -1,0 +1,84 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [
+        {
+          "entity_id": "main.source",
+          "name": "source",
+          "type": "String"
+        }
+      ],
+      "result": "Unit",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.drop1",
+              "opcode": "drop",
+              "inputs": [
+                "main.source"
+              ],
+              "outputs": [],
+              "attributes": {},
+              "effects": [],
+              "consumes": [
+                "main.source"
+              ],
+              "produces": []
+            },
+            {
+              "entity_id": "main.drop2",
+              "opcode": "drop",
+              "inputs": [
+                "main.source"
+              ],
+              "outputs": [],
+              "attributes": {},
+              "effects": [],
+              "consumes": [
+                "main.source"
+              ],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

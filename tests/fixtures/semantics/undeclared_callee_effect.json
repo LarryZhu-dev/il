@@ -1,0 +1,93 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [
+    {
+      "entity_id": "app",
+      "path": "app",
+      "imports": [],
+      "declarations": [
+        "effectful",
+        "main"
+      ],
+      "visibility": "public"
+    }
+  ],
+  "types": [],
+  "functions": [
+    {
+      "entity_id": "effectful",
+      "name": "effectful",
+      "parameters": [],
+      "result": "Unit",
+      "effects": [
+        "alloc"
+      ],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "effectful.entry",
+          "arguments": [],
+          "operations": [],
+          "terminator": {
+            "entity_id": "effectful.return",
+            "opcode": "return",
+            "inputs": [],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    },
+    {
+      "entity_id": "main",
+      "name": "main",
+      "parameters": [],
+      "result": "Unit",
+      "effects": [],
+      "capabilities": [],
+      "blocks": [
+        {
+          "entity_id": "main.entry",
+          "arguments": [],
+          "operations": [
+            {
+              "entity_id": "main.call",
+              "opcode": "call",
+              "inputs": [],
+              "outputs": [],
+              "attributes": {
+                "callee": "effectful"
+              },
+              "effects": [
+                "alloc"
+              ],
+              "consumes": [],
+              "produces": []
+            }
+          ],
+          "terminator": {
+            "entity_id": "main.return",
+            "opcode": "return",
+            "inputs": [],
+            "outputs": [],
+            "attributes": {},
+            "effects": [],
+            "consumes": [],
+            "produces": []
+          }
+        }
+      ],
+      "contracts": []
+    }
+  ],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}
