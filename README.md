@@ -4,10 +4,10 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-P00–P03 are verified, including a successful
-[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37767371198).
-P03 includes the shared static checker, annotated text frontend and semantic graph
-transactions. The full compiler, runtime, HTTP package, extensions and self-hosting
+P00–P04 are verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37772237811).
+The verified implementation includes the shared static checker, structured text
+frontend, semantic graph transactions, HIR/MIR and bounded interpreter. The full compiler, runtime, HTTP package, extensions and self-hosting
 are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
 No release is available until all of its gates pass.
