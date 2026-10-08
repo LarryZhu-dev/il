@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/tool.schema.json",
+  "title": "Intelligent language structured tool response",
+  "description": "CLI command arguments are JSON stdin values validated by the named request definition. Paths are trusted CLI options, never JSON request fields. JSON input and output are bounded to 262144 UTF-8 bytes. Context budgets use a conservative byte count as a token upper bound.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "tool", "tool_version", "base_revision", "result_revision", "diagnostics", "artifacts", "evidence_id", "result"],
+  "properties": {
+    "ok": {"type": "boolean"},
+    "tool": {"type": "string", "minLength": 1},
+    "tool_version": {"const": "1.0.0"},
+    "base_revision": {"$ref": "#/$defs/revision"},
+    "result_revision": {"$ref": "#/$defs/revision"},
+    "diagnostics": {"type": "array", "items": {"$ref": "diagnostic.schema.json"}},
+    "artifacts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
+    "evidence_id": {"type": ["string", "null"]},
+    "result": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "id": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"},
+    "ids": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+    "budget": {"type": "integer", "minimum": 1, "maximum": 65536},
+    "check": {"enum": ["schema", "names", "references", "types", "ownership", "effects", "capabilities", "contracts"]},
+    "state": {"type": "object", "additionalProperties": false},
+    "transact": {"$ref": "transaction.schema.json"},
+    "inspect": {
+      "type": "object", "additionalProperties": false, "required": ["entity_id"],
+      "properties": {"entity_id": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/revision"}, "fields": {"type": "array", "items": {"type": "string"}}, "budget": {"$ref": "#/$defs/budget"}}
+    },
+    "validate": {
+      "type": "object", "additionalProperties": false, "required": ["graph_or_revision", "checks"],
+      "properties": {"graph_or_revision": {"oneOf": [{"$ref": "#/$defs/revision"}, {"$ref": "program_graph.schema.json"}]}, "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}}}
+    },
+    "diff": {
+      "type": "object", "additionalProperties": false, "required": ["base_revision", "target_revision"],
+      "properties": {"base_revision": {"$ref": "#/$defs/revision"}, "target_revision": {"$ref": "#/$defs/revision"}, "scope": {"$ref": "#/$defs/ids"}}
+    },
+    "restore": {
+      "type": "object", "additionalProperties": false, "required": ["revision", "reason"],
+      "properties": {"revision": {"$ref": "#/$defs/revision"}, "reason": {"type": "string", "minLength": 1}}
+    },
+    "slice": {
+      "type": "object", "additionalProperties": false, "required": ["root_entities", "max_nodes", "max_tokens"],
+      "properties": {"root_entities": {"$ref": "#/$defs/ids"}, "revision": {"$ref": "#/$defs/revision"}, "max_nodes": {"type": "integer", "minimum": 1, "maximum": 4096}, "max_tokens": {"$ref": "#/$defs/budget"}}
+    },
+    "callers": {
+      "type": "object", "additionalProperties": false, "required": ["entity_id"],
+      "properties": {"entity_id": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/revision"}, "budget": {"$ref": "#/$defs/budget"}}
+    },
+    "dependencies": {
+      "type": "object", "additionalProperties": false, "required": ["entity_id"],
+      "properties": {"entity_id": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/revision"}, "budget": {"$ref": "#/$defs/budget"}, "direction": {"enum": ["forward", "reverse"]}}
+    }
+  }
+}
