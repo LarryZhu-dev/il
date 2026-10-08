@@ -1,0 +1,1565 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/program_graph.schema.json",
+  "title": "Intelligent language canonical program graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project_id",
+    "graph_version",
+    "revision",
+    "target",
+    "modules",
+    "types",
+    "functions",
+    "capabilities",
+    "packages",
+    "contracts"
+  ],
+  "properties": {
+    "project_id": {
+      "const": "il"
+    },
+    "graph_version": {
+      "const": "1.0.0"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "target": {
+      "const": "x86_64-unknown-linux-gnu"
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/module"
+      }
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/type"
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/function"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/package"
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/contract"
+      }
+    }
+  },
+  "$defs": {
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "type"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "name",
+        "type"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "path",
+        "imports",
+        "declarations",
+        "visibility"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "imports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "declarations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "visibility": {
+          "enum": [
+            "private",
+            "public"
+          ]
+        }
+      }
+    },
+    "type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "kind",
+        "parameters",
+        "layout"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "kind": {
+          "enum": [
+            "unit",
+            "never",
+            "bool",
+            "int",
+            "usize",
+            "string",
+            "bytes",
+            "record",
+            "sum",
+            "option",
+            "result",
+            "tuple"
+          ]
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "layout": {
+          "enum": [
+            "inferred",
+            "ffi",
+            "opaque"
+          ]
+        },
+        "integer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signed",
+            "bits"
+          ],
+          "properties": {
+            "signed": {
+              "type": "boolean"
+            },
+            "bits": {
+              "enum": [
+                8,
+                16,
+                32,
+                64
+              ]
+            }
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "fields"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "kind",
+        "scope"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "kind": {
+          "enum": [
+            "FileRead",
+            "FileWrite",
+            "Listen",
+            "Connect",
+            "SpawnProcess",
+            "ClockRead"
+          ]
+        },
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "name",
+        "version",
+        "modules",
+        "effects",
+        "capabilities"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "alloc",
+              "fs",
+              "net",
+              "clock",
+              "process",
+              "unsafe"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "subject",
+        "predicates"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "predicates": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "type_ref"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "returns"
+                  },
+                  "type_ref": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "effect"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "requires_effect"
+                  },
+                  "effect": {
+                    "enum": [
+                      "alloc",
+                      "fs",
+                      "net",
+                      "clock",
+                      "process",
+                      "unsafe"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "capability"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "requires_capability"
+                  },
+                  "capability": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "literal": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 18446744073709551615
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      ]
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "opcode",
+        "inputs",
+        "outputs",
+        "attributes",
+        "effects",
+        "consumes",
+        "produces"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "opcode": {
+          "enum": [
+            "const",
+            "add",
+            "sub",
+            "mul",
+            "div",
+            "rem",
+            "shl",
+            "shr",
+            "bit_and",
+            "bit_or",
+            "bit_xor",
+            "eq",
+            "ne",
+            "lt",
+            "le",
+            "gt",
+            "ge",
+            "not",
+            "cast",
+            "call",
+            "record",
+            "field",
+            "tuple",
+            "tuple_get",
+            "variant",
+            "tag",
+            "payload",
+            "move",
+            "clone",
+            "borrow",
+            "borrow_mut",
+            "end_borrow",
+            "drop",
+            "branch",
+            "cond_branch",
+            "switch",
+            "return",
+            "trap",
+            "runtime_call"
+          ]
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        "attributes": {
+          "type": "object"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "alloc",
+              "fs",
+              "net",
+              "clock",
+              "process",
+              "unsafe"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "consumes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "produces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "const"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "value"
+                ],
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/literal"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "add"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "sub"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "mul"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "div"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "rem"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "shl"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "shr"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "bit_and"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "bit_or"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "bit_xor"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "eq"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "ne"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "lt"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "le"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "gt"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "ge"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "not"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "cast"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target_type"
+                ],
+                "properties": {
+                  "target_type": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "call"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "callee"
+                ],
+                "properties": {
+                  "callee": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "record"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type_id"
+                ],
+                "properties": {
+                  "type_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "field"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field"
+                ],
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "tuple"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "tuple_get"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "index"
+                ],
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "variant"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type_id",
+                  "variant"
+                ],
+                "properties": {
+                  "type_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "variant": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "tag"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "payload"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "move"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "clone"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "borrow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "borrow_mut"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "end_borrow"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "drop"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "branch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "cond_branch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "then_block",
+                  "else_block",
+                  "then_arguments",
+                  "else_arguments"
+                ],
+                "properties": {
+                  "then_block": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  },
+                  "else_block": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  },
+                  "then_arguments": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                    }
+                  },
+                  "else_arguments": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "switch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "cases",
+                  "default",
+                  "default_arguments"
+                ],
+                "properties": {
+                  "cases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "tag",
+                        "target",
+                        "arguments"
+                      ],
+                      "properties": {
+                        "tag": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "target": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                        },
+                        "arguments": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "default": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  },
+                  "default_arguments": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "return"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "trap"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "opcode": {
+                "const": "runtime_call"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "symbol"
+                ],
+                "properties": {
+                  "symbol": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "arguments",
+        "operations",
+        "terminator"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value"
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "terminator": {
+          "$ref": "#/$defs/operation"
+        }
+      }
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "name",
+        "parameters",
+        "result",
+        "effects",
+        "capabilities",
+        "blocks",
+        "contracts"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/parameter"
+          }
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "alloc",
+              "fs",
+              "net",
+              "clock",
+              "process",
+              "unsafe"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

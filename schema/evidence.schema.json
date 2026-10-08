@@ -245,14 +245,13 @@
             "$ref": "#/$defs/hash"
           },
           "compiler_hash": {
-            "type": "null"
+            "$ref": "#/$defs/hash"
           },
           "runtime_hash": {
             "type": "null"
           },
           "unavailable_components": {
             "const": [
-              "compiler",
               "runtime"
             ]
           }

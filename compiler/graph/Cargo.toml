@@ -12,3 +12,7 @@ fs2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[test]]
+name = "graph_core"
+path = "../../tests/graph/core.rs"

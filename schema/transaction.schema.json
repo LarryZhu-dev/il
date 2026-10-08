@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/transaction.schema.json",
+  "title": "Intelligent language atomic graph transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "base_revision",
+    "scope",
+    "operations",
+    "required_checks"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+    },
+    "base_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+      },
+      "uniqueItems": true
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    },
+    "required_checks": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "schema",
+          "names",
+          "references",
+          "types",
+          "ownership",
+          "effects",
+          "capabilities",
+          "contracts"
+        ]
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "module"
+          ],
+          "properties": {
+            "op": {
+              "const": "add_module"
+            },
+            "module": {
+              "$ref": "program_graph.schema.json#/$defs/module"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id"
+          ],
+          "properties": {
+            "op": {
+              "const": "remove_module"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id",
+            "path"
+          ],
+          "properties": {
+            "op": {
+              "const": "rename_module"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id",
+            "visibility"
+          ],
+          "properties": {
+            "op": {
+              "const": "set_module_visibility"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "visibility": {
+              "enum": [
+                "private",
+                "public"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id",
+            "imports"
+          ],
+          "properties": {
+            "op": {
+              "const": "set_module_imports"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "imports": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "type_definition"
+          ],
+          "properties": {
+            "op": {
+              "const": "add_type"
+            },
+            "type_definition": {
+              "$ref": "program_graph.schema.json#/$defs/type"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "function"
+          ],
+          "properties": {
+            "op": {
+              "const": "add_function"
+            },
+            "function": {
+              "$ref": "program_graph.schema.json#/$defs/function"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "function"
+          ],
+          "properties": {
+            "op": {
+              "const": "replace_function"
+            },
+            "function": {
+              "$ref": "program_graph.schema.json#/$defs/function"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id"
+          ],
+          "properties": {
+            "op": {
+              "const": "remove_entity"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -24,6 +24,13 @@ These values come from the CLI's repository verification, never untrusted reques
 strings. Commit provenance and application graph revision are separately named
 and must not be compared as if they were the same counter.
 
+An older snapshot's source commit need not equal the current compiler-development
+HEAD. The CLI verifies that its stored commit exists, its tree matches, and it is
+an ancestor of the current verified source commit. A legitimate subsequent source
+commit therefore does not invalidate an existing application Store. Each new
+transaction or restore receives the current verified source context explicitly
+and records it in its new manifest. Historical manifest provenance is immutable.
+
 ## Files and commit point
 
 The selected application root contains `.il/revisions/<20-digit-revision>/`
@@ -55,6 +62,22 @@ An orphan's revision number is never reused. Corrupt HEAD or snapshots fail
 closed; the tool does not guess a replacement head from the largest directory.
 Failed schema/semantic candidates are retained separately as experiments and
 cannot appear through ordinary inspect, diff or restore.
+
+Initialization has one deterministic recovery rule: under the same exclusive
+writer lock, a missing HEAD with incomplete revision 0 may resume only by filling
+missing files of the expected empty graph and initialization manifest using the
+same verified source provenance. Every existing file must exactly match those
+expected canonical bytes. Divergent bytes reject recovery. The implementation
+then publishes that exact revision-0 HEAD. This also serializes concurrent first
+writers; another writer reopens a completed matching initialization and performs
+normal base-revision validation. It never treats a partial directory as a graph.
+
+If the directory sync after HEAD's rename fails, publication has already occurred.
+Return nonretryable `E_COMMIT_DURABILITY_UNCERTAIN`, identify the committed revision
+in the response's `result_revision` and structured result, and reload HEAD for
+the observed state. Do not claim rollback, retry automatically or delete either
+snapshot. The new head is visible, but its durability across power loss is not
+confirmed; all prior immutable snapshots remain available for explicit recovery.
 
 The first supported store platform is Linux x86-64. An unverified platform cannot
 claim durability by substituting a non-atomic delete-and-rename sequence. Native
