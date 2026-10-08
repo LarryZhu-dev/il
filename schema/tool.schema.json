@@ -277,6 +277,46 @@
           "type": "string"
         }
       }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "isolation",
+        "suite"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "isolation": {
+          "const": "captured"
+        },
+        "suite": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entry",
+            "arguments",
+            "limits"
+          ],
+          "properties": {
+            "entry": {
+              "$ref": "#/$defs/id"
+            },
+            "arguments": {
+              "type": "array",
+              "items": {
+                "$ref": "execution.schema.json#/$defs/value"
+              }
+            },
+            "limits": {
+              "$ref": "execution.schema.json#/$defs/limits"
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -107,6 +107,9 @@ dependencies = [
  "il-checker",
  "il-frontend",
  "il-graph",
+ "il-hir",
+ "il-interpreter",
+ "il-mir",
  "serde",
  "serde_json",
  "sha2",
@@ -124,7 +127,11 @@ dependencies = [
 name = "il-frontend"
 version = "0.1.0"
 dependencies = [
+ "il-checker",
  "il-graph",
+ "il-hir",
+ "il-interpreter",
+ "il-mir",
  "serde",
  "serde_json",
 ]
@@ -138,6 +145,38 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+]
+
+[[package]]
+name = "il-hir"
+version = "0.1.0"
+dependencies = [
+ "il-checker",
+ "il-graph",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "il-interpreter"
+version = "0.1.0"
+dependencies = [
+ "il-checker",
+ "il-graph",
+ "il-mir",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "il-mir"
+version = "0.1.0"
+dependencies = [
+ "il-checker",
+ "il-graph",
+ "il-hir",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,6 +1,7 @@
 mod protocol;
 mod source;
 mod strict_json;
+mod execution;
 
 use il_graph::*;
 use protocol::*;
@@ -63,6 +64,14 @@ struct Inspect {
 struct Validate {
     graph_or_revision: Value,
     checks: Vec<Check>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Test {
+    revision: u64,
+    suite: execution::Suite,
+    isolation: String,
 }
 
 #[derive(Deserialize)]
@@ -198,7 +207,10 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                 "graph_hash": graph.hash().map_err(Failure::json)?, "project_id": graph.project_id, "target": graph.target})))
         }
         "transact" => {
-            let transaction = transaction_request(input)?;
+            let parsed = match transaction_request(input) {
+                Err(error) if error.diagnostics.is_empty() => return Err(error),
+                parsed => parsed,
+            };
             let store = match store {
                 Some(store) => store,
                 None => {
@@ -218,7 +230,14 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                     }
                 }
             };
-            Ok(outcome(tool, store.transact(&transaction, context.provenance.clone(), &il_checker::check)?))
+            match parsed {
+                Ok(transaction) => Ok(outcome(tool, store.transact(&transaction, context.provenance.clone(), &il_checker::check)?)),
+                Err(error) => {
+                    let request: Value = request(input)?;
+                    let revision = request["base_revision"].as_u64().unwrap();
+                    Ok(outcome(tool, store.retain_rejected_text(revision, &request, error.diagnostics)?))
+                }
+            }
         }
         "restore" => {
             let args: Restore = request(input)?;
@@ -266,6 +285,16 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             if !diagnostics.is_empty() { return Err(Failure::diagnostics(diagnostics)); }
             let source = il_frontend::format(&graph).map_err(Failure::diagnostics)?;
             Ok(envelope(tool, current, current, json!({"graph": graph, "source": source})))
+        }
+        "test" => {
+            let args: Test = request(input)?;
+            if args.isolation != "captured" { return Err(Failure::input("interpreter tests require captured isolation")); }
+            let graph = load(store.as_ref(), context, args.revision)?;
+            let result = execution::run(&graph, args.suite)?;
+            let mut response = envelope(tool, current, args.revision, result);
+            response["ok"] = json!(response["result"]["execution"]["status"] == "returned");
+            response["diagnostics"] = response["result"]["execution"]["diagnostics"].clone();
+            Ok(response)
         }
         "diff" => {
             let args: Diff = request(input)?;

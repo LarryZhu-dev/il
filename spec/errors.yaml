@@ -46,5 +46,8 @@ stable_codes:
   - E_BORROW_CONFLICT
   - E_UNREACHABLE_BLOCK
   - E_COMMIT_DURABILITY_UNCERTAIN
+  - E_MIR_MISSING_DROP
+  - E_MIR_INVALID_CLEANUP
+  - E_MIR_CLEANUP_ORDER
 retryable_false: stop_automatic_retry_and_set_DESIGN_REQUIRED_or_BLOCKED
 diagnostic_identity: deterministic_revision_stage_entity_code_and_ordinal

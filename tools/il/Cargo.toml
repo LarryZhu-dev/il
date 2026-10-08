@@ -11,3 +11,6 @@ sha2.workspace = true
 il-graph.workspace = true
 il-checker.workspace = true
 il-frontend.workspace = true
+il-hir.workspace = true
+il-mir.workspace = true
+il-interpreter.workspace = true
