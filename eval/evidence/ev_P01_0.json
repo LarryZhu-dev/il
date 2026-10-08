@@ -1,0 +1,79 @@
+{
+  "evidence_id": "ev_P01_0",
+  "task_id": "P01",
+  "phase": "native_probe",
+  "revision": 0,
+  "git_commit": "e858dd1e5c638cc637987ee0795647aa831444f8",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:6980c3445a03b1d332a42f91644ba7e8fa9946e83512ef25fc16dd798bc589c0",
+  "runtime_hash": "sha256:d493b7b11cc481d8ca45d241af80ca5d922dcc9254e65037b4e877d271939bff",
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "build-native-probe",
+      "argv_hash": "sha256:3cb6e424cd15e491f7a36e7cf7900540c1f3d3f5102d3f63431703a79f2146fa",
+      "exit_code": 0
+    },
+    {
+      "id": "llvm-verify",
+      "argv_hash": "sha256:4d70f345fb890fff912c64a6fc729cccb68aa28040811b6a09d105320a4f2f59",
+      "exit_code": 0
+    },
+    {
+      "id": "llvm-object",
+      "argv_hash": "sha256:da733826d9a8697f634bb94407775eebbbf39ded71ec1c153c9d2e8cbdfb9831",
+      "exit_code": 0
+    },
+    {
+      "id": "native-link",
+      "argv_hash": "sha256:0fda3bd1cebf9738e953bdfc52ffd45c8325688c101fac6904e692267ea88050",
+      "exit_code": 0
+    },
+    {
+      "id": "clean-environment-execution",
+      "argv_hash": "sha256:cb48019e55e9779aaf7445f41bf60787d4e12dfc00144c05d8d269d611446696",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/probe.ll",
+      "sha256": "sha256:50f77188130f457f64a52abe836142a7172b1309ad18ff1a4b2ed0f8a04f0305"
+    },
+    {
+      "path": "build/probe.o",
+      "sha256": "sha256:eb4d25b69abdec2467590c0fb381b2136054e0194a7ca85bcbf010a2579b81a2"
+    },
+    {
+      "path": "build/probe.elf",
+      "sha256": "sha256:90fda5810b1db5cfcffa087e2d945cf976a2a99eff7da0951353ba634ef0f3c7"
+    },
+    {
+      "path": "target/debug/il-native-probe",
+      "sha256": "sha256:6980c3445a03b1d332a42f91644ba7e8fa9946e83512ef25fc16dd798bc589c0"
+    },
+    {
+      "path": "target/debug/libil_probe_runtime.a",
+      "sha256": "sha256:d493b7b11cc481d8ca45d241af80ca5d922dcc9254e65037b4e877d271939bff"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "clean-environment-execution",
+      "passed": true,
+      "count": 4
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified."
+  ]
+}
