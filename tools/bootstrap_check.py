@@ -34,6 +34,10 @@ class ValidationError(ValueError):
     pass
 
 
+class UnsupportedSchema(ValidationError):
+    pass
+
+
 def read_json(path: Path):
     def no_duplicate_keys(pairs):
         result = {}
@@ -75,7 +79,7 @@ def validate_instance(value, schema, schema_path: Path, location="$", root_schem
         raise ValidationError(f"{location}: schema must be object or boolean")
     unknown = set(schema) - ANNOTATIONS - ASSERTIONS
     if unknown:
-        raise ValidationError(f"{location}: unsupported schema keywords {sorted(unknown)}")
+        raise UnsupportedSchema(f"{location}: unsupported schema keywords {sorted(unknown)}")
     root_schema = schema if root_schema is None else root_schema
 
     def child(item, rule, at=location):
@@ -85,6 +89,8 @@ def validate_instance(value, schema, schema_path: Path, location="$", root_schem
         try:
             child(item, rule)
             return True
+        except UnsupportedSchema:
+            raise
         except ValidationError:
             return False
 
@@ -226,6 +232,10 @@ def check_evidence(root: Path, record, state, lock):
     for artifact in record["artifacts"]:
         if digest(safe_artifact(root, artifact["path"])) != artifact["sha256"]:
             raise ValidationError("evidence artifact hash differs: " + artifact["path"])
+    artifact_hashes = {artifact["sha256"] for artifact in record["artifacts"]}
+    for component in ("graph", "compiler", "runtime"):
+        if record[component + "_hash"] is not None and record[component + "_hash"] not in artifact_hashes:
+            raise ValidationError("evidence lacks a verified artifact for " + component)
     committed = json.loads(git(root, "show", record["git_commit"] + ":repository_state.json"))
     if committed["head_revision"] != record["revision"]:
         raise ValidationError("evidence revision differs from its Git commit")
