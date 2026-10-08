@@ -247,12 +247,15 @@ class GraphCliAcceptance(unittest.TestCase):
         self.assert_code(rejected, "E_SCHEMA_INVALID")
         self.assertEqual(self.head_revision(), 0)
 
-    def test_unavailable_semantic_check_is_not_silently_skipped(self):
+    def test_full_semantic_checks_are_available_and_unknown_checks_rejected(self):
         request = transaction()
-        request["required_checks"].append("types")
+        request["required_checks"] = ["schema", "names", "types", "ownership", "effects", "capabilities", "contracts"]
+        self.invoke("transact", request)
+        request = transaction(1, "second")
+        request["required_checks"] = ["schema", "disable_types"]
         rejected = self.invoke("transact", request, False)
-        self.assert_code(rejected, "E_UNSUPPORTED_FEATURE")
-        self.assertEqual(self.head_revision(), 0)
+        self.assert_code(rejected, "E_SCHEMA_INVALID")
+        self.assertEqual(self.head_revision(), 1)
 
     def test_empty_checks_cannot_bypass_reference_validation(self):
         request = transaction()

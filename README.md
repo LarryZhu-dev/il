@@ -4,13 +4,20 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-P00 (repository bootstrap) is verified, including a successful
-[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37760959629).
-P01 and P02 are under development. This verifies the repository, locked toolchain,
-schemas and evidence infrastructure; the compiler, runtime, HTTP package,
-extensions and self-hosting are not yet verified. `repository_state.json`, task
+P00–P02 are verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37763840674).
+P03 adds the shared static checker, annotated text frontend and semantic graph
+transactions. The full compiler, runtime, HTTP package, extensions and self-hosting
+are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
 No release is available until all of its gates pass.
+
+The bootstrap CLI accepts JSON on standard input. `schema-check` previews `.il`
+text as a checked graph and canonical annotated source; `transact` with an
+`import_text` operation and `program` scope publishes it atomically. `validate`
+always runs all applicable checks, even when the requested check list is empty.
+See RFC 0005 for the text syntax and RFC 0008 for transaction examples. Text and
+graph callers share the same checker and cannot declare their own host authority.
 
 ## Normative inputs
 
