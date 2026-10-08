@@ -1,5 +1,6 @@
 use il_frontend::{format, parse};
 use il_graph::*;
+mod structured;
 
 const HELLO: &str = include_str!("../../examples/core/hello.il");
 

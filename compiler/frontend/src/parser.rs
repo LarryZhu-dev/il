@@ -3,16 +3,18 @@ use il_graph::*;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
+mod surface;
+mod lowering;
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
 pub fn parse(source: &str, revision: u64) -> std::result::Result<Graph, Vec<Diagnostic>> {
     let tokens = lex(source).map_err(|(offset, message)| vec![diagnostic(revision, "E_SCHEMA_INVALID", offset, &message)])?;
     let mut parser = Parser { tokens, at: 0, revision, counter: 0, graph: Graph::empty(),
-        names: BTreeMap::new(), sugar: BTreeSet::new(), depth: 0 };
+        names: BTreeMap::new(), pending: vec![], depth: 0 };
     parser.graph.revision = revision;
     parser.document().map_err(|error| vec![error])?;
-    parser.resolve();
+    parser.finish().map_err(|error| vec![error])?;
     Ok(parser.graph)
 }
 
@@ -24,8 +26,10 @@ fn diagnostic(revision: u64, code: &str, offset: usize, message: &str) -> Diagno
 
 struct Parser {
     tokens: Vec<Token>, at: usize, revision: u64, counter: u64,
-    graph: Graph, names: BTreeMap<String, String>, sugar: BTreeSet<String>, depth: usize,
+    graph: Graph, names: BTreeMap<String, String>, pending: Vec<Pending>, depth: usize,
 }
+
+struct Pending { function: usize, start: usize, end: usize, scope: String }
 
 impl Parser {
     fn token(&self) -> &Token { &self.tokens[self.at] }
@@ -256,96 +260,32 @@ impl Parser {
     }
     fn function(&mut self, annotation: Option<String>, scope: &str) -> Result<String> {
         let name = self.name()?; let id = self.id(annotation, scope);
-        let effective_scope = if scope == "global" {
+        let scope = if scope == "global" {
             self.graph.modules.iter().find(|module| module.declarations.contains(&id)).map(|module| module.entity_id.clone()).unwrap_or_else(|| scope.into())
         } else { scope.into() };
-        let scope = effective_scope.as_str();
-        self.register(scope, &name, &id)?;
-        let parameters = self.parameters(&id, scope)?;
-        self.expect("->")?; let result = self.type_name(scope)?;
+        self.register(&scope, &name, &id)?;
+        let parameters = self.parameters(&id, &scope)?;
+        self.expect("->")?; let result = self.type_name(&scope)?;
         let mut effects = vec![]; let mut capabilities = vec![]; let mut contracts = vec![];
         if self.eat("effects") { effects = self.effects()?; }
         if self.eat("capabilities") { capabilities = self.list()?; }
         if self.eat("contracts") { contracts = self.list()?; }
-        self.expect("{")?; self.enter()?;
-        let mut blocks = vec![]; let mut block_names = BTreeMap::new();
-        while !self.eat("}") {
-            let annotation = self.annotation()?;
-            if self.eat("block") {
-                let name = self.name()?; let block_id = self.id(annotation, &id);
-                if block_names.insert(name, block_id.clone()).is_some() { return Err(self.error("E_DUPLICATE_NAME", "duplicate block name")); }
-                let args = if self.is("(") { self.parameters(&block_id, scope)? } else { vec![] };
-                self.expect("{")?;
-                let symbols = parameters.iter().chain(&args).map(|p| (p.name.clone(), ValueDef { entity_id: p.entity_id.clone(), type_ref: p.type_ref.clone() })).collect();
-                let block = self.statements(&id, block_id, args.into_iter().map(|p| ValueDef { entity_id: p.entity_id, type_ref: p.type_ref }).collect(), scope, &result, symbols, None)?;
-                blocks.push(block);
-            } else {
-                if !blocks.is_empty() { return Err(self.error("E_SCHEMA_INVALID", "cannot mix implicit statements and explicit blocks")); }
-                let block_id = self.allocate(&id);
-                let symbols = parameters.iter().map(|p| (p.name.clone(), ValueDef { entity_id: p.entity_id.clone(), type_ref: p.type_ref.clone() })).collect();
-                let block = self.statements(&id, block_id, vec![], scope, &result, symbols, annotation)?;
-                blocks.push(block);
-                break;
-            }
+        self.expect("{")?;
+        let start = self.at; let mut braces = 1;
+        while braces > 0 {
+            if self.token().kind == Kind::End { return Err(self.error("E_SCHEMA_INVALID", "unterminated function body")); }
+            if self.is("{") { braces += 1; }
+            if self.is("}") { braces -= 1; }
+            if braces > 32 { return Err(self.error("E_RESOURCE_LIMIT", "function nesting exceeds 32")); }
+            self.at += 1;
         }
-        self.depth -= 1;
-        for block in &mut blocks {
-            if !self.sugar.contains(&block.terminator.entity_id) { continue; }
-            match &mut block.terminator.attributes {
-                Attributes::Branch { target } => if let Some(id) = block_names.get(target) { *target = id.clone(); },
-                Attributes::CondBranch { then_block, else_block, .. } => { if let Some(id) = block_names.get(then_block) { *then_block = id.clone(); } if let Some(id) = block_names.get(else_block) { *else_block = id.clone(); } },
-                _ => {}
-            }
-        }
-        self.graph.functions.push(Function { entity_id: id.clone(), name, parameters, result, effects, capabilities, blocks, contracts });
+        let index = self.graph.functions.len();
+        self.graph.functions.push(Function { entity_id: id.clone(), name, parameters, result, effects, capabilities, contracts, blocks: vec![] });
+        self.pending.push(Pending { function: index, start, end: self.at - 1, scope });
         Ok(id)
     }
-    fn statements(&mut self, function: &str, block: String, arguments: Vec<ValueDef>, scope: &str, result_type: &str,
-                  mut symbols: BTreeMap<String, ValueDef>, first_annotation: Option<String>) -> Result<Block> {
-        let mut operations = vec![]; let mut terminator = None; let mut first = Some(first_annotation);
-        while !self.eat("}") {
-            if terminator.is_some() { return Err(self.error("E_SCHEMA_INVALID", "statement after terminator")); }
-            let annotation = match first.take() { Some(Some(id)) => Some(id), _ => self.annotation()? };
-            let id = self.id(annotation, &block);
-            if self.eat("op") {
-                let operation = self.core_operation(id)?;
-                for output in &operation.outputs { symbols.insert(output.entity_id.clone(), output.clone()); }
-                if operation.opcode.is_terminator() { terminator = Some(operation); } else { operations.push(operation); }
-            } else if self.eat("let") {
-                let output_annotation = self.annotation()?; let name = self.name()?; self.expect(":")?;
-                let ty = self.type_name(scope)?; self.expect("=")?;
-                let output = ValueDef { entity_id: output_annotation.unwrap_or_else(|| format!("{id}.value")), type_ref: ty.clone() };
-                let expression = self.expression(scope, &symbols, &mut operations, &ty, 0)?;
-                self.expect(";")?;
-                let mut operation = expression.finish(id.clone(), output.clone());
-                self.sugar.insert(id); operation.outputs = vec![output.clone()]; operations.push(operation);
-                if symbols.insert(name, output).is_some() { return Err(self.error("E_DUPLICATE_NAME", "duplicate local name")); }
-            } else if self.eat("return") {
-                let mut inputs = vec![];
-                if !self.is(";") {
-                    let expression = self.expression(scope, &symbols, &mut operations, result_type, 0)?;
-                    inputs.push(self.materialize(expression, &mut operations, &id, result_type));
-                }
-                self.expect(";")?;
-                self.sugar.insert(id.clone());
-                terminator = Some(op(id, Opcode::Return, inputs, vec![], Attributes::Empty {}));
-            } else if self.eat("branch") {
-                let target = self.name()?; let inputs = self.arguments(&symbols)?; self.expect(";")?;
-                self.sugar.insert(id.clone());
-                terminator = Some(op(id, Opcode::Branch, inputs, vec![], Attributes::Branch { target }));
-            } else if self.eat("cond_branch") {
-                let condition = self.value_reference(&symbols)?; self.expect(",")?;
-                let then_block = self.name()?; let then_arguments = self.arguments(&symbols)?; self.expect(",")?;
-                let else_block = self.name()?; let else_arguments = self.arguments(&symbols)?; self.expect(";")?;
-                self.sugar.insert(id.clone());
-                terminator = Some(op(id, Opcode::CondBranch, vec![condition], vec![], Attributes::CondBranch { then_block, else_block, then_arguments, else_arguments }));
-            } else { return Err(self.error("E_UNSUPPORTED_FEATURE", &format!("unsupported statement in function {function}; use an explicit core operation"))); }
-        }
-        let terminator = terminator.ok_or_else(|| self.error("E_MISSING_RETURN", "block requires an explicit terminator"))?;
-        Ok(Block { entity_id: block, arguments, operations, terminator })
-    }
     fn core_operation(&mut self, id: String) -> Result<Operation> {
-        let opcode: Opcode = self.enum_name()?;
+        let opcode = self.enum_name()?;
         self.expect("inputs")?; let inputs = self.list()?;
         self.expect("outputs")?; let outputs = self.value_list(&id)?;
         self.expect("attributes")?; let attributes = self.typed_json()?;
@@ -355,146 +295,48 @@ impl Parser {
         self.expect(";")?;
         Ok(Operation { entity_id: id, opcode, inputs, outputs, attributes, effects, consumes, produces })
     }
-    fn value_reference(&mut self, symbols: &BTreeMap<String, ValueDef>) -> Result<String> {
-        let name = self.name()?;
-        Ok(symbols.get(&name).map(|value| value.entity_id.clone()).unwrap_or(name))
+    fn resolve_name(&self, scope: &str, name: &str) -> String {
+        resolve_name(&self.graph, &self.names, scope, name)
     }
-    fn arguments(&mut self, symbols: &BTreeMap<String, ValueDef>) -> Result<Vec<String>> {
-        self.expect("(")?; let mut args = vec![];
-        if !self.eat(")") { loop { args.push(self.value_reference(symbols)?); if self.eat(")") { break; } self.expect(",")?; }}
-        Ok(args)
-    }
-    fn materialize(&mut self, expression: Expression, operations: &mut Vec<Operation>, owner: &str, expected: &str) -> String {
-        match expression {
-            Expression::Value(value) => value.entity_id,
-            expression => {
-                let id = self.allocate(owner); let output = ValueDef { entity_id: format!("{id}.value"), type_ref: expected.into() };
-                self.sugar.insert(id.clone()); operations.push(expression.finish(id, output.clone())); output.entity_id
-            }
-        }
-    }
-    fn expression(&mut self, scope: &str, symbols: &BTreeMap<String, ValueDef>, operations: &mut Vec<Operation>, expected: &str, precedence: u8) -> Result<Expression> {
-        self.enter()?;
-        let result = self.expression_inner(scope, symbols, operations, expected, precedence);
-        self.depth -= 1;
-        result
-    }
-    fn expression_inner(&mut self, scope: &str, symbols: &BTreeMap<String, ValueDef>, operations: &mut Vec<Operation>, expected: &str, precedence: u8) -> Result<Expression> {
-        let mut left = if self.eat("(") {
-            if self.eat(")") { Expression::Literal(Literal::Unit(())) }
-            else { let value = self.expression(scope, symbols, operations, expected, 0)?; self.expect(")")?; value }
-        } else if self.eat("!") || self.eat("not") {
-            let inner = self.expression(scope, symbols, operations, expected, 10)?;
-            let input = self.materialize(inner, operations, "il.expr", expected);
-            Expression::Operation(Opcode::Not, vec![input], Attributes::Empty {})
-        } else if self.eat("cast") {
-            self.expect("<")?; let target_type = self.type_name(scope)?; self.expect(">")?; self.expect("(")?;
-            let inner = self.expression(scope, symbols, operations, "I64", 0)?; self.expect(")")?;
-            let input = self.materialize(inner, operations, "il.expr", "I64");
-            Expression::Operation(Opcode::Cast, vec![input], Attributes::Cast { target_type })
-        } else if self.is("-") || matches!(self.token().kind, Kind::Number(_) | Kind::String(_)) || self.is("true") || self.is("false") {
-            let value = self.json()?;
-            let literal: Literal = serde_json::from_value(value).map_err(|error| self.error("E_SCHEMA_INVALID", &error.to_string()))?;
-            Expression::Literal(literal)
-        } else {
-            let name = self.name()?;
-            if self.eat("(") {
-                let mut inputs = vec![];
-                if !self.eat(")") { loop {
-                    let value = self.expression(scope, symbols, operations, "I64", 0)?;
-                    inputs.push(self.materialize(value, operations, "il.expr", "I64"));
-                    if self.eat(")") { break; } self.expect(",")?;
-                }}
-                Expression::Operation(Opcode::Call, inputs, Attributes::Call { callee: self.reference(scope, name) })
-            } else { Expression::Value(symbols.get(&name).cloned().unwrap_or(ValueDef { entity_id: name, type_ref: expected.into() })) }
-        };
-        loop {
-            let operator = match &self.token().kind { Kind::Symbol(value) => value.as_str(), _ => break };
-            let (level, opcode) = match operator {
-                "|" => (1, Opcode::BitOr), "^" => (2, Opcode::BitXor), "&" => (3, Opcode::BitAnd),
-                "==" => (4, Opcode::Eq), "!=" => (4, Opcode::Ne), "<" => (5, Opcode::Lt), "<=" => (5, Opcode::Le), ">" => (5, Opcode::Gt), ">=" => (5, Opcode::Ge),
-                "<<" => (6, Opcode::Shl), ">>" => (6, Opcode::Shr), "+" => (7, Opcode::Add), "-" => (7, Opcode::Sub),
-                "*" => (8, Opcode::Mul), "/" => (8, Opcode::Div), "%" => (8, Opcode::Rem), _ => break,
-            };
-            if level < precedence { break; }
-            self.at += 1;
-            let input_type = match &left { Expression::Value(value) => value.type_ref.clone(), _ if expected == "Bool" => "I64".into(), _ => expected.into() };
-            let right = self.expression(scope, symbols, operations, &input_type, level + 1)?;
-            let left_id = self.materialize(left, operations, "il.expr", &input_type);
-            let right_id = self.materialize(right, operations, "il.expr", &input_type);
-            left = Expression::Operation(opcode, vec![left_id, right_id], Attributes::Empty {});
-        }
-        Ok(left)
-    }
-    fn resolve(&mut self) {
-        let resolve = |name: &mut String| {
-            if let Some(reference) = name.strip_prefix('?') {
-                if let Some(id) = self.names.get(reference).or_else(|| reference.rsplit_once("::").and_then(|(_, name)| self.names.get(&format!("global::{name}")))) {
-                    *name = id.clone();
-                } else { *name = reference.rsplit_once("::").map(|(_, name)| name).unwrap_or(reference).into(); }
-            }
-        };
-        for ty in &mut self.graph.types {
-            for reference in ty.parameters.iter_mut().chain(ty.fields.iter_mut().map(|field| &mut field.type_ref)).chain(ty.variants.iter_mut().flat_map(|variant| variant.fields.iter_mut())) { resolve(reference); }
-        }
-        for function in &mut self.graph.functions {
-            resolve(&mut function.result);
-            for parameter in &mut function.parameters { resolve(&mut parameter.type_ref); }
-            for block in &mut function.blocks {
-                for argument in &mut block.arguments { resolve(&mut argument.type_ref); }
-                for operation in block.operations.iter_mut().chain(std::iter::once(&mut block.terminator)) {
-                    for output in operation.outputs.iter_mut().chain(&mut operation.produces) { resolve(&mut output.type_ref); }
-                    match &mut operation.attributes { Attributes::Call { callee } => resolve(callee), Attributes::Cast { target_type } => resolve(target_type), _ => {} }
-                }
-            }
-        }
+    fn finish(&mut self) -> Result<()> {
         let graph = self.graph.clone();
-        for function in &mut self.graph.functions {
-            for block in &mut function.blocks {
-                let mut values: BTreeMap<_, _> = function.parameters.iter().map(|p| (p.entity_id.clone(), p.type_ref.clone())).chain(block.arguments.iter().map(|v| (v.entity_id.clone(), v.type_ref.clone()))).collect();
-                for operation in block.operations.iter_mut().chain(std::iter::once(&mut block.terminator)) {
-                    if self.sugar.contains(&operation.entity_id) {
-                        if matches!(operation.opcode, Opcode::Call | Opcode::Move | Opcode::Return | Opcode::Branch | Opcode::CondBranch | Opcode::Switch) {
-                            operation.consumes = operation.inputs.iter().chain(operation.branch_arguments()).filter(|id| values.get(*id).is_some_and(|ty| owned(&graph, ty, &mut BTreeSet::new()))).cloned().collect();
-                            operation.consumes.sort(); operation.consumes.dedup();
-                        }
-                        operation.produces = operation.outputs.iter().filter(|value| owned(&graph, &value.type_ref, &mut BTreeSet::new())).cloned().collect();
-                        if operation.opcode == Opcode::Const && !operation.produces.is_empty() { operation.effects = vec![Effect::Alloc]; }
-                        if let Attributes::Call { callee } = &operation.attributes {
-                            if let Some(callee) = graph.functions.iter().find(|function| function.entity_id == *callee) { operation.effects = callee.effects.clone(); }
-                        }
-                    }
-                    for value in &operation.outputs { values.insert(value.entity_id.clone(), value.type_ref.clone()); }
-                }
+        for ty in &mut self.graph.types {
+            for reference in ty.parameters.iter_mut().chain(ty.fields.iter_mut().map(|field| &mut field.type_ref)).chain(ty.variants.iter_mut().flat_map(|variant| variant.fields.iter_mut())) {
+                *reference = resolve_name(&graph, &self.names, "global", reference);
             }
         }
+        for function in &mut self.graph.functions {
+            function.result = resolve_name(&graph, &self.names, "global", &function.result);
+            for parameter in &mut function.parameters { parameter.type_ref = resolve_name(&graph, &self.names, "global", &parameter.type_ref); }
+        }
+        let pending = std::mem::take(&mut self.pending);
+        let mut bodies = vec![];
+        for pending in &pending {
+            self.at = pending.start;
+            let function = self.graph.functions[pending.function].clone();
+            bodies.push(surface::body(self, pending.end, &pending.scope, &function.entity_id)?);
+        }
+        for (pending, body) in pending.into_iter().zip(bodies) {
+            let function = self.graph.functions[pending.function].clone();
+            let blocks = lowering::lower(&mut self.graph, &self.names, &pending.scope, &function, body)?;
+            self.graph.functions[pending.function].blocks = blocks;
+        }
+        Ok(())
     }
 }
 
-fn owned(graph: &Graph, name: &str, visited: &mut BTreeSet<String>) -> bool {
-    let mut pending = vec![name.to_owned()];
-    while let Some(name) = pending.pop() {
-        if matches!(name.as_str(), "String" | "Bytes") { return true; }
-        if !visited.insert(name.clone()) { continue; }
-        if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == name) {
-            if matches!(ty.kind, TypeKind::String | TypeKind::Bytes) || ty.layout == Layout::Opaque { return true; }
-            pending.extend(ty.parameters.iter().chain(ty.fields.iter().map(|field| &field.type_ref)).chain(ty.variants.iter().flat_map(|variant| &variant.fields)).cloned());
+fn resolve_name(graph: &Graph, names: &BTreeMap<String, String>, scope: &str, raw: &str) -> String {
+    let (scope, name) = if let Some(reference) = raw.strip_prefix('?') { reference.rsplit_once("::").unwrap_or((scope, reference)) } else { (scope, raw) };
+    if is_builtin_type(name) || graph.types.iter().any(|ty| ty.entity_id == name) || graph.functions.iter().any(|f| f.entity_id == name) { return name.into(); }
+    if let Some(id) = names.get(&format!("{scope}::{name}")) { return id.clone(); }
+    if let Some((module_name, member)) = name.rsplit_once('.') {
+        if let Some(module) = graph.modules.iter().find(|module| module.path == module_name || module.entity_id == module_name) {
+            if let Some(id) = names.get(&format!("{}::{member}", module.entity_id)) { return id.clone(); }
         }
     }
-    false
+    names.get(&format!("global::{name}")).cloned().unwrap_or_else(|| name.into())
 }
 
 fn op(entity_id: String, opcode: Opcode, inputs: Vec<String>, outputs: Vec<ValueDef>, attributes: Attributes) -> Operation {
     Operation { entity_id, opcode, inputs, outputs, attributes, effects: vec![], consumes: vec![], produces: vec![] }
-}
-
-enum Expression { Value(ValueDef), Literal(Literal), Operation(Opcode, Vec<String>, Attributes) }
-impl Expression {
-    fn finish(self, id: String, output: ValueDef) -> Operation {
-        match self {
-            Self::Value(value) => op(id, Opcode::Move, vec![value.entity_id], vec![output], Attributes::Empty {}),
-            Self::Literal(value) => op(id, Opcode::Const, vec![], vec![output], Attributes::Constant { value }),
-            Self::Operation(opcode, inputs, attributes) => op(id, opcode, inputs, vec![output], attributes),
-        }
-    }
 }
