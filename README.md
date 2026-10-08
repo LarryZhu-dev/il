@@ -4,9 +4,9 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-P00–P02 are verified, including a successful
-[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37763840674).
-P03 adds the shared static checker, annotated text frontend and semantic graph
+P00–P03 are verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37767371198).
+P03 includes the shared static checker, annotated text frontend and semantic graph
 transactions. The full compiler, runtime, HTTP package, extensions and self-hosting
 are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
@@ -18,6 +18,18 @@ text as a checked graph and canonical annotated source; `transact` with an
 always runs all applicable checks, even when the requested check list is empty.
 See RFC 0005 for the text syntax and RFC 0008 for transaction examples. Text and
 graph callers share the same checker and cannot declare their own host authority.
+
+On Windows with Docker Desktop, build the locked environment with
+`./tools/dev.ps1 image` and pass JSON requests through standard input:
+
+```powershell
+'{}' | ./tools/dev.ps1 il state
+```
+
+P04's `il test` executes a published graph through checked HIR and verified MIR
+with captured output and explicit step, call-depth, heap and output budgets.
+Its JSON interface is defined by `schema/tool.schema.json` and RFC 0013. A passing
+interpreter result does not claim native-code or operating-system runtime support.
 
 ## Normative inputs
 

@@ -15,7 +15,16 @@ switch ($Action) {
     'check' { $containerArguments += @('python3', 'tools/ci/run.py') }
     'test' { $containerArguments += @('cargo', 'test', '--workspace', '--locked'); $containerArguments += $ToolArguments }
     'build' { $containerArguments += @('cargo', 'build', '--workspace', '--locked'); $containerArguments += $ToolArguments }
-    'il' { $containerArguments += @('cargo', 'run', '--locked', '--bin', 'il', '--'); $containerArguments += $ToolArguments }
+    'il' {
+        $containerArguments = @('run', '--rm', '-i') + $containerArguments[2..($containerArguments.Length - 1)]
+        $containerArguments += @('cargo', 'run', '--locked', '--bin', 'il', '--')
+        $containerArguments += $ToolArguments
+    }
 }
-docker @containerArguments
+if ($Action -eq 'il') {
+    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $input | docker @containerArguments
+} else {
+    docker @containerArguments
+}
 exit $LASTEXITCODE

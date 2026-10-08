@@ -27,9 +27,11 @@
   "outputs": [
     "compiler/hir",
     "compiler/mir",
-    "compiler/mir_verifier",
+    "compiler/mir/src/verify.rs",
     "runtime/interpreter",
-    "tests/semantic_snapshots"
+    "tests/mir",
+    "tests/interpreter",
+    "tests/execution_cli.py"
   ],
   "rollback_revision": 0,
   "status": "RUNNING"

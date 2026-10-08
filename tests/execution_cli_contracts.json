@@ -1,0 +1,2354 @@
+{
+  "contract_version": "1.0.0",
+  "cases": [
+    {
+      "id": "I8_max_identity",
+      "type": "I8",
+      "opcode": "add",
+      "operands": [
+        127,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 127
+      }
+    },
+    {
+      "id": "I8_min_identity",
+      "type": "I8",
+      "opcode": "sub",
+      "operands": [
+        -128,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -128
+      }
+    },
+    {
+      "id": "I8_add_overflow",
+      "type": "I8",
+      "opcode": "add",
+      "operands": [
+        127,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_sub_overflow",
+      "type": "I8",
+      "opcode": "sub",
+      "operands": [
+        -128,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_mul_overflow",
+      "type": "I8",
+      "opcode": "mul",
+      "operands": [
+        127,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_divide_zero",
+      "type": "I8",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I8_remainder_zero",
+      "type": "I8",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I8_shift_width",
+      "type": "I8",
+      "opcode": "shl",
+      "operands": [
+        1,
+        8
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I8_rshift_width",
+      "type": "I8",
+      "opcode": "shr",
+      "operands": [
+        1,
+        8
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I8_shift_overflow",
+      "type": "I8",
+      "opcode": "shl",
+      "operands": [
+        127,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_and_mask",
+      "type": "I8",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "I8_or_mask",
+      "type": "I8",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "I8_xor_mask",
+      "type": "I8",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "I8_less_than",
+      "type": "I8",
+      "opcode": "lt",
+      "operands": [
+        -128,
+        127
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I8_equal",
+      "type": "I8",
+      "opcode": "eq",
+      "operands": [
+        127,
+        127
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I8_divide_min_negative",
+      "type": "I8",
+      "opcode": "div",
+      "operands": [
+        -128,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_remainder_min_negative",
+      "type": "I8",
+      "opcode": "rem",
+      "operands": [
+        -128,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I8_negative_shift",
+      "type": "I8",
+      "opcode": "shl",
+      "operands": [
+        1,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I8_divide_truncates_zero",
+      "type": "I8",
+      "opcode": "div",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2
+      }
+    },
+    {
+      "id": "I8_remainder_sign",
+      "type": "I8",
+      "opcode": "rem",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I8_arithmetic_right",
+      "type": "I8",
+      "opcode": "shr",
+      "operands": [
+        -128,
+        7
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I8_negative_left_fits",
+      "type": "I8",
+      "opcode": "shl",
+      "operands": [
+        -1,
+        7
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -128
+      }
+    },
+    {
+      "id": "I8_complement",
+      "type": "I8",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I16_max_identity",
+      "type": "I16",
+      "opcode": "add",
+      "operands": [
+        32767,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 32767
+      }
+    },
+    {
+      "id": "I16_min_identity",
+      "type": "I16",
+      "opcode": "sub",
+      "operands": [
+        -32768,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -32768
+      }
+    },
+    {
+      "id": "I16_add_overflow",
+      "type": "I16",
+      "opcode": "add",
+      "operands": [
+        32767,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_sub_overflow",
+      "type": "I16",
+      "opcode": "sub",
+      "operands": [
+        -32768,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_mul_overflow",
+      "type": "I16",
+      "opcode": "mul",
+      "operands": [
+        32767,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_divide_zero",
+      "type": "I16",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I16_remainder_zero",
+      "type": "I16",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I16_shift_width",
+      "type": "I16",
+      "opcode": "shl",
+      "operands": [
+        1,
+        16
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I16_rshift_width",
+      "type": "I16",
+      "opcode": "shr",
+      "operands": [
+        1,
+        16
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I16_shift_overflow",
+      "type": "I16",
+      "opcode": "shl",
+      "operands": [
+        32767,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_and_mask",
+      "type": "I16",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "I16_or_mask",
+      "type": "I16",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "I16_xor_mask",
+      "type": "I16",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "I16_less_than",
+      "type": "I16",
+      "opcode": "lt",
+      "operands": [
+        -32768,
+        32767
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I16_equal",
+      "type": "I16",
+      "opcode": "eq",
+      "operands": [
+        32767,
+        32767
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I16_divide_min_negative",
+      "type": "I16",
+      "opcode": "div",
+      "operands": [
+        -32768,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_remainder_min_negative",
+      "type": "I16",
+      "opcode": "rem",
+      "operands": [
+        -32768,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I16_negative_shift",
+      "type": "I16",
+      "opcode": "shl",
+      "operands": [
+        1,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I16_divide_truncates_zero",
+      "type": "I16",
+      "opcode": "div",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2
+      }
+    },
+    {
+      "id": "I16_remainder_sign",
+      "type": "I16",
+      "opcode": "rem",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I16_arithmetic_right",
+      "type": "I16",
+      "opcode": "shr",
+      "operands": [
+        -32768,
+        15
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I16_negative_left_fits",
+      "type": "I16",
+      "opcode": "shl",
+      "operands": [
+        -1,
+        15
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -32768
+      }
+    },
+    {
+      "id": "I16_complement",
+      "type": "I16",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I32_max_identity",
+      "type": "I32",
+      "opcode": "add",
+      "operands": [
+        2147483647,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2147483647
+      }
+    },
+    {
+      "id": "I32_min_identity",
+      "type": "I32",
+      "opcode": "sub",
+      "operands": [
+        -2147483648,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2147483648
+      }
+    },
+    {
+      "id": "I32_add_overflow",
+      "type": "I32",
+      "opcode": "add",
+      "operands": [
+        2147483647,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_sub_overflow",
+      "type": "I32",
+      "opcode": "sub",
+      "operands": [
+        -2147483648,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_mul_overflow",
+      "type": "I32",
+      "opcode": "mul",
+      "operands": [
+        2147483647,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_divide_zero",
+      "type": "I32",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I32_remainder_zero",
+      "type": "I32",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I32_shift_width",
+      "type": "I32",
+      "opcode": "shl",
+      "operands": [
+        1,
+        32
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I32_rshift_width",
+      "type": "I32",
+      "opcode": "shr",
+      "operands": [
+        1,
+        32
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I32_shift_overflow",
+      "type": "I32",
+      "opcode": "shl",
+      "operands": [
+        2147483647,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_and_mask",
+      "type": "I32",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "I32_or_mask",
+      "type": "I32",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "I32_xor_mask",
+      "type": "I32",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "I32_less_than",
+      "type": "I32",
+      "opcode": "lt",
+      "operands": [
+        -2147483648,
+        2147483647
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I32_equal",
+      "type": "I32",
+      "opcode": "eq",
+      "operands": [
+        2147483647,
+        2147483647
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I32_divide_min_negative",
+      "type": "I32",
+      "opcode": "div",
+      "operands": [
+        -2147483648,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_remainder_min_negative",
+      "type": "I32",
+      "opcode": "rem",
+      "operands": [
+        -2147483648,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I32_negative_shift",
+      "type": "I32",
+      "opcode": "shl",
+      "operands": [
+        1,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I32_divide_truncates_zero",
+      "type": "I32",
+      "opcode": "div",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2
+      }
+    },
+    {
+      "id": "I32_remainder_sign",
+      "type": "I32",
+      "opcode": "rem",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I32_arithmetic_right",
+      "type": "I32",
+      "opcode": "shr",
+      "operands": [
+        -2147483648,
+        31
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I32_negative_left_fits",
+      "type": "I32",
+      "opcode": "shl",
+      "operands": [
+        -1,
+        31
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2147483648
+      }
+    },
+    {
+      "id": "I32_complement",
+      "type": "I32",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I64_max_identity",
+      "type": "I64",
+      "opcode": "add",
+      "operands": [
+        9223372036854775807,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 9223372036854775807
+      }
+    },
+    {
+      "id": "I64_min_identity",
+      "type": "I64",
+      "opcode": "sub",
+      "operands": [
+        -9223372036854775808,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -9223372036854775808
+      }
+    },
+    {
+      "id": "I64_add_overflow",
+      "type": "I64",
+      "opcode": "add",
+      "operands": [
+        9223372036854775807,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_sub_overflow",
+      "type": "I64",
+      "opcode": "sub",
+      "operands": [
+        -9223372036854775808,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_mul_overflow",
+      "type": "I64",
+      "opcode": "mul",
+      "operands": [
+        9223372036854775807,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_divide_zero",
+      "type": "I64",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I64_remainder_zero",
+      "type": "I64",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "I64_shift_width",
+      "type": "I64",
+      "opcode": "shl",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I64_rshift_width",
+      "type": "I64",
+      "opcode": "shr",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I64_shift_overflow",
+      "type": "I64",
+      "opcode": "shl",
+      "operands": [
+        9223372036854775807,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_and_mask",
+      "type": "I64",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "I64_or_mask",
+      "type": "I64",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "I64_xor_mask",
+      "type": "I64",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "I64_less_than",
+      "type": "I64",
+      "opcode": "lt",
+      "operands": [
+        -9223372036854775808,
+        9223372036854775807
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I64_equal",
+      "type": "I64",
+      "opcode": "eq",
+      "operands": [
+        9223372036854775807,
+        9223372036854775807
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "I64_divide_min_negative",
+      "type": "I64",
+      "opcode": "div",
+      "operands": [
+        -9223372036854775808,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_remainder_min_negative",
+      "type": "I64",
+      "opcode": "rem",
+      "operands": [
+        -9223372036854775808,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "I64_negative_shift",
+      "type": "I64",
+      "opcode": "shl",
+      "operands": [
+        1,
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "I64_divide_truncates_zero",
+      "type": "I64",
+      "opcode": "div",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -2
+      }
+    },
+    {
+      "id": "I64_remainder_sign",
+      "type": "I64",
+      "opcode": "rem",
+      "operands": [
+        -7,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I64_arithmetic_right",
+      "type": "I64",
+      "opcode": "shr",
+      "operands": [
+        -9223372036854775808,
+        63
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "I64_negative_left_fits",
+      "type": "I64",
+      "opcode": "shl",
+      "operands": [
+        -1,
+        63
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -9223372036854775808
+      }
+    },
+    {
+      "id": "I64_complement",
+      "type": "I64",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": -1
+      }
+    },
+    {
+      "id": "U8_max_identity",
+      "type": "U8",
+      "opcode": "add",
+      "operands": [
+        255,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 255
+      }
+    },
+    {
+      "id": "U8_min_identity",
+      "type": "U8",
+      "opcode": "sub",
+      "operands": [
+        0,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 0
+      }
+    },
+    {
+      "id": "U8_add_overflow",
+      "type": "U8",
+      "opcode": "add",
+      "operands": [
+        255,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U8_sub_overflow",
+      "type": "U8",
+      "opcode": "sub",
+      "operands": [
+        0,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U8_mul_overflow",
+      "type": "U8",
+      "opcode": "mul",
+      "operands": [
+        255,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U8_divide_zero",
+      "type": "U8",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U8_remainder_zero",
+      "type": "U8",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U8_shift_width",
+      "type": "U8",
+      "opcode": "shl",
+      "operands": [
+        1,
+        8
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U8_rshift_width",
+      "type": "U8",
+      "opcode": "shr",
+      "operands": [
+        1,
+        8
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U8_shift_overflow",
+      "type": "U8",
+      "opcode": "shl",
+      "operands": [
+        255,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U8_and_mask",
+      "type": "U8",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "U8_or_mask",
+      "type": "U8",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "U8_xor_mask",
+      "type": "U8",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "U8_less_than",
+      "type": "U8",
+      "opcode": "lt",
+      "operands": [
+        0,
+        255
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U8_equal",
+      "type": "U8",
+      "opcode": "eq",
+      "operands": [
+        255,
+        255
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U8_logical_right",
+      "type": "U8",
+      "opcode": "shr",
+      "operands": [
+        255,
+        7
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 1
+      }
+    },
+    {
+      "id": "U8_complement",
+      "type": "U8",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 255
+      }
+    },
+    {
+      "id": "U16_max_identity",
+      "type": "U16",
+      "opcode": "add",
+      "operands": [
+        65535,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 65535
+      }
+    },
+    {
+      "id": "U16_min_identity",
+      "type": "U16",
+      "opcode": "sub",
+      "operands": [
+        0,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 0
+      }
+    },
+    {
+      "id": "U16_add_overflow",
+      "type": "U16",
+      "opcode": "add",
+      "operands": [
+        65535,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U16_sub_overflow",
+      "type": "U16",
+      "opcode": "sub",
+      "operands": [
+        0,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U16_mul_overflow",
+      "type": "U16",
+      "opcode": "mul",
+      "operands": [
+        65535,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U16_divide_zero",
+      "type": "U16",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U16_remainder_zero",
+      "type": "U16",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U16_shift_width",
+      "type": "U16",
+      "opcode": "shl",
+      "operands": [
+        1,
+        16
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U16_rshift_width",
+      "type": "U16",
+      "opcode": "shr",
+      "operands": [
+        1,
+        16
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U16_shift_overflow",
+      "type": "U16",
+      "opcode": "shl",
+      "operands": [
+        65535,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U16_and_mask",
+      "type": "U16",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "U16_or_mask",
+      "type": "U16",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "U16_xor_mask",
+      "type": "U16",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "U16_less_than",
+      "type": "U16",
+      "opcode": "lt",
+      "operands": [
+        0,
+        65535
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U16_equal",
+      "type": "U16",
+      "opcode": "eq",
+      "operands": [
+        65535,
+        65535
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U16_logical_right",
+      "type": "U16",
+      "opcode": "shr",
+      "operands": [
+        65535,
+        15
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 1
+      }
+    },
+    {
+      "id": "U16_complement",
+      "type": "U16",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 65535
+      }
+    },
+    {
+      "id": "U32_max_identity",
+      "type": "U32",
+      "opcode": "add",
+      "operands": [
+        4294967295,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 4294967295
+      }
+    },
+    {
+      "id": "U32_min_identity",
+      "type": "U32",
+      "opcode": "sub",
+      "operands": [
+        0,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 0
+      }
+    },
+    {
+      "id": "U32_add_overflow",
+      "type": "U32",
+      "opcode": "add",
+      "operands": [
+        4294967295,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U32_sub_overflow",
+      "type": "U32",
+      "opcode": "sub",
+      "operands": [
+        0,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U32_mul_overflow",
+      "type": "U32",
+      "opcode": "mul",
+      "operands": [
+        4294967295,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U32_divide_zero",
+      "type": "U32",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U32_remainder_zero",
+      "type": "U32",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U32_shift_width",
+      "type": "U32",
+      "opcode": "shl",
+      "operands": [
+        1,
+        32
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U32_rshift_width",
+      "type": "U32",
+      "opcode": "shr",
+      "operands": [
+        1,
+        32
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U32_shift_overflow",
+      "type": "U32",
+      "opcode": "shl",
+      "operands": [
+        4294967295,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U32_and_mask",
+      "type": "U32",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "U32_or_mask",
+      "type": "U32",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "U32_xor_mask",
+      "type": "U32",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "U32_less_than",
+      "type": "U32",
+      "opcode": "lt",
+      "operands": [
+        0,
+        4294967295
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U32_equal",
+      "type": "U32",
+      "opcode": "eq",
+      "operands": [
+        4294967295,
+        4294967295
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U32_logical_right",
+      "type": "U32",
+      "opcode": "shr",
+      "operands": [
+        4294967295,
+        31
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 1
+      }
+    },
+    {
+      "id": "U32_complement",
+      "type": "U32",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 4294967295
+      }
+    },
+    {
+      "id": "U64_max_identity",
+      "type": "U64",
+      "opcode": "add",
+      "operands": [
+        18446744073709551615,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 18446744073709551615
+      }
+    },
+    {
+      "id": "U64_min_identity",
+      "type": "U64",
+      "opcode": "sub",
+      "operands": [
+        0,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 0
+      }
+    },
+    {
+      "id": "U64_add_overflow",
+      "type": "U64",
+      "opcode": "add",
+      "operands": [
+        18446744073709551615,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U64_sub_overflow",
+      "type": "U64",
+      "opcode": "sub",
+      "operands": [
+        0,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U64_mul_overflow",
+      "type": "U64",
+      "opcode": "mul",
+      "operands": [
+        18446744073709551615,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U64_divide_zero",
+      "type": "U64",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U64_remainder_zero",
+      "type": "U64",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "U64_shift_width",
+      "type": "U64",
+      "opcode": "shl",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U64_rshift_width",
+      "type": "U64",
+      "opcode": "shr",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "U64_shift_overflow",
+      "type": "U64",
+      "opcode": "shl",
+      "operands": [
+        18446744073709551615,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "U64_and_mask",
+      "type": "U64",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "U64_or_mask",
+      "type": "U64",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "U64_xor_mask",
+      "type": "U64",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "U64_less_than",
+      "type": "U64",
+      "opcode": "lt",
+      "operands": [
+        0,
+        18446744073709551615
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U64_equal",
+      "type": "U64",
+      "opcode": "eq",
+      "operands": [
+        18446744073709551615,
+        18446744073709551615
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "U64_logical_right",
+      "type": "U64",
+      "opcode": "shr",
+      "operands": [
+        18446744073709551615,
+        63
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 1
+      }
+    },
+    {
+      "id": "U64_complement",
+      "type": "U64",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 18446744073709551615
+      }
+    },
+    {
+      "id": "Usize_max_identity",
+      "type": "Usize",
+      "opcode": "add",
+      "operands": [
+        18446744073709551615,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 18446744073709551615
+      }
+    },
+    {
+      "id": "Usize_min_identity",
+      "type": "Usize",
+      "opcode": "sub",
+      "operands": [
+        0,
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 0
+      }
+    },
+    {
+      "id": "Usize_add_overflow",
+      "type": "Usize",
+      "opcode": "add",
+      "operands": [
+        18446744073709551615,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "Usize_sub_overflow",
+      "type": "Usize",
+      "opcode": "sub",
+      "operands": [
+        0,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "Usize_mul_overflow",
+      "type": "Usize",
+      "opcode": "mul",
+      "operands": [
+        18446744073709551615,
+        2
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "Usize_divide_zero",
+      "type": "Usize",
+      "opcode": "div",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "Usize_remainder_zero",
+      "type": "Usize",
+      "opcode": "rem",
+      "operands": [
+        1,
+        0
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_DIVIDE_BY_ZERO"
+      }
+    },
+    {
+      "id": "Usize_shift_width",
+      "type": "Usize",
+      "opcode": "shl",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "Usize_rshift_width",
+      "type": "Usize",
+      "opcode": "shr",
+      "operands": [
+        1,
+        64
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INVALID_SHIFT"
+      }
+    },
+    {
+      "id": "Usize_shift_overflow",
+      "type": "Usize",
+      "opcode": "shl",
+      "operands": [
+        18446744073709551615,
+        1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      }
+    },
+    {
+      "id": "Usize_and_mask",
+      "type": "Usize",
+      "opcode": "bit_and",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 2
+      }
+    },
+    {
+      "id": "Usize_or_mask",
+      "type": "Usize",
+      "opcode": "bit_or",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 7
+      }
+    },
+    {
+      "id": "Usize_xor_mask",
+      "type": "Usize",
+      "opcode": "bit_xor",
+      "operands": [
+        6,
+        3
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 5
+      }
+    },
+    {
+      "id": "Usize_less_than",
+      "type": "Usize",
+      "opcode": "lt",
+      "operands": [
+        0,
+        18446744073709551615
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "Usize_equal",
+      "type": "Usize",
+      "opcode": "eq",
+      "operands": [
+        18446744073709551615,
+        18446744073709551615
+      ],
+      "expected": {
+        "status": "returned",
+        "value": true
+      },
+      "result_type": "Bool"
+    },
+    {
+      "id": "Usize_logical_right",
+      "type": "Usize",
+      "opcode": "shr",
+      "operands": [
+        18446744073709551615,
+        63
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 1
+      }
+    },
+    {
+      "id": "Usize_complement",
+      "type": "Usize",
+      "opcode": "not",
+      "operands": [
+        0
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 18446744073709551615
+      }
+    },
+    {
+      "id": "U64_cast_to_signed_overflow",
+      "type": "U64",
+      "opcode": "cast",
+      "operands": [
+        18446744073709551615
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      },
+      "result_type": "I64"
+    },
+    {
+      "id": "I64_negative_to_unsigned",
+      "type": "I64",
+      "opcode": "cast",
+      "operands": [
+        -1
+      ],
+      "expected": {
+        "status": "trapped",
+        "code": "E_INTEGER_OVERFLOW"
+      },
+      "result_type": "U64"
+    },
+    {
+      "id": "U8_widen_to_signed",
+      "type": "U8",
+      "opcode": "cast",
+      "operands": [
+        255
+      ],
+      "expected": {
+        "status": "returned",
+        "value": 255
+      },
+      "result_type": "I16"
+    }
+  ]
+}

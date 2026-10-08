@@ -25,12 +25,13 @@
     "memory_bytes": 8589934592
   },
   "outputs": [
-    "compiler/schema_checker",
-    "compiler/name_resolver",
-    "compiler/type_checker",
-    "compiler/effect_checker",
-    "compiler/ownership_checker",
-    "compiler/diagnostics"
+    "compiler/checker",
+    "compiler/frontend",
+    "tools/il",
+    "tests/semantics",
+    "tests/frontend",
+    "tests/semantic_cli.py",
+    "tests/text_cli.py"
   ],
   "rollback_revision": 0,
   "status": "VERIFIED"

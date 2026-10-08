@@ -25,7 +25,7 @@ DEPENDENCIES = {
 }
 DIRECTORIES = "spec rfc adr schema compiler runtime packages tools tests examples eval build release".split()
 SPEC_FILES = "language types memory effects abi http errors versioning".split()
-SCHEMA_FILES = "diagnostic evidence task repository_state".split()
+SCHEMA_FILES = "diagnostic evidence task repository_state program_graph transaction tool execution mir".split()
 HASH = re.compile(r"^sha256:[0-9a-f]{64}$")
 ANNOTATIONS = {"$schema", "$id", "$defs", "$comment", "title", "description", "default", "examples", "deprecated", "readOnly", "writeOnly"}
 ASSERTIONS = {"$ref", "type", "const", "enum", "allOf", "anyOf", "oneOf", "not", "if", "then", "else", "properties", "required", "additionalProperties", "patternProperties", "propertyNames", "dependentRequired", "items", "prefixItems", "contains", "minContains", "maxContains", "minItems", "maxItems", "uniqueItems", "minLength", "maxLength", "pattern", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minProperties", "maxProperties"}
