@@ -19,7 +19,11 @@ fabricated. This is an explicit P00-only exception to the original evidence
 requirement for an existing product compiler hash. `graph_hash` hashes the real
 canonical empty revision-0 graph at `examples/bootstrap/graph.json`. Validation commands,
 their actual exits, the schema checks and toolchain lock hash remain mandatory.
-P01 records the actual probe compiler and runtime artifact hashes; subsequent
+P01 records the actual probe compiler and runtime artifact hashes. P02 verifies
+structural graph tools before a semantic compiler exists: its `compiler_hash`
+records the real graph-tool executable and the applicability record identifies
+that artifact as the structural bootstrap tool, not a working language compiler.
+Its `runtime_hash` is null because it exercises no language runtime. Subsequent
 stages record the product artifacts they verify. Earlier evidence stays immutable.
 
 Rust 1.90.0 and LLVM 14.0.6 are the baseline. P00 target verification concerns the

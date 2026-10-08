@@ -4,17 +4,19 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-This repository is under initial development. The documents below describe the
-intended language, not a claim that the compiler, runtime, HTTP package, extensions,
-or self-hosting already work. `repository_state.json`, task records and successful
-machine-readable evidence determine which milestones are verified. No release is
-available until all of its gates pass.
+P00 (repository bootstrap) is verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37760959629).
+P01 and P02 are under development. This verifies the repository, locked toolchain,
+schemas and evidence infrastructure; the compiler, runtime, HTTP package,
+extensions and self-hosting are not yet verified. `repository_state.json`, task
+records and successful machine-readable evidence determine milestone status.
+No release is available until all of its gates pass.
 
 ## Normative inputs
 
-- The original development document is retained in
-  [aip_ai_execution_spec_v1.md](aip_ai_execution_spec_v1.md) for provenance. Its
-  former product spelling is superseded by accepted RFC 0001; it is not an alias.
+- The development document is
+  [il_execution_spec_v1.md](il_execution_spec_v1.md). Its product spelling was
+  normalized by accepted RFC 0001; former spellings are not compatibility aliases.
 - [Language specifications](spec/language.yaml) and the other files in `spec/`
   make the locked rules machine-readable.
 - [Accepted bootstrap RFC](rfc/0001-bootstrap-and-identity.md) resolves initial

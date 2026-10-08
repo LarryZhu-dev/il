@@ -10,7 +10,7 @@ if ($Action -eq 'image') {
     docker build --tag il-toolchain:1.90.0-llvm14 --file (Join-Path $PSScriptRoot 'Dockerfile') $workspace
     exit $LASTEXITCODE
 }
-$containerArguments = @('run', '--rm', '--platform', 'linux/amd64', '--mount', "type=bind,source=$workspace,target=/workspace", '--env', 'CARGO_HOME=/workspace/.il/cargo', '--workdir', '/workspace', 'il-toolchain:1.90.0-llvm14')
+$containerArguments = @('run', '--rm', '--platform', 'linux/amd64', '--mount', "type=bind,source=$workspace,target=/workspace", '--mount', 'type=volume,source=il-cargo-registry,target=/usr/local/cargo/registry', '--workdir', '/workspace', 'il-toolchain:1.90.0-llvm14')
 switch ($Action) {
     'check' { $containerArguments += @('python3', 'tools/ci/run.py') }
     'test' { $containerArguments += @('cargo', 'test', '--workspace', '--locked'); $containerArguments += $ToolArguments }

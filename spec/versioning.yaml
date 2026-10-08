@@ -13,12 +13,23 @@ git_binding:
   verify: tracked_state_and_graph_match_bound_commit_blobs
   missing_or_mismatch: E_STATE_INCONSISTENT
   bootstrap_exception: explicit_P00_initialization_only
+application_store:
+  repository_state_domain: compiler_development_milestones_and_bootstrap_graph
+  graph_revision_domain: independent_application_store
+  repository_git_validation: required_before_CLI_dispatch
+  revision_provenance: [source_git_commit, source_tree_hash]
+  snapshot_path: '.il/revisions/<20-digit-revision>/'
+  manifest: [revision, parent_revision, parent_manifest_hash, graph_hash, provenance]
+  publication_pointer: .il/HEAD
+  pointer_fields: [revision, graph_hash, manifest_hash]
+  visible_revisions: verified_HEAD_ancestry_only
+  orphan_revision_reuse: forbidden
 transaction:
   concurrency: single_writer_lock
   stale_base: E_STALE_REVISION
   scope: exact_entity_identifiers
   commit: atomic_publication_of_complete_revision
-  interrupted_commit: recover_to_last_complete_journal_record
+  interrupted_commit: keep_complete_HEAD_and_ignore_unpublished_snapshots
   failed_candidate: retained_as_experiment_only
   failed_head_change: forbidden
   semantic_conflict_automerge: forbidden
@@ -37,6 +48,8 @@ verification:
   P00_compiler_hash: null
   P00_host_compiler_hash: real_SHA256_of_rustc
   P00_runtime_hash: null
+  P02_compiler_hash: real_SHA256_of_structural_graph_tool
+  P02_runtime_hash: null
   phase_applicability_record: required
 release:
   immutable: true
