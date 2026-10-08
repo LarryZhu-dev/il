@@ -7,11 +7,10 @@
   "runtime_version": null,
   "target": "x86_64-unknown-linux-gnu",
   "open_tasks": [
-    "P00"
+    "P01",
+    "P02"
   ],
   "blocked_tasks": [
-    "P01",
-    "P02",
     "P03",
     "P04",
     "P05",
