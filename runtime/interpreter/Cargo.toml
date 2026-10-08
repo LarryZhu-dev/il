@@ -1,0 +1,16 @@
+[package]
+name = "il-interpreter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+il-graph.workspace = true
+il-checker.workspace = true
+il-mir = { path = "../../compiler/mir" }
+serde.workspace = true
+serde_json.workspace = true
+
+[[test]]
+name = "interpreter_contracts"
+path = "../../tests/interpreter/contracts.rs"

@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/execution.schema.json",
+  "title": "Intelligent language captured MIR execution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "value",
+    "stdout",
+    "stderr",
+    "diagnostics",
+    "steps",
+    "peak_heap_bytes",
+    "live_allocations",
+    "lifecycle"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "returned",
+        "trapped",
+        "rejected"
+      ]
+    },
+    "value": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/value"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stdout": {
+      "$ref": "#/$defs/bytes"
+    },
+    "stderr": {
+      "$ref": "#/$defs/bytes"
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "diagnostic.schema.json"
+      }
+    },
+    "steps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "peak_heap_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "live_allocations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "lifecycle": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "entity_id",
+          "allocation_ids"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "allocate",
+              "move",
+              "borrow",
+              "end_borrow",
+              "drop",
+              "return"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "allocation_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "data"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unit"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "bool"
+                },
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "integer"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^(0|-?[1-9][0-9]*)$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "bytes"
+                },
+                "value": {
+                  "$ref": "#/$defs/bytes"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "record"
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/value"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "tuple"
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/value"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "variant"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "tag",
+                    "fields"
+                  ],
+                  "properties": {
+                    "tag": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/value"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_steps",
+        "max_call_depth",
+        "max_heap_bytes",
+        "max_output_bytes"
+      ],
+      "properties": {
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "max_call_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "max_heap_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        }
+      }
+    },
+    "bytes": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  }
+}

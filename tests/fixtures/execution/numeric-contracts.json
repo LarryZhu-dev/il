@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "cases": [
+    {"name":"u64-full-range-eq","type":"U64","opcode":"eq","a":"18446744073709551615","b":"18446744073709551615","answer":true},
+    {"name":"signed-ne","type":"I64","opcode":"ne","a":"-1","b":"0","answer":true},
+    {"name":"signed-lt","type":"I64","opcode":"lt","a":"-2","b":"-1","answer":true},
+    {"name":"signed-le","type":"I64","opcode":"le","a":"-1","b":"-1","answer":true},
+    {"name":"unsigned-gt","type":"U64","opcode":"gt","a":"18446744073709551615","b":"0","answer":true},
+    {"name":"unsigned-ge","type":"U64","opcode":"ge","a":"0","b":"0","answer":true},
+    {"name":"signed-positive-lt-negative","type":"I64","opcode":"lt","a":"0","b":"-1","answer":false}
+  ]
+}
