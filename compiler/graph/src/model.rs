@@ -7,6 +7,18 @@ use crate::{GRAPH_VERSION, TARGET};
 pub type EntityId = String;
 pub type TypeRef = String;
 
+fn optional_non_null<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(deserializer: D) -> Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
+}
+
+fn required_nullable<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(deserializer: D) -> Result<Option<T>, D::Error> {
+    Option::<T>::deserialize(deserializer)
+}
+
+fn has_duplicates<T: Ord>(values: &[T]) -> bool {
+    values.iter().collect::<BTreeSet<_>>().len() != values.len()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Graph {
@@ -53,7 +65,7 @@ pub struct TypeDef {
     pub kind: TypeKind,
     pub parameters: Vec<TypeRef>,
     pub layout: Layout,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "optional_non_null", skip_serializing_if = "Option::is_none")]
     pub integer: Option<IntegerLayout>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<Field>,
@@ -171,7 +183,12 @@ pub enum CapabilityKind { FileRead, FileWrite, Listen, Connect, SpawnProcess, Cl
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct Capability { pub entity_id: EntityId, pub kind: CapabilityKind, pub scope: Option<String> }
+pub struct Capability {
+    pub entity_id: EntityId,
+    pub kind: CapabilityKind,
+    #[serde(deserialize_with = "required_nullable")]
+    pub scope: Option<String>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -264,6 +281,7 @@ impl Graph {
         let mut diagnostics = vec![];
         let mut ids = BTreeSet::new();
         let mut add_id = |id: &str| {
+            if id == "program" { diagnostics.push(Diagnostic::error("E_SCHEMA_INVALID", Some(id), "program is the reserved whole-program scope", self.revision)); }
             if !valid_id(id) { diagnostics.push(Diagnostic::error("E_SCHEMA_INVALID", Some(id), "invalid stable logical entity identifier", self.revision)); }
             if !ids.insert(id.to_owned()) { diagnostics.push(Diagnostic::error("E_DUPLICATE_NAME", Some(id), "duplicate entity identifier", self.revision)); }
         };
@@ -335,6 +353,12 @@ impl Graph {
             }
         }
         for package in &self.packages {
+            if package.name.is_empty() || package.version.is_empty() {
+                error("E_SCHEMA_INVALID", &package.entity_id, "package name and version must be nonempty".into());
+            }
+            if has_duplicates(&package.modules) || has_duplicates(&package.effects) || has_duplicates(&package.capabilities) {
+                error("E_SCHEMA_INVALID", &package.entity_id, "package modules, effects and capabilities must contain unique entries".into());
+            }
             for reference in &package.modules { if !module_ids.contains(reference.as_str()) { error("E_NAME_NOT_FOUND", &package.entity_id, format!("dangling package module: {reference}")); } }
             for reference in &package.capabilities { if !capability_ids.contains(reference.as_str()) { error("E_NAME_NOT_FOUND", &package.entity_id, format!("dangling capability: {reference}")); } }
         }
@@ -350,6 +374,12 @@ impl Graph {
         }
         for function in &self.functions {
             if !valid_id(&function.name) { error("E_SCHEMA_INVALID", &function.entity_id, "invalid function name".into()); }
+            for parameter in &function.parameters {
+                if !valid_id(&parameter.name) { error("E_SCHEMA_INVALID", &parameter.entity_id, "invalid parameter name".into()); }
+            }
+            if has_duplicates(&function.effects) || has_duplicates(&function.capabilities) || has_duplicates(&function.contracts) {
+                error("E_SCHEMA_INVALID", &function.entity_id, "function effects, capabilities and contracts must contain unique entries".into());
+            }
             for reference in function.parameters.iter().map(|p| &p.type_ref).chain(std::iter::once(&function.result)) {
                 if !type_exists(reference) { error("E_NAME_NOT_FOUND", &function.entity_id, format!("dangling signature type: {reference}")); }
             }
@@ -363,10 +393,17 @@ impl Graph {
                 for (operation, is_final) in block.operations.iter().map(|op| (op, false)).chain(std::iter::once((&block.terminator, true))) {
                     if operation.opcode.is_terminator() != is_final { error("E_SCHEMA_INVALID", &operation.entity_id, "terminator must appear exactly once at block end".into()); }
                     if !operation.attributes_match() { error("E_SCHEMA_INVALID", &operation.entity_id, "opcode attributes do not match closed schema".into()); }
+                    if has_duplicates(&operation.effects) || has_duplicates(&operation.consumes) {
+                        error("E_SCHEMA_INVALID", &operation.entity_id, "operation effects and consumed values must contain unique entries".into());
+                    }
                     for reference in operation.inputs.iter().chain(&operation.consumes).chain(operation.branch_arguments()) {
                         if !values.contains(reference.as_str()) { error("E_NAME_NOT_FOUND", &operation.entity_id, format!("value used before local definition: {reference}")); }
                     }
-                    for consumed in &operation.consumes { if !operation.inputs.contains(consumed) { error("E_SCHEMA_INVALID", &operation.entity_id, "consumed value must be an input".into()); } }
+                    for consumed in &operation.consumes {
+                        if !operation.inputs.contains(consumed) && !operation.branch_arguments().contains(&consumed) {
+                            error("E_SCHEMA_INVALID", &operation.entity_id, "consumed value must be an input or an explicit branch argument".into());
+                        }
+                    }
                     for produced in &operation.produces { if !operation.outputs.contains(produced) { error("E_SCHEMA_INVALID", &operation.entity_id, "produced owned value must be an output".into()); } }
                     for target in operation.branch_targets() { if !blocks.contains(target.as_str()) { error("E_NAME_NOT_FOUND", &operation.entity_id, format!("dangling block target: {target}")); } }
                     match &operation.attributes {
@@ -385,18 +422,25 @@ impl Graph {
         drop(error);
         // MVP has no pointer-bearing user type; all cycles through value fields are illegal.
         let edges: BTreeMap<&str, Vec<&str>> = self.types.iter().map(|ty| (ty.entity_id.as_str(), ty.parameters.iter().map(String::as_str).chain(ty.fields.iter().map(|f| f.type_ref.as_str())).chain(ty.variants.iter().flat_map(|v| v.fields.iter().map(String::as_str))).filter(|name| type_ids.contains(name)).collect())).collect();
-        fn cycle<'a>(id: &'a str, edges: &BTreeMap<&'a str, Vec<&'a str>>, visiting: &mut BTreeSet<&'a str>, visited: &mut BTreeSet<&'a str>) -> bool {
-            if visiting.contains(id) { return true; }
-            if !visited.insert(id) { return false; }
-            visiting.insert(id);
-            let found = edges.get(id).is_some_and(|next| next.iter().any(|child| cycle(child, edges, visiting, visited)));
-            visiting.remove(id);
-            found
-        }
-        let mut visited = BTreeSet::new();
+        let mut colors = BTreeMap::<&str, u8>::new();
         for id in edges.keys() {
-            if cycle(id, &edges, &mut BTreeSet::new(), &mut visited) {
-                diagnostics.push(Diagnostic::error("E_SCHEMA_INVALID", Some(id), "type cycle without indirection", self.revision));
+            if colors.contains_key(id) { continue; }
+            let mut stack = vec![(*id, false)];
+            while let Some((node, leaving)) = stack.pop() {
+                if leaving { colors.insert(node, 2); continue; }
+                match colors.get(node) {
+                    Some(1) => {
+                        diagnostics.push(Diagnostic::error("E_SCHEMA_INVALID", Some(node), "type cycle without indirection", self.revision));
+                        continue;
+                    }
+                    Some(2) => continue,
+                    _ => {}
+                }
+                colors.insert(node, 1);
+                stack.push((node, true));
+                if let Some(children) = edges.get(node) {
+                    for child in children.iter().rev() { stack.push((child, false)); }
+                }
             }
         }
         diagnostics
@@ -405,6 +449,23 @@ impl Graph {
 
 impl Operation {
     pub fn attributes_match(&self) -> bool {
+        let fields_valid = match &self.attributes {
+            Attributes::Call { callee } => valid_id(callee),
+            Attributes::RuntimeCall { symbol } => !symbol.is_empty(),
+            Attributes::Cast { target_type } => !target_type.is_empty(),
+            Attributes::Record { type_id } => !type_id.is_empty(),
+            Attributes::Field { field } => valid_id(field),
+            Attributes::Variant { type_id, variant } => !type_id.is_empty() && valid_id(variant),
+            Attributes::Branch { target } => valid_id(target),
+            Attributes::CondBranch { then_block, else_block, then_arguments, else_arguments } =>
+                valid_id(then_block) && valid_id(else_block) && then_arguments.iter().chain(else_arguments).all(|id| valid_id(id)),
+            Attributes::Switch { cases, default, default_arguments } => valid_id(default)
+                && default_arguments.iter().all(|id| valid_id(id))
+                && cases.iter().all(|case| !case.tag.is_empty() && valid_id(&case.target) && case.arguments.iter().all(|id| valid_id(id))),
+            Attributes::Trap { code } => !code.is_empty(),
+            Attributes::Constant { .. } | Attributes::TupleGet { .. } | Attributes::Empty {} => true,
+        };
+        if !fields_valid { return false; }
         match (&self.opcode, &self.attributes) {
             (Opcode::Const, Attributes::Constant { .. }) | (Opcode::Call, Attributes::Call { .. }) |
             (Opcode::RuntimeCall, Attributes::RuntimeCall { .. }) | (Opcode::Cast, Attributes::Cast { .. }) |

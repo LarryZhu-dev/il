@@ -24,10 +24,12 @@ pub enum TransactionOperation {
     RenameModule { entity_id: EntityId, path: String },
     SetModuleVisibility { entity_id: EntityId, visibility: Visibility },
     SetModuleImports { entity_id: EntityId, imports: Vec<EntityId> },
+    SetModuleDeclarations { entity_id: EntityId, declarations: Vec<EntityId> },
     AddType { type_definition: TypeDef },
     AddFunction { function: Function },
     ReplaceFunction { function: Function },
     RemoveEntity { entity_id: EntityId },
+    ReplaceProgram { graph: Graph },
 }
 
 impl TransactionOperation {
@@ -36,16 +38,13 @@ impl TransactionOperation {
             Self::AddModule { module } => &module.entity_id,
             Self::RemoveModule { entity_id } | Self::RenameModule { entity_id, .. } |
             Self::SetModuleVisibility { entity_id, .. } | Self::SetModuleImports { entity_id, .. } |
-            Self::RemoveEntity { entity_id } => entity_id,
+            Self::SetModuleDeclarations { entity_id, .. } | Self::RemoveEntity { entity_id } => entity_id,
             Self::AddType { type_definition } => &type_definition.entity_id,
             Self::AddFunction { function } | Self::ReplaceFunction { function } => &function.entity_id,
+            Self::ReplaceProgram { .. } => "program",
         }
     }
 
-    pub fn semantic(&self) -> bool {
-        matches!(self, Self::AddType { .. } | Self::AddFunction { .. } | Self::ReplaceFunction { .. } | Self::RemoveEntity { .. }) ||
-            matches!(self, Self::AddModule { module } if !module.declarations.is_empty())
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -59,8 +58,9 @@ pub struct TransactionOutcome {
     pub candidate: Option<String>,
 }
 
-/// P02 is deliberately limited to operations fully checked without P03.
-pub fn apply_structural(base: &Graph, transaction: &Transaction) -> (Graph, Vec<Diagnostic>) {
+/// Apply edits to a private candidate. Publication additionally requires the caller's
+/// mandatory semantic checker; requested checks can never disable validation.
+pub fn apply_transaction(base: &Graph, transaction: &Transaction) -> (Graph, Vec<Diagnostic>) {
     let mut candidate = base.clone();
     let mut diagnostics = vec![];
     let mut reject = |code, entity: Option<&str>, reason: &str| diagnostics.push(Diagnostic::error(code, entity, reason, base.revision));
@@ -72,13 +72,12 @@ pub fn apply_structural(base: &Graph, transaction: &Transaction) -> (Graph, Vec<
     if transaction.required_checks.iter().enumerate().any(|(index, check)| transaction.required_checks[..index].contains(check)) {
         reject("E_SCHEMA_INVALID", None, "required checks must not contain duplicates");
     }
-    if transaction.required_checks.iter().any(|check| !matches!(check, Check::Schema | Check::Names | Check::References)) {
-        reject("E_UNSUPPORTED_FEATURE", None, "semantic checks require the VERIFIED P03 checker");
-    }
-    if base.has_semantics() { reject("E_UNSUPPORTED_FEATURE", None, "semantic graph requires the VERIFIED P03 checker"); }
     for operation in &transaction.operations {
         if !scopes.contains(&operation.entity_id().to_owned()) { reject("E_INVALID_SCOPE", Some(operation.entity_id()), "modified entity is outside the exact transaction scope"); }
-        if operation.semantic() { reject("E_UNSUPPORTED_FEATURE", Some(operation.entity_id()), "semantic edits require the VERIFIED P03 checker"); }
+        if let TransactionOperation::ReplaceProgram { graph } = operation {
+            if graph.revision != base.revision { reject("E_STALE_REVISION", Some("program"), "imported program must identify the transaction base revision"); }
+            if graph.capabilities != base.capabilities { reject("E_CAPABILITY_MISSING", Some("program"), "ordinary transactions cannot create or change host-injected capabilities"); }
+        }
     }
     drop(reject);
     if !diagnostics.is_empty() { return (candidate, diagnostics); }
@@ -103,7 +102,27 @@ pub fn apply_structural(base: &Graph, transaction: &Transaction) -> (Graph, Vec<
                 if let Some(index) = existing { candidate.modules[index].imports = imports.clone(); }
                 else { diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "module does not exist", base.revision)); }
             }
-            _ => unreachable!("semantic operations were rejected before applying edits"),
+            TransactionOperation::SetModuleDeclarations { declarations, .. } => {
+                if let Some(index) = existing { candidate.modules[index].declarations = declarations.clone(); }
+                else { diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "module does not exist", base.revision)); }
+            }
+            TransactionOperation::AddType { type_definition } => candidate.types.push(type_definition.clone()),
+            TransactionOperation::AddFunction { function } => candidate.functions.push(function.clone()),
+            TransactionOperation::ReplaceFunction { function } => {
+                if let Some(existing) = candidate.functions.iter_mut().find(|value| value.entity_id == function.entity_id) { *existing = function.clone(); }
+                else { diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "function to replace does not exist", base.revision)); }
+            }
+            TransactionOperation::RemoveEntity { entity_id } => {
+                let before = candidate.modules.len() + candidate.types.len() + candidate.functions.len() + candidate.contracts.len() + candidate.packages.len();
+                candidate.modules.retain(|v| v.entity_id != *entity_id);
+                candidate.types.retain(|v| v.entity_id != *entity_id);
+                candidate.functions.retain(|v| v.entity_id != *entity_id);
+                candidate.contracts.retain(|v| v.entity_id != *entity_id);
+                candidate.packages.retain(|v| v.entity_id != *entity_id);
+                let after = candidate.modules.len() + candidate.types.len() + candidate.functions.len() + candidate.contracts.len() + candidate.packages.len();
+                if before == after { diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "removable entity does not exist", base.revision)); }
+            }
+            TransactionOperation::ReplaceProgram { graph } => candidate = graph.clone(),
         }
     }
     diagnostics.extend(candidate.validate_structural());

@@ -225,6 +225,64 @@
               "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "entity_id",
+            "declarations"
+          ],
+          "properties": {
+            "op": {
+              "const": "set_module_declarations"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "declarations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "graph"
+          ],
+          "properties": {
+            "op": {
+              "const": "replace_program"
+            },
+            "graph": {
+              "$ref": "program_graph.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "source"
+          ],
+          "properties": {
+            "op": {
+              "const": "import_text"
+            },
+            "source": {
+              "type": "string"
+            }
+          }
         }
       ]
     }

@@ -181,15 +181,18 @@ impl Store {
         maximum.checked_add(1).ok_or_else(|| StoreError::new("E_RESOURCE_LIMIT", "revision counter exhausted"))
     }
 
-    pub fn transact(&self, transaction: &Transaction, provenance: Provenance) -> StoreResult<TransactionOutcome> { self.transact_with_fault(transaction, provenance, None) }
+    pub fn transact(&self, transaction: &Transaction, provenance: Provenance, checker: &dyn Fn(&Graph) -> Vec<Diagnostic>) -> StoreResult<TransactionOutcome> {
+        self.transact_with_fault(transaction, provenance, checker, None)
+    }
 
     /// Explicit fault-injection seam for durability tests; never accepted from user JSON.
-    pub fn transact_with_fault(&self, transaction: &Transaction, provenance: Provenance, fault: Option<FaultPoint>) -> StoreResult<TransactionOutcome> {
+    pub fn transact_with_fault(&self, transaction: &Transaction, provenance: Provenance, checker: &dyn Fn(&Graph) -> Vec<Diagnostic>, fault: Option<FaultPoint>) -> StoreResult<TransactionOutcome> {
         provenance.validate()?;
         let _lock = self.lock()?;
         let head = self.read_head()?;
         let base = self.load(head.revision)?;
-        let (mut candidate, diagnostics) = apply_structural(&base, transaction);
+        let (mut candidate, mut diagnostics) = apply_transaction(&base, transaction);
+        if diagnostics.is_empty() { diagnostics.extend(checker(&candidate)); }
         if !diagnostics.is_empty() {
             let candidate_path = self.retain_candidate(&candidate, transaction, &diagnostics)?;
             return Ok(TransactionOutcome { ok: false, base_revision: transaction.base_revision, result_revision: head.revision,
@@ -254,13 +257,17 @@ impl Store {
         Ok(head)
     }
 
-    pub fn restore(&self, revision: u64, reason: &str, provenance: Provenance) -> StoreResult<TransactionOutcome> {
+    pub fn restore(&self, revision: u64, reason: &str, provenance: Provenance, checker: &dyn Fn(&Graph) -> Vec<Diagnostic>) -> StoreResult<TransactionOutcome> {
         provenance.validate()?;
         if reason.trim().is_empty() { return Err(StoreError::new("E_SCHEMA_INVALID", "restore reason cannot be empty")); }
         let _lock = self.lock()?;
         let head = self.read_head()?;
         let mut graph = self.load(revision)?;
-        if graph.has_semantics() { return Err(StoreError::new("E_UNSUPPORTED_FEATURE", "semantic restoration requires VERIFIED P03 checker")); }
+        let diagnostics = checker(&graph);
+        if !diagnostics.is_empty() {
+            return Ok(TransactionOutcome { ok: false, base_revision: head.revision, result_revision: head.revision,
+                diagnostics, graph_hash: head.graph_hash, candidate: None });
+        }
         graph.revision = self.next_revision(head.revision)?;
         let restored = self.publish(&graph, Some(&head), provenance, format!("restore:{revision}:{reason}"), None)?;
         Ok(TransactionOutcome { ok: true, base_revision: head.revision, result_revision: restored.revision,
@@ -337,7 +344,17 @@ pub fn entity_references(graph: &Graph, id: &str) -> Vec<String> {
     if let Some(module) = graph.modules.iter().find(|module| module.entity_id == id) { return module.imports.iter().chain(&module.declarations).cloned().collect(); }
     if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == id) { return ty.parameters.iter().chain(ty.fields.iter().map(|f| &f.type_ref)).chain(ty.variants.iter().flat_map(|v| &v.fields)).filter(|name| !is_builtin_type(name)).cloned().collect(); }
     if let Some(function) = graph.functions.iter().find(|function| function.entity_id == id) {
-        return function.parameters.iter().map(|p| &p.type_ref).chain(std::iter::once(&function.result)).filter(|name| !is_builtin_type(name)).chain(&function.capabilities).chain(&function.contracts).cloned().collect();
+        let mut references: Vec<String> = function.parameters.iter().map(|p| &p.type_ref).chain(std::iter::once(&function.result)).filter(|name| !is_builtin_type(name)).chain(&function.capabilities).chain(&function.contracts).cloned().collect();
+        for block in &function.blocks {
+            for operation in block.operations.iter().chain(std::iter::once(&block.terminator)) {
+                if let Attributes::Call { callee } = &operation.attributes { references.push(callee.clone()); }
+                for value in &operation.outputs {
+                    if !is_builtin_type(&value.type_ref) { references.push(value.type_ref.clone()); }
+                }
+            }
+        }
+        references.sort(); references.dedup();
+        return references;
     }
     vec![]
 }
