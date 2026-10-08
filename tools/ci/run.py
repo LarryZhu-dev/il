@@ -42,9 +42,9 @@ def main() -> int:
             print(f"Recorded installed package versions in {log.relative_to(ROOT).as_posix()}", flush=True)
         else:
             print(process.stdout, end="", flush=True)
-        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "rust-tests"}
+        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "rust-tests", "native-probe"}
         test_count = 0
-        if name in {"bootstrap-pre-commit", "bootstrap-strict"}:
+        if name in {"bootstrap-pre-commit", "bootstrap-strict", "native-probe"}:
             test_count = 1
             try:
                 report = json.loads(process.stdout)
@@ -87,20 +87,21 @@ def main() -> int:
         run("toolchain-rust", ["rustc", "--version", "--verbose"])
         run("toolchain-llvm", ["llvm-config-14", "--version"])
         run("environment-packages", ["dpkg-query", "--show", "--showformat=${Package}\t${Version}\n"])
-        run("bootstrap-pre-commit", [sys.executable, "tools/bootstrap_check.py", "--pre-commit"])
         # The binding is an external log, deliberately reconstructed after checkout
         # rather than committed into the tree whose Git identity it describes.
         run("git-revision-binding", [sys.executable, "tools/bind_revision.py"])
-        run("bootstrap-strict", [sys.executable, "tools/bootstrap_check.py"])
         state = json.loads((ROOT / "repository_state.json").read_text(encoding="utf-8"))
         manifest = ROOT / "Cargo.toml"
         compiler_expected = state.get("compiler_version") is not None or any(
             (ROOT / "compiler").rglob("*.rs")
         )
+        native_probe_enabled = False
         for task_path in sorted((ROOT / "eval" / "tasks").glob("*.json")):
             task = json.loads(task_path.read_text(encoding="utf-8"))
             if task["task_id"] != "P00" and task["status"] in ("RUNNING", "VERIFIED"):
                 compiler_expected = True
+            if task["task_id"] == "P01" and task["status"] in ("RUNNING", "VERIFIED"):
+                native_probe_enabled = True
         if not manifest.exists() and compiler_expected:
             raise RuntimeError("compiler implementation exists but Cargo.toml is missing")
         if manifest.exists():
@@ -108,12 +109,19 @@ def main() -> int:
                 raise RuntimeError("locked Rust builds require checked-in Cargo.lock")
             run("rust-tests", ["cargo", "test", "--workspace", "--locked"])
             run("rust-release", ["cargo", "build", "--workspace", "--release", "--locked"])
+            if native_probe_enabled:
+                run("native-probe", [sys.executable, "tools/test_native_probe.py"])
         else:
             result["gates"].append({
                 "name": "rust-compiler",
                 "status": "NOT_APPLICABLE_P00",
                 "reason": "No Rust compiler implementation exists; this is bootstrap acceptance only.",
             })
+        # Build recorded artifacts first: a fresh checkout has no build directory.
+        # Evidence is verified against these real reconstructed bytes, never skipped.
+        run("bootstrap-pre-commit", [sys.executable, "tools/bootstrap_check.py", "--pre-commit"])
+        run("bootstrap-unit-tests", [sys.executable, "-m", "unittest", "discover", "-s", "tools/ci", "-p", "test_bootstrap.py", "-v"])
+        run("bootstrap-strict", [sys.executable, "tools/bootstrap_check.py"])
         result["status"] = "PASSED"
         return 0
     except (OSError, ValueError, subprocess.SubprocessError, RuntimeError) as error:
