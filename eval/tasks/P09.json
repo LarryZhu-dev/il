@@ -1,0 +1,36 @@
+{
+  "task_id": "P09",
+  "requires": [
+    "P07",
+    "P08"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p09"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "no_internal_http_imports_in_blackbox",
+    "every_failure_has_diagnostic",
+    "old_verified_revision_still_runs",
+    "evidence_schema_valid"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "tests/blackbox",
+    "tests/fault_injection",
+    "eval/evidence"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

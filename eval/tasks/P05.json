@@ -1,0 +1,38 @@
+{
+  "task_id": "P05",
+  "requires": [
+    "P01",
+    "P03",
+    "P04"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p05"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "interpreter_and_native_outputs_match",
+    "debug_and_release_semantics_match",
+    "no_high_level_target_source_emitted",
+    "reproducible_binary_hash_for_same_inputs"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/native_ir",
+    "compiler/codegen_x86_64",
+    "compiler/object_emitter",
+    "compiler/link_driver"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

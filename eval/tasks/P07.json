@@ -1,0 +1,39 @@
+{
+  "task_id": "P07",
+  "requires": [
+    "P06"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p07"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "health_contract_passes",
+    "hello_contract_passes",
+    "malformed_request_cases_pass",
+    "fragmentation_cases_pass",
+    "timeout_cases_pass",
+    "body_and_header_limits_pass",
+    "route_collision_is_rejected"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "packages/net",
+    "packages/http",
+    "examples/http_demo",
+    "tests/http_blackbox"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

@@ -1,0 +1,35 @@
+{
+  "task_id": "E05",
+  "requires": [
+    "P10"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "e05"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "formatter_before_docs_before_stdlib_subset_before_graph_tools_before_frontend_before_compiler",
+    "stage0_builds_stage1_builds_stage2_builds_stage3",
+    "stage2_and_stage3_hashes_match",
+    "stage2_compiles_language_suite_and_http_example",
+    "no_hidden_Rust_semantic_processing"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/selfhost",
+    "release/bootstrap_manifest.json"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

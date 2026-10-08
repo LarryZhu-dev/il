@@ -1,0 +1,77 @@
+spec_version: '1.0.0'
+kind: library_package_not_language_keyword
+protocol: HTTP/1.1_subset
+connection: one_request_then_close
+bind: 127.0.0.1:8080
+required_capability: Listen
+request_body: reject_nonzero_length
+transfer_encoding: reject
+upgrade: reject
+connect: reject
+compression: reject
+tls: external_boundary_not_mvp
+limits:
+  request_line_max_bytes: 4096
+  header_section_max_bytes: 16384
+  read_deadline_ms: 5000
+  write_deadline_ms: 5000
+  path_parameter_max_utf8_bytes: 128
+parsing:
+  line_ending: CRLF_only
+  host_header: exactly_one_nonempty
+  content_length: at_most_one_unsigned_decimal_zero
+  duplicate_content_length: reject_even_if_equal
+  path_percent_decode: once_per_segment
+  decoded_slash_or_nul: reject
+  path_utf8: strict
+  request_target: origin_form
+  query: excluded_from_route_matching
+  header_names: ASCII_case_insensitive
+  header_continuation: reject
+  accept_encoding: ignored_no_compression_produced
+routing:
+  static_segments: exact_case_sensitive
+  parameters: one_nonempty_segment
+  ambiguous_patterns: reject_at_graph_validation
+  trailing_slash: significant
+  wrong_method_known_path: 405
+responses:
+  mandatory_headers: [Content-Length, Connection]
+  connection: close
+  content_length: encoded_body_byte_count
+  health:
+    request: GET /health
+    status: 200
+    content_type: text/plain; charset=utf-8
+    body: ok
+  hello:
+    request: GET /hello/Larry
+    status: 200
+    content_type: application/json
+    body_json: {message: 'Hello, Larry'}
+  errors:
+    malformed_request: 400
+    invalid_percent_encoding: 400
+    invalid_utf8: 400
+    conflicting_length_headers: 400
+    transfer_encoding: 400
+    nonzero_body: 413
+    request_line_too_long: 414
+    headers_too_large: 431
+    parameter_too_long: 414
+    read_timeout: 408
+    unknown_path: 404
+    wrong_method: 405
+    upgrade: 400
+    connect: 405
+    unsupported_http_version: 505
+    handler_error: 500
+  error_body: empty
+  method_not_allowed_header: 'Allow: GET'
+io:
+  read_deadline: absolute_from_accept_no_reset_per_fragment
+  write_deadline: absolute_from_response_start
+  partial_write: retry_remaining_bytes_until_deadline
+  peer_disconnect: release_connection_emit_structured_diagnostic
+  write_timeout: close_connection_emit_structured_diagnostic
+blackbox: external_TCP_client_using_this_contract_without_internal_imports

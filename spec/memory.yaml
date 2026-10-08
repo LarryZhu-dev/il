@@ -1,0 +1,34 @@
+spec_version: '1.0.0'
+scalar: copy
+scalar_types: [Unit, Bool, I8, I16, I32, I64, U8, U16, U32, U64, Usize]
+owned_heap_value: move
+copy_owned_value: explicit_clone
+aggregate_copy: all_fields_copy
+borrow_shared: lexical_non_escaping
+borrow_mut: unique_lexical_non_escaping
+raw_pointer: unsafe_only
+borrow_across_await: forbidden
+field_partial_move: forbidden_in_mvp
+states: [Uninitialized, Initialized, Moved, Borrowed, Dropped]
+transitions:
+  Uninitialized: [Initialized]
+  Initialized: [Moved, Borrowed, Dropped]
+  Borrowed: [Initialized]
+  Moved: []
+  Dropped: []
+control_flow_join: reject_inconsistent_live_ownership
+drop_order: reverse_initialization_order
+early_return: drop_all_live_locals
+error_propagation: drop_all_live_locals
+panic: unrecoverable_process_exit_without_unwinding
+resource_rules:
+  - one_owner_per_handle
+  - close_invalidates_handle
+  - double_close_detectable
+  - failed_allocation_is_explicit
+  - partial_io_is_explicit
+  - timeout_is_explicit
+runtime_modes:
+  full-runtime: all_declared_runtime_components
+  minimal-runtime: startup_trap_and_stdout_without_heap_or_network
+  no-runtime: pure_freestanding_exports_no_managed_values_or_host_effects

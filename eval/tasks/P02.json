@@ -1,0 +1,42 @@
+{
+  "task_id": "P02",
+  "requires": [
+    "P00"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p02"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "failed_transaction_preserves_base_revision",
+    "normalized_serialization_is_deterministic",
+    "stale_revision_rejected",
+    "dangling_reference_rejected",
+    "duplicate_id_rejected",
+    "unknown_opcode_rejected",
+    "partial_commit_prevented",
+    "invalid_scope_rejected"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "schema/program_graph.schema.json",
+    "schema/transaction.schema.json",
+    "tools/graph_validate",
+    "tools/graph_inspect",
+    "tools/graph_transact",
+    "tests/graph"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

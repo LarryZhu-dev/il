@@ -1,0 +1,36 @@
+{
+  "task_id": "E03",
+  "requires": [
+    "P10"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "e03"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "aarch64_linux_before_macos_before_windows",
+    "each_target_abi_verified",
+    "each_target_runtime_verified",
+    "each_target_syscall_verified",
+    "each_target_linker_verified",
+    "each_target_blackbox_verified",
+    "each_target_reproducibility_verified"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "release/targets"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

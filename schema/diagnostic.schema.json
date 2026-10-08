@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/diagnostic.schema.json",
+  "title": "Intelligent language diagnostic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagnostic_id", "code", "stage", "severity", "entity_id", "related_entities", "expected", "actual", "cause", "suggested_operations", "retryable", "base_revision"],
+  "properties": {
+    "diagnostic_id": {"type": "string", "minLength": 1},
+    "code": {"type": "string", "pattern": "^(E_[A-Z][A-Z0-9_]*|STATE_INCONSISTENT|CONTEXT_INSUFFICIENT)$"},
+    "stage": {"type": "string", "minLength": 1},
+    "severity": {"enum": ["error", "warning", "note"]},
+    "entity_id": {"type": ["string", "null"], "minLength": 1},
+    "related_entities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "expected": {"type": ["string", "null"]},
+    "actual": {"type": ["string", "null"]},
+    "cause": {"type": "string", "minLength": 1},
+    "suggested_operations": {"type": "array", "items": {"$ref": "transaction.schema.json#/$defs/operation"}},
+    "retryable": {"type": "boolean"},
+    "base_revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615}
+  }
+}

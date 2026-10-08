@@ -1,0 +1,44 @@
+spec_version: '1.0.0'
+graph_version: '1.0.0'
+revision: monotonically_increasing_uint64
+initial_revision: 0
+initial_graph: empty_with_required_top_level_collections
+snapshot: immutable_canonical_graph_and_build_inputs
+snapshot_hash: SHA256_of_canonical_bytes
+git_binding:
+  journal: .git/il/revision_bindings.json
+  tracked_state_self_commit_hash: forbidden
+  format: schema_version_and_bindings_array
+  record: [revision, git_commit, tree_hash]
+  verify: tracked_state_and_graph_match_bound_commit_blobs
+  missing_or_mismatch: E_STATE_INCONSISTENT
+  bootstrap_exception: explicit_P00_initialization_only
+transaction:
+  concurrency: single_writer_lock
+  stale_base: E_STALE_REVISION
+  scope: exact_entity_identifiers
+  commit: atomic_publication_of_complete_revision
+  interrupted_commit: recover_to_last_complete_journal_record
+  failed_candidate: retained_as_experiment_only
+  failed_head_change: forbidden
+  semantic_conflict_automerge: forbidden
+restore:
+  revision: new_monotonically_increasing_revision
+  preserves_history: true
+  content: graph_configuration_and_build_inputs
+  external_side_effects: never_undone
+task_statuses: [READY, RUNNING, VERIFIED, FAILED, BLOCKED, DESIGN_REQUIRED, ROLLED_BACK]
+dependency_gate: all_requires_VERIFIED
+verification:
+  real_commands_and_exits: required
+  graph_hash: required
+  compiler_hash: required_from_P01
+  runtime_hash: stage_applicable
+  P00_compiler_hash: null
+  P00_host_compiler_hash: real_SHA256_of_rustc
+  P00_runtime_hash: null
+  phase_applicability_record: required
+release:
+  immutable: true
+  MVP_requires: [G0, G1, G2, G3, G4]
+  extension_requires: all_extension_task_evidence_and_native_target_evidence

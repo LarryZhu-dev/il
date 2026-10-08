@@ -1,0 +1,37 @@
+{
+  "task_id": "E01",
+  "requires": [
+    "P10"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "e01"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "generics_before_traits_before_floats_before_const_eval_before_controlled_macros",
+    "one_extension_one_rfc_one_retest",
+    "interpreter_and_native_extension_semantics_match",
+    "macros_cannot_execute_host_commands"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/generics",
+    "compiler/traits",
+    "compiler/floats",
+    "compiler/const_eval",
+    "compiler/macros"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

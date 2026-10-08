@@ -1,0 +1,38 @@
+{
+  "task_id": "P10",
+  "requires": [
+    "P09"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p10"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "all_G0_G4_predicates_true",
+    "clean_environment_rebuild_passes",
+    "http_blackbox_passes",
+    "ai_transaction_repair_passes",
+    "rollback_passes",
+    "comparison_data_complete"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "release/mvp_manifest.json",
+    "release/mvp_binary_hashes.json",
+    "release/known_limits.json",
+    "eval/mvp_comparison.json"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

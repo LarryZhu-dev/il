@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/repository_state.schema.json",
+  "title": "Intelligent language repository state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "schema_version", "head_revision", "last_verified_revision", "compiler_version", "runtime_version", "target", "open_tasks", "blocked_tasks", "failed_tasks", "locks"],
+  "properties": {
+    "project_id": {"const": "il"},
+    "schema_version": {"const": "1.0.0"},
+    "head_revision": {"$ref": "#/$defs/revision"},
+    "last_verified_revision": {"$ref": "#/$defs/revision"},
+    "compiler_version": {"type": ["string", "null"], "minLength": 1},
+    "runtime_version": {"type": ["string", "null"], "minLength": 1},
+    "target": {"const": "x86_64-unknown-linux-gnu"},
+    "open_tasks": {"$ref": "#/$defs/tasks"},
+    "blocked_tasks": {"$ref": "#/$defs/tasks"},
+    "failed_tasks": {"$ref": "#/$defs/tasks"},
+    "locks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "revision"],
+        "properties": {"owner": {"type": "string", "minLength": 1}, "revision": {"$ref": "#/$defs/revision"}}
+      }
+    }
+  },
+  "$defs": {
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "tasks": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(P0[0-9]|P10|E0[1-5])$"}}
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "task_id": "P03",
+  "requires": [
+    "P02"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p03"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "every_negative_case_has_stable_code",
+    "every_positive_fixture_passes",
+    "no_checker_panic_on_fuzz_input"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/schema_checker",
+    "compiler/name_resolver",
+    "compiler/type_checker",
+    "compiler/effect_checker",
+    "compiler/ownership_checker",
+    "compiler/diagnostics"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

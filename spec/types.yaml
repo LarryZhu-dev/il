@@ -1,0 +1,30 @@
+spec_version: '1.0.0'
+primitive: [Unit, Never, Bool, I8, I16, I32, I64, U8, U16, U32, U64, Usize, String, Bytes]
+compound: [Tuple, Record, Sum, Option, Result]
+default_integer_literal: I64
+usize: target_pointer_width_unsigned
+integer_widths: [8, 16, 32, 64]
+bool_values: [false, true]
+unit_values: one
+never_values: none
+string: owned_valid_UTF8
+bytes: owned_arbitrary_octets
+record_identity: nominal_entity_id
+sum_identity: nominal_entity_id
+record_field_order: declaration_order
+tuple_identity: ordered_element_types
+implicit_numeric_conversion: false
+implicit_nullable_conversion: false
+structural_record_subtyping: false
+recursive_value_type: reject_unless_indirected
+option_variants: ['None', 'Some(T)']
+result_variants: ['Ok(T)', 'Err(E)']
+question_operator: propagate_E_only_to_enclosing_Result_with_identical_error_type
+match: exhaustive_without_implicit_default
+generic_types_in_mvp: [Option, Result, Tuple]
+user_generics_in_mvp: forbidden
+explicit_cast:
+  syntax: 'cast<T>(value)'
+  out_of_range: E_INTEGER_OVERFLOW
+  reinterpretation: unsafe_only
+literal_range_check: before_lowering

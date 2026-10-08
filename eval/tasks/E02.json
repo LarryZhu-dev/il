@@ -1,0 +1,38 @@
+{
+  "task_id": "E02",
+  "requires": [
+    "P10"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "e02"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "Thread_before_Mutex_before_Channel_before_Atomic_before_structured_tasks_before_async",
+    "cross_await_borrow_rejected",
+    "cancellation_releases_resources",
+    "real_asynchronous_io_passes"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "runtime/thread",
+    "runtime/mutex",
+    "runtime/channel",
+    "runtime/atomic",
+    "runtime/tasks",
+    "runtime/async"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

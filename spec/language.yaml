@@ -1,0 +1,60 @@
+spec_version: '1.0.0'
+project_id: il
+name: Intelligent language
+extension: .il
+authority: source_document_and_accepted_rfcs
+representation:
+  primary: canonical_program_graph
+  text: lossless_projection_with_stable_entity_annotations
+  entity_id: explicit_logical_identifier_immutable_after_creation
+  prohibited_id_sources: [memory_address, line_number, random_value]
+normalization:
+  encoding: UTF-8
+  object_key_order: schema_order
+  array_order: semantic_order
+  number_format: decimal_without_exponent
+  line_ending: LF
+  trailing_newline: true
+  unknown_fields: reject
+  unknown_opcodes: reject
+syntax:
+  blocks: braces
+  statements: semicolon_terminated
+  comments: double_slash_to_end_of_line
+  entity_annotation: '@id("logical_identifier")'
+  identifier: '[A-Za-z_][A-Za-z0-9_]*'
+  parameter_separator: comma
+  type_annotation: colon
+  return_type: arrow
+  automatic_semicolon_insertion: false
+  implicit_return: false
+  implicit_conversion: false
+  runtime_eval: forbidden
+  user_defined_syntax: forbidden
+integer_semantics:
+  arithmetic: checked_in_debug_and_release
+  overflow: E_INTEGER_OVERFLOW
+  divide_by_zero: E_DIVIDE_BY_ZERO
+  invalid_shift: E_INVALID_SHIFT
+  right_shift_signed: arithmetic
+  signed_division: truncate_toward_zero
+pipeline:
+  - load_graph
+  - schema_validate
+  - resolve_modules
+  - resolve_names
+  - type_check
+  - effect_check
+  - capability_check
+  - ownership_check
+  - lower_to_hir
+  - lower_to_mir
+  - verify_mir
+  - lower_to_native_ir
+  - verify_native_ir
+  - codegen_x86_64
+  - emit_object
+  - link_runtime
+  - emit_elf
+target_program_high_level_translation: forbidden
+extension_gate: P10_VERIFIED

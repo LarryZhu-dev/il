@@ -1,0 +1,36 @@
+{
+  "task_id": "P04",
+  "requires": [
+    "P03"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p04"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "pure_fixtures_pass",
+    "illegal_mir_is_rejected",
+    "output_is_deterministic"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/hir",
+    "compiler/mir",
+    "compiler/mir_verifier",
+    "runtime/interpreter",
+    "tests/semantic_snapshots"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

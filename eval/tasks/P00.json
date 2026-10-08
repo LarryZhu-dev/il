@@ -1,0 +1,36 @@
+{
+  "task_id": "P00",
+  "requires": [],
+  "base_revision": 0,
+  "scope": [
+    "p00"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json"
+  ],
+  "operations": [],
+  "acceptance": [
+    "clean_repository",
+    "target_is_x86_64_linux",
+    "state_head_equals_git_head",
+    "schemas_parse",
+    "forbidden_target_languages_not_used"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "repository_tree",
+    "repository_state.json",
+    "toolchain.lock",
+    "rfc/template.md",
+    "schema/diagnostic.schema.json",
+    "schema/evidence.schema.json"
+  ],
+  "rollback_revision": 0,
+  "status": "RUNNING"
+}

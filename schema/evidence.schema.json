@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/evidence.schema.json",
+  "title": "Intelligent language revision evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id",
+    "task_id",
+    "phase",
+    "revision",
+    "git_commit",
+    "graph_hash",
+    "compiler_hash",
+    "runtime_hash",
+    "host_compiler_hash",
+    "unavailable_components",
+    "target",
+    "toolchain_lock_hash",
+    "commands",
+    "artifacts",
+    "tests",
+    "effects_delta",
+    "capabilities_delta",
+    "known_limits"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^(P0[0-9]|P10|E0[1-5])(-[A-Za-z0-9_]+)?$"
+    },
+    "phase": {
+      "enum": [
+        "bootstrap",
+        "native_probe",
+        "graph",
+        "compiler",
+        "runtime",
+        "application",
+        "extension"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "graph_hash": {
+      "$ref": "#/$defs/optionalHash"
+    },
+    "compiler_hash": {
+      "$ref": "#/$defs/optionalHash"
+    },
+    "runtime_hash": {
+      "$ref": "#/$defs/optionalHash"
+    },
+    "host_compiler_hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "unavailable_components": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "graph",
+          "compiler",
+          "runtime"
+        ]
+      }
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "toolchain_lock_hash": {
+      "$ref": "#/$defs/hash"
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "argv_hash",
+          "exit_code"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "argv_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "exit_code": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "suite",
+          "passed",
+          "count"
+        ],
+        "properties": {
+          "suite": {
+            "type": "string",
+            "minLength": 1
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "effects_delta": {
+      "$ref": "#/$defs/strings"
+    },
+    "capabilities_delta": {
+      "$ref": "#/$defs/strings"
+    },
+    "known_limits": {
+      "$ref": "#/$defs/strings"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "const": "bootstrap"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "task_id": {
+            "const": "P00"
+          },
+          "target": {
+            "const": "x86_64-unknown-linux-gnu"
+          },
+          "graph_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "compiler_hash": {
+            "type": "null"
+          },
+          "runtime_hash": {
+            "type": "null"
+          },
+          "unavailable_components": {
+            "const": [
+              "compiler",
+              "runtime"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "const": "native_probe"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "task_id": {
+            "const": "P01"
+          },
+          "graph_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "compiler_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "runtime_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "unavailable_components": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "const": "graph"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "task_id": {
+            "const": "P02"
+          },
+          "graph_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "compiler_hash": {
+            "type": "null"
+          },
+          "runtime_hash": {
+            "type": "null"
+          },
+          "unavailable_components": {
+            "const": [
+              "compiler",
+              "runtime"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "compiler",
+              "runtime",
+              "application",
+              "extension"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "graph_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "compiler_hash": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "runtime",
+              "application",
+              "extension"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "runtime_hash": {
+            "$ref": "#/$defs/hash"
+          },
+          "unavailable_components": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "optionalHash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "strings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

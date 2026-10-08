@@ -1,0 +1,39 @@
+{
+  "task_id": "P06",
+  "requires": [
+    "P05"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p06"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "hello_native_runs_clean",
+    "resource_failure_is_explicit",
+    "double_drop_is_detected",
+    "leaked_handle_test_passes"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "runtime/startup",
+    "runtime/allocator",
+    "runtime/handles",
+    "packages/core",
+    "packages/alloc",
+    "packages/io",
+    "examples/hello"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

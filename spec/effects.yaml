@@ -1,0 +1,26 @@
+spec_version: '1.0.0'
+effects: [alloc, fs, net, clock, process, unsafe]
+call_rule: caller_effects_superset_of_callee_effects
+propagation: transitive_union
+inference: may_compute_requirements_but_never_silently_add_declarations
+capabilities:
+  FileRead: path_scope
+  FileWrite: path_scope
+  Listen: address_scope
+  Connect: address_scope
+  SpawnProcess: command_scope
+  ClockRead: no_scope
+capability_origin: host_injection_only
+capability_construction_by_graph: forbidden
+capability_forgery_by_cast: forbidden
+capability_argument: explicit
+path_scope: canonical_path_containment_checked_at_open
+address_scope: normalized_address_and_port_exact_match
+command_scope: locked_executable_and_argument_policy
+effect_capability_pairs:
+  file_read: [fs, FileRead]
+  file_write: [fs, FileWrite]
+  listen: [net, Listen]
+  connect: [net, Connect]
+  spawn: [process, SpawnProcess]
+  now: [clock, ClockRead]

@@ -1,0 +1,45 @@
+spec_version: '1.0.0'
+business_errors: typed_Result
+localized_text_matching: forbidden
+panic_and_trap: unrecoverable_only
+panic_exit_code: 101
+required_diagnostic_fields:
+  - diagnostic_id
+  - code
+  - stage
+  - severity
+  - entity_id
+  - related_entities
+  - expected
+  - actual
+  - cause
+  - suggested_operations
+  - retryable
+  - base_revision
+stable_codes:
+  - E_SCHEMA_INVALID
+  - E_STALE_REVISION
+  - E_STATE_INCONSISTENT
+  - E_NAME_NOT_FOUND
+  - E_DUPLICATE_NAME
+  - E_TYPE_MISMATCH
+  - E_MISSING_RETURN
+  - E_NON_EXHAUSTIVE_MATCH
+  - E_USE_AFTER_MOVE
+  - E_BORROW_ESCAPE
+  - E_DOUBLE_DROP
+  - E_EFFECT_UNDECLARED
+  - E_CAPABILITY_MISSING
+  - E_ROUTE_COLLISION
+  - E_HTTP_MALFORMED
+  - E_RESOURCE_LIMIT
+  - E_UNSUPPORTED_FEATURE
+  - E_TOOLCHAIN_FAILURE
+  - E_EVIDENCE_INCOMPLETE
+  - E_INTEGER_OVERFLOW
+  - E_DIVIDE_BY_ZERO
+  - E_INVALID_SHIFT
+  - E_INVALID_SCOPE
+  - E_CONTEXT_INSUFFICIENT
+retryable_false: stop_automatic_retry_and_set_DESIGN_REQUIRED_or_BLOCKED
+diagnostic_identity: deterministic_revision_stage_entity_code_and_ordinal

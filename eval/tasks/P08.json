@@ -1,0 +1,40 @@
+{
+  "task_id": "P08",
+  "requires": [
+    "P02",
+    "P03",
+    "P07"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p08"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "add_route_without_full_source_dump",
+    "stale_transaction_rejected",
+    "failed_transaction_keeps_old_revision",
+    "diagnostic_is_machine_parseable",
+    "evidence_can_reconstruct_build"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "tools/ai_protocol",
+    "schema/task.schema.json",
+    "schema/evidence.schema.json",
+    "eval/tasks",
+    "eval/runner"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

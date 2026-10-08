@@ -1,0 +1,36 @@
+{
+  "task_id": "E04",
+  "requires": [
+    "P10"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "e04"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "manifest_verified",
+    "lockfile_verified",
+    "content_hash_verified",
+    "capability_declaration_verified",
+    "isolated_build_verified",
+    "sbom_verified"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "tools/package",
+    "schema/package.schema.json"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

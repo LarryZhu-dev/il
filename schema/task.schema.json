@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/task.schema.json",
+  "title": "Intelligent language execution task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "requires", "base_revision", "scope", "inputs", "operations", "acceptance", "resource_budget", "outputs", "rollback_revision", "status"],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^(P0[0-9]|P10|E0[1-5])(-[A-Za-z0-9_]+)?$"},
+    "requires": {"$ref": "#/$defs/strings"},
+    "base_revision": {"$ref": "#/$defs/revision"},
+    "scope": {"$ref": "#/$defs/strings", "minItems": 1},
+    "inputs": {"$ref": "#/$defs/strings", "minItems": 1},
+    "operations": {"type": "array", "items": {"$ref": "transaction.schema.json#/$defs/operation"}},
+    "acceptance": {"$ref": "#/$defs/strings", "minItems": 1},
+    "resource_budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_tokens", "tool_calls", "cpu_seconds", "memory_bytes"],
+      "properties": {
+        "context_tokens": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "tool_calls": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "cpu_seconds": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+        "memory_bytes": {"type": "integer", "minimum": 1, "maximum": 18446744073709551615}
+      }
+    },
+    "outputs": {"$ref": "#/$defs/strings", "minItems": 1},
+    "rollback_revision": {"$ref": "#/$defs/revision"},
+    "status": {"enum": ["READY", "RUNNING", "VERIFIED", "FAILED", "BLOCKED", "DESIGN_REQUIRED", "ROLLED_BACK"]}
+  },
+  "$defs": {
+    "revision": {"type": "integer", "minimum": 0, "maximum": 18446744073709551615},
+    "strings": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}

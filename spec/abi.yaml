@@ -1,0 +1,36 @@
+spec_version: '1.0.0'
+first_target: x86_64-unknown-linux-gnu
+binary_format: ELF
+bootstrap_language: Rust
+bootstrap_version: '1.90.0'
+llvm_version: '14.0.6'
+endianness: little
+pointer_bits: 64
+calling_convention: System_V_AMD64
+runtime_boundary: explicit_C_ABI_functions_implemented_in_Rust
+target_program_translation_to_C: forbidden
+layout:
+  Unit: zero_sized
+  Never: no_runtime_value
+  Bool: byte_zero_or_one
+  integer: declared_width_natural_alignment
+  Usize: unsigned_pointer_width
+  String: owned_pointer_length_capacity
+  Bytes: owned_pointer_length_capacity
+  Record: declaration_order_with_natural_alignment_padding
+  Tuple: position_order_with_natural_alignment_padding
+  Sum: u32_discriminant_then_maximum_aligned_payload
+  Option: same_as_sum_without_niche_optimization
+  Result: same_as_sum_without_niche_optimization
+internal_aggregate_passing: indirect_with_explicit_result_pointer
+external_aggregate_passing: unsupported_until_explicit_ffi_declaration
+allocator_owner: allocating_runtime
+cross_boundary_unwinding: forbidden
+entrypoint:
+  source: 'fn main() -> I32'
+  host: runtime_startup_calls_il_main
+  success_exit: 0
+  trap_exit: 101
+debug_information: source_entity_id_and_text_span_when_available
+symbol_naming: il_prefix_and_hex_encoded_entity_id
+target_extension_requires: [abi, runtime, syscall, linker, blackbox, reproducibility]

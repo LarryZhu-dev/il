@@ -1,0 +1,36 @@
+{
+  "task_id": "P01",
+  "requires": [
+    "P00"
+  ],
+  "base_revision": 0,
+  "scope": [
+    "p01"
+  ],
+  "inputs": [
+    "il_execution_spec_v1.md",
+    "repository_state.json",
+    "toolchain.lock"
+  ],
+  "operations": [],
+  "acceptance": [
+    "exit_code_is_zero",
+    "stdout_equals_probe_ok",
+    "clean_environment_execution",
+    "evidence_complete"
+  ],
+  "resource_budget": {
+    "context_tokens": 65536,
+    "tool_calls": 512,
+    "cpu_seconds": 3600,
+    "memory_bytes": 8589934592
+  },
+  "outputs": [
+    "compiler/native_probe",
+    "runtime/probe_runtime",
+    "build/probe.elf",
+    "build/probe_evidence.json"
+  ],
+  "rollback_revision": 0,
+  "status": "BLOCKED"
+}

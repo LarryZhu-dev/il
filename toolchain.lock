@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "rust": "1.90.0",
+  "llvm": "14.0.6",
+  "target": "x86_64-unknown-linux-gnu",
+  "base_image": "rust:1.90.0-bookworm",
+  "base_image_digest": "sha256:3914072ca0c3b8aad871db9169a651ccfce30cf58303e5d6f2db16d1d8a7e58f",
+  "dependency_policy": "Cargo.lock required; locked builds; no package build scripts in il packages",
+  "bootstrap_status": "VERIFIED",
+  "llvm_packages": {
+    "clang-14": "1:14.0.6-12",
+    "llvm-14": "1:14.0.6-12",
+    "lld-14": "1:14.0.6-12"
+  },
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "local_image_id": "sha256:782fb64e318b3dc85920bff66fdf69f0cf227ecc4d4ea54f97af701564dd815a"
+}
