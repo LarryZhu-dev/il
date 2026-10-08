@@ -1,0 +1,207 @@
+{
+  "evidence_id": "ev_P04_0",
+  "task_id": "P04",
+  "phase": "compiler",
+  "revision": 0,
+  "git_commit": "190a5dd14773815c78eb73335b47d4cf0a7717f7",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:edb4649b25848629dd2331a9e2dd9d93c57cdb704f6897dac9e4f6ab3ad65ab9",
+  "runtime_hash": null,
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [
+    "runtime"
+  ],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "toolchain-rust",
+      "argv_hash": "sha256:8486d9561e12a51de5ec438f1458ef70581e599bfa1409d96d0a6e46734a12f5",
+      "exit_code": 0
+    },
+    {
+      "id": "toolchain-llvm",
+      "argv_hash": "sha256:5c218374ff9812343ea5a0c7f52fde7e40fd198706ab2ba639d194f20f90decb",
+      "exit_code": 0
+    },
+    {
+      "id": "environment-packages",
+      "argv_hash": "sha256:367e60807afe55c0de8163e719f8ce2de648917e9122196e7cf7b53c3fddea98",
+      "exit_code": 0
+    },
+    {
+      "id": "git-revision-binding",
+      "argv_hash": "sha256:0572ba01cc3a0f14ccdeca92c0225c15d09e5f0e19139f6bf36b9f3c7bf6c39b",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-tests",
+      "argv_hash": "sha256:795eb7c61d91ef39f1031a69bbf5c569b355ab8bec69bb77b577068b52e94c47",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-debug",
+      "argv_hash": "sha256:8372ed38fa4fbd2e29ed3626a55fc80e06e31527c3dc66b79b57d1c94d6dfb5f",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli-debug",
+      "argv_hash": "sha256:e5bba993afc90822cf23b9c0c99833ef6b4f0e2af0a10d2b1680f138b7c77154",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-release",
+      "argv_hash": "sha256:1edcee5273bd09129a7227d8d31c5757bb447627d32b0698bb3a1cd1725c3f91",
+      "exit_code": 0
+    },
+    {
+      "id": "native-probe",
+      "argv_hash": "sha256:8d2207034ad03cc8fa03c75a571f9b31e9f3ace19383ac879cf63b376876590f",
+      "exit_code": 0
+    },
+    {
+      "id": "graph-cli",
+      "argv_hash": "sha256:016e9cbd04eec4d2ec9c0bae13568826fef7d4b6cb39d7c2fb289ffc9bcd6c16",
+      "exit_code": 0
+    },
+    {
+      "id": "semantic-cli",
+      "argv_hash": "sha256:e65b17c3e5364dcd1ecfdf8d7c6d9c57269a7df687939c642e52d5ab4e9d80be",
+      "exit_code": 0
+    },
+    {
+      "id": "text-cli",
+      "argv_hash": "sha256:7c6678f69c8c4ca741e587a0227bcbdfe00eef88af45b056a8c6310076bc9818",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli",
+      "argv_hash": "sha256:cbd9c7fefdf5ec7c75a8f67e8f148ed9c8b3b11dcdea010058d3106c5ae4193d",
+      "exit_code": 0
+    },
+    {
+      "id": "interpreter-profile-parity",
+      "argv_hash": "sha256:ac3bba6d57e03ae222b7fcf18ff96a359249371a04d95022abbaee5ce2a8368e",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-pre-commit",
+      "argv_hash": "sha256:b8fa89c8ce791cba94a1e342d101c0c2bb3a72f73d8e9aeea929ae106d28c28c",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-unit-tests",
+      "argv_hash": "sha256:5964df816921afcf874dbc56a1b0206891d331a603e281c3177b1778d8a97f8a",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-strict",
+      "argv_hash": "sha256:ca7d1f05b24d34fac70f2f54ab737f8ad82f2ec0c5cb6c354c32b4ca73b60fb0",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "target/release/il",
+      "sha256": "sha256:edb4649b25848629dd2331a9e2dd9d93c57cdb704f6897dac9e4f6ab3ad65ab9"
+    },
+    {
+      "path": "build/ci/result.json",
+      "sha256": "sha256:d4b76fde84f78fe333c28ce39c0f86ff39ff16fb4014fa97813ad1d0cf7c86b1"
+    },
+    {
+      "path": "build/ci/rust-tests.log",
+      "sha256": "sha256:521e808a697c87c0b0d3e5ed7629225563fff4488735588fcd418dbd29f0d2fa"
+    },
+    {
+      "path": "build/execution_cli_debug_report.json",
+      "sha256": "sha256:c833e3368ae5a246c5994ed039b2ef1e46a06a4dbc0a5c0dc2d58d5e04b18d5a"
+    },
+    {
+      "path": "build/execution_cli_report.json",
+      "sha256": "sha256:c833e3368ae5a246c5994ed039b2ef1e46a06a4dbc0a5c0dc2d58d5e04b18d5a"
+    },
+    {
+      "path": "build/semantic_cli_report.json",
+      "sha256": "sha256:3737d9f52a2de38085ba576455a388d32ac1630e200e134e4273ed00b4af13d2"
+    },
+    {
+      "path": "build/text_cli_report.json",
+      "sha256": "sha256:407ae59936315ed7990454570c5104747b221b2bc6d9f035fde97e17b36973e3"
+    },
+    {
+      "path": "build/graph_cli_report.json",
+      "sha256": "sha256:f6f4fee287e0ffcf6e2843ccae74c9f2d5be0cc29137ea73be4cd2a8da0dd649"
+    },
+    {
+      "path": "build/failures/P04-initial-execution/report.json",
+      "sha256": "sha256:c78bd5b2616e02d9b10d3a9f82400ebb8df358b39352c37dfab1e51b4d8013da"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "rust-tests",
+      "passed": true,
+      "count": 107
+    },
+    {
+      "suite": "execution-cli-debug",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-probe",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "graph-cli",
+      "passed": true,
+      "count": 28
+    },
+    {
+      "suite": "semantic-cli",
+      "passed": true,
+      "count": 231
+    },
+    {
+      "suite": "text-cli",
+      "passed": true,
+      "count": 14
+    },
+    {
+      "suite": "execution-cli",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "interpreter-profile-parity",
+      "passed": true,
+      "count": 180
+    },
+    {
+      "suite": "bootstrap-pre-commit",
+      "passed": true,
+      "count": 7
+    },
+    {
+      "suite": "bootstrap-unit-tests",
+      "passed": true,
+      "count": 17
+    },
+    {
+      "suite": "bootstrap-strict",
+      "passed": true,
+      "count": 9
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified."
+  ]
+}
