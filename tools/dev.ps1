@@ -1,9 +1,21 @@
+[CmdletBinding(PositionalBinding = $false)]
 param(
+    [Parameter(Position = 0)]
     [ValidateSet('image', 'check', 'test', 'build', 'il')]
     [string]$Action = 'check',
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$ToolArguments
+    [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
+    [string[]]$ToolArguments,
+    [Parameter(ValueFromPipeline = $true)]
+    [AllowEmptyString()]
+    [string]$RequestLine
 )
+begin {
+    $requestLines = [System.Collections.Generic.List[string]]::new()
+}
+process {
+    if ($null -ne $RequestLine) { $requestLines.Add($RequestLine) }
+}
+end {
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ($Action -eq 'image') {
@@ -23,8 +35,9 @@ switch ($Action) {
 }
 if ($Action -eq 'il') {
     $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-    $input | docker @containerArguments
+    $requestLines | docker @containerArguments
 } else {
     docker @containerArguments
 }
 exit $LASTEXITCODE
+}
