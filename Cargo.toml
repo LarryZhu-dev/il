@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "tools/il"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.90"
+
+[workspace.dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+sha2 = "=0.10.9"
+fs2 = "=0.4.3"
+tempfile = "=3.23.0"
+il-graph = { path = "compiler/graph" }
+
+[profile.release]
+debug = false
+strip = "debuginfo"
+codegen-units = 1
+lto = "thin"
