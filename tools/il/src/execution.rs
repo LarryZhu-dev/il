@@ -1,7 +1,8 @@
 use crate::protocol::Failure;
 use il_graph::{canonical_bytes, hash_bytes, valid_id, Graph};
 use il_hir::StageRecord;
-use il_interpreter::{execute, Limits, Value};
+use il_interpreter::execute;
+use il_execution_model::{Limits, Value};
 use serde::Deserialize;
 use serde_json::json;
 

@@ -1,5 +1,6 @@
 use il_frontend::{format, parse};
-use il_interpreter::{execute, Execution, ExecutionStatus, Limits, ValueData};
+use il_interpreter::execute;
+use il_execution_model::{Execution, ExecutionStatus, Limits, ValueData};
 
 fn run(source: &str, limits: Limits) -> Execution {
     let graph = parse(source, 0).unwrap_or_else(|errors| panic!("parse: {errors:#?}"));

@@ -105,6 +105,7 @@ name = "il"
 version = "0.1.0"
 dependencies = [
  "il-checker",
+ "il-execution-model",
  "il-frontend",
  "il-graph",
  "il-hir",
@@ -124,10 +125,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "il-execution-model"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "il-frontend"
 version = "0.1.0"
 dependencies = [
  "il-checker",
+ "il-execution-model",
  "il-graph",
  "il-hir",
  "il-interpreter",
@@ -162,6 +173,7 @@ name = "il-interpreter"
 version = "0.1.0"
 dependencies = [
  "il-checker",
+ "il-execution-model",
  "il-graph",
  "il-mir",
  "serde",

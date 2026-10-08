@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "tools/il"]
+members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "runtime/execution_model", "tools/il"]
 
 [workspace.package]
 version = "0.1.0"
@@ -20,6 +20,8 @@ il-frontend = { path = "compiler/frontend" }
 il-hir = { path = "compiler/hir" }
 il-mir = { path = "compiler/mir" }
 il-interpreter = { path = "runtime/interpreter" }
+
+il-execution-model = { path = "runtime/execution_model" }
 
 [profile.release]
 debug = false

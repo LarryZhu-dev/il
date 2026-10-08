@@ -1,3 +1,4 @@
+//! Shared execution values and reports; contains no evaluator.
 use il_graph::Diagnostic;
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +67,7 @@ impl Default for Limits {
     fn default() -> Self { Self { max_steps: 100_000, max_call_depth: 128, max_heap_bytes: 16_777_216, max_output_bytes: 1_048_576 } }
 }
 impl Limits {
-    pub(crate) fn valid(self) -> bool {
+    pub fn valid(self) -> bool {
         (1..=1_000_000).contains(&self.max_steps) && (1..=128).contains(&self.max_call_depth)
             && (1..=67_108_864).contains(&self.max_heap_bytes) && (1..=1_048_576).contains(&self.max_output_bytes)
     }
@@ -104,7 +105,7 @@ fn required_nullable<'de,D:serde::Deserializer<'de>>(deserializer:D)->Result<Opt
 }
 
 impl Execution {
-    pub(crate) fn rejected(diagnostics: Vec<Diagnostic>) -> Self {
+    pub fn rejected(diagnostics: Vec<Diagnostic>) -> Self {
         Self { status: ExecutionStatus::Rejected, value: None, stdout: vec![], stderr: vec![], diagnostics,
             steps: 0, peak_heap_bytes: 0, live_allocations: 0, lifecycle: vec![] }
     }

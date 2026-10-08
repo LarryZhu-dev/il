@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+il-execution-model.workspace = true
 il-graph.workspace = true
 il-checker.workspace = true
 il-mir = { path = "../../compiler/mir" }

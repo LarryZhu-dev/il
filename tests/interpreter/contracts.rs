@@ -1,5 +1,6 @@
 use il_graph::{Attributes, Opcode, Operation, ValueDef, Parameter, TypeDef, TypeKind, Layout, Effect};
-use il_interpreter::{execute, ExecutionStatus, Limits, Value, ValueData, LifecycleKind};
+use il_interpreter::execute;
+use il_execution_model::{ExecutionStatus, Limits, Value, ValueData, LifecycleKind};
 use il_mir::{Program,Function,Block,Terminator,DropAction,Edge};
 
 fn value(id:&str,ty:&str)->ValueDef { ValueDef { entity_id:id.into(),type_ref:ty.into() } }
@@ -13,12 +14,12 @@ fn program(ty:&str,params:&[(&str,&str)],operations:Vec<Operation>,result:Option
         }]
     }] }
 }
-fn binary(ty:&str,opcode:Opcode,a:i128,b:i128)->il_interpreter::Execution {
+fn binary(ty:&str,opcode:Opcode,a:i128,b:i128)->il_execution_model::Execution {
     let p=program(ty,&[("a",ty),("b",ty)],vec![op("calculate",opcode,&["a","b"],&[("answer",ty)],Attributes::Empty{})],Some("answer"));
     execute(&p,"main",&[Value::integer(ty,a),Value::integer(ty,b)],Limits::default())
 }
-fn success(e:&il_interpreter::Execution,expected:Value) { assert_eq!(e.status,ExecutionStatus::Returned,"{:?}",e.diagnostics);assert_eq!(e.value,Some(expected));assert!(e.diagnostics.is_empty()); }
-fn trapped(e:&il_interpreter::Execution,code:&str) { assert_eq!(e.status,ExecutionStatus::Trapped,"{:?}",e.diagnostics);assert_eq!(e.diagnostics[0].code,code);assert!(e.value.is_none()); }
+fn success(e:&il_execution_model::Execution,expected:Value) { assert_eq!(e.status,ExecutionStatus::Returned,"{:?}",e.diagnostics);assert_eq!(e.value,Some(expected));assert!(e.diagnostics.is_empty()); }
+fn trapped(e:&il_execution_model::Execution,code:&str) { assert_eq!(e.status,ExecutionStatus::Trapped,"{:?}",e.diagnostics);assert_eq!(e.diagnostics[0].code,code);assert!(e.value.is_none()); }
 
 #[test]
 fn checked_integer_boundaries_every_width() {
@@ -140,7 +141,7 @@ fn opaque_external_values_rejected() {
 fn strict_wire_data_and_required_nullable_execution_value() {
     for text in [r#"{"kind":"unit","value":null}"#,r#"{"kind":"unit","extra":1}"#,r#"{"kind":"integer","value":1}"#,r#"{"kind":"bool","value":true,"extra":1}"#] {assert!(serde_json::from_str::<ValueData>(text).is_err(),"accepted {text}");}
     assert_eq!(serde_json::from_str::<ValueData>(r#"{"kind":"unit"}"#).unwrap(),ValueData::Unit);
-    let p=program("Unit",&[],vec![],None);let e=execute(&p,"main",&[],Limits::default());let mut json=serde_json::to_value(e).unwrap();json.as_object_mut().unwrap().remove("value");assert!(serde_json::from_value::<il_interpreter::Execution>(json).is_err());
+    let p=program("Unit",&[],vec![],None);let e=execute(&p,"main",&[],Limits::default());let mut json=serde_json::to_value(e).unwrap();json.as_object_mut().unwrap().remove("value");assert!(serde_json::from_value::<il_execution_model::Execution>(json).is_err());
 }
 
 #[test]
@@ -162,9 +163,9 @@ fn concat_result_and_typed_budget_failure() {
     let mut error=typedef("core.AllocError",TypeKind::Sum,vec![]);error.variants=il_checker::runtime_error_variants("core.AllocError").unwrap().iter().map(|name|il_graph::Variant{name:name.to_string(),fields:vec![]}).collect();p.types=vec![error,typedef("ConcatResult",TypeKind::Result,vec!["String".into(),"core.AllocError".into()])];
     if let Terminator::Return{cleanup,..}=&mut p.functions[0].blocks[0].terminator{*cleanup=vec![DropAction{value_id:"b".into(),type_ref:"String".into()},DropAction{value_id:"a".into(),type_ref:"String".into()}];}
     let e=execute(&p,"main",&[Value::string("你好"),Value::string("!")],Limits::default());
-    success(&e,Value{type_ref:"ConcatResult".into(),data:ValueData::Variant(il_interpreter::VariantValue{tag:"Ok".into(),fields:vec![Value::string("你好!")]})});assert_eq!(e.peak_heap_bytes,14);assert_eq!(e.live_allocations,1);
+    success(&e,Value{type_ref:"ConcatResult".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:"Ok".into(),fields:vec![Value::string("你好!")]})});assert_eq!(e.peak_heap_bytes,14);assert_eq!(e.live_allocations,1);
     let e=execute(&p,"main",&[Value::string("你好"),Value::string("!")],Limits{max_heap_bytes:7,..Limits::default()});
-    success(&e,Value{type_ref:"ConcatResult".into(),data:ValueData::Variant(il_interpreter::VariantValue{tag:"Err".into(),fields:vec![Value{type_ref:"core.AllocError".into(),data:ValueData::Variant(il_interpreter::VariantValue{tag:"OutOfMemory".into(),fields:vec![]})}]})});assert_eq!(e.live_allocations,0);
+    success(&e,Value{type_ref:"ConcatResult".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:"Err".into(),fields:vec![Value{type_ref:"core.AllocError".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:"OutOfMemory".into(),fields:vec![]})}]})});assert_eq!(e.live_allocations,0);
 }
 
 #[test]
@@ -212,10 +213,10 @@ fn owned_variant_payload_and_tag() {
         Block{entity_id:"invalid".into(),arguments:vec![],operations:vec![],terminator:Terminator::Trap{entity_id:"trap".into(),code:"INVALID_TAG".into()}}
     ]);
     for (tag,fields,expected) in [("Some",vec![Value::string("payload")],"payload"),("None",vec![],"<none>")] {
-        let arg=Value{type_ref:"Maybe".into(),data:ValueData::Variant(il_interpreter::VariantValue{tag:tag.into(),fields})};let e=execute(&p,"main",&[arg],Limits::default());success(&e,Value::string(expected));assert_eq!(e.live_allocations,1);
+        let arg=Value{type_ref:"Maybe".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:tag.into(),fields})};let e=execute(&p,"main",&[arg],Limits::default());success(&e,Value::string(expected));assert_eq!(e.live_allocations,1);
     }
     let mut p=program("U32",&[("arg","Maybe")],vec![op("tag",Opcode::Tag,&["arg"],&[("index","U32")],Attributes::Empty{})],Some("index"));p.types.push(typedef("Maybe",TypeKind::Option,vec!["I64".into()]));
-    let arg=Value{type_ref:"Maybe".into(),data:ValueData::Variant(il_interpreter::VariantValue{tag:"Some".into(),fields:vec![Value::integer("I64",42)]})};success(&execute(&p,"main",&[arg],Limits::default()),Value::integer("U32",1));
+    let arg=Value{type_ref:"Maybe".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:"Some".into(),fields:vec![Value::integer("I64",42)]})};success(&execute(&p,"main",&[arg],Limits::default()),Value::integer("U32",1));
 }
 
 #[test]

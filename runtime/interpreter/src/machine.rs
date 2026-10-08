@@ -1,4 +1,5 @@
-use crate::{numbers, value::*};
+use crate::numbers;
+use il_execution_model::*;
 use il_graph::{Attributes, Diagnostic, Graph, Literal, Opcode, Operation, TypeDef, TypeKind};
 use il_mir::{DropAction, Program, Terminator};
 use std::{collections::{BTreeMap, BTreeSet}, rc::Rc};
