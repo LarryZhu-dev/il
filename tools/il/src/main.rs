@@ -17,12 +17,44 @@ const OUTPUT_LIMIT: usize = 262_144;
 #[serde(deny_unknown_fields)]
 struct Empty {}
 
+fn optional<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(deserializer: D) -> Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceText { source: String }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportText { op: String, source: String }
+
+fn transaction_request(input: &str) -> Result<Transaction, Failure> {
+    let mut value: Value = request(input)?;
+    let revision = value.get("base_revision").and_then(Value::as_u64)
+        .ok_or_else(|| Failure::input("base_revision must be uint64"))?;
+    if let Some(operations) = value.get_mut("operations").and_then(Value::as_array_mut) {
+        for operation in operations {
+            if operation.get("op").and_then(Value::as_str) == Some("import_text") {
+                let source: ImportText = serde_json::from_value(operation.clone()).map_err(Failure::json)?;
+                debug_assert_eq!(source.op, "import_text");
+                let graph = il_frontend::parse(&source.source, revision).map_err(Failure::diagnostics)?;
+                *operation = serde_json::to_value(TransactionOperation::ReplaceProgram { graph }).map_err(Failure::json)?;
+            }
+        }
+    }
+    serde_json::from_value(value).map_err(Failure::json)
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Inspect {
     entity_id: String,
+    #[serde(default, deserialize_with = "optional")]
     revision: Option<u64>,
+    #[serde(default, deserialize_with = "optional")]
     fields: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "optional")]
     budget: Option<usize>,
 }
 
@@ -53,6 +85,7 @@ struct Restore {
 #[serde(deny_unknown_fields)]
 struct Slice {
     root_entities: Vec<String>,
+    #[serde(default, deserialize_with = "optional")]
     revision: Option<u64>,
     max_nodes: usize,
     max_tokens: usize,
@@ -62,8 +95,11 @@ struct Slice {
 #[serde(deny_unknown_fields)]
 struct Relations {
     entity_id: String,
+    #[serde(default, deserialize_with = "optional")]
     revision: Option<u64>,
+    #[serde(default, deserialize_with = "optional")]
     budget: Option<usize>,
+    #[serde(default, deserialize_with = "optional")]
     direction: Option<String>,
 }
 
@@ -162,7 +198,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                 "graph_hash": graph.hash().map_err(Failure::json)?, "project_id": graph.project_id, "target": graph.target})))
         }
         "transact" => {
-            let transaction: Transaction = request(input)?;
+            let transaction = transaction_request(input)?;
             let store = match store {
                 Some(store) => store,
                 None => {
@@ -182,20 +218,22 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                     }
                 }
             };
-            Ok(outcome(tool, store.transact(&transaction, context.provenance.clone())?))
+            Ok(outcome(tool, store.transact(&transaction, context.provenance.clone(), &il_checker::check)?))
         }
         "restore" => {
             let args: Restore = request(input)?;
             if args.reason.trim().is_empty() { return Err(Failure::input("restore reason cannot be empty")); }
             let store = store.ok_or_else(|| Failure::new("E_NAME_NOT_FOUND", "application store has not been initialized"))?;
-            Ok(outcome(tool, store.restore(args.revision, &args.reason, context.provenance.clone())?))
+            Ok(outcome(tool, store.restore(args.revision, &args.reason, context.provenance.clone(), &il_checker::check)?))
         }
         "inspect" => {
             let args: Inspect = request(input)?;
             let revision = args.revision.unwrap_or(current);
             let graph = load(store.as_ref(), context, revision)?;
-            let mut entity = entity_index(&graph)?.remove(&args.entity_id)
-                .ok_or_else(|| Failure::new("E_NAME_NOT_FOUND", "entity not found at revision"))?;
+            let mut entity = if args.entity_id == "program" { json!(graph) } else {
+                entity_index(&graph)?.remove(&args.entity_id)
+                    .ok_or_else(|| Failure::new("E_NAME_NOT_FOUND", "entity not found at revision"))?
+            };
             if let Some(fields) = args.fields {
                 let object = entity.as_object().unwrap();
                 let mut selected = serde_json::Map::new();
@@ -208,19 +246,26 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
         }
         "validate" => {
             let args: Validate = request(input)?;
-            if args.checks.iter().any(|check| !matches!(check, Check::Schema | Check::Names | Check::References)) {
-                return Err(Failure::new("E_UNSUPPORTED_FEATURE", "semantic checks require P03"));
+            if args.checks.iter().enumerate().any(|(index, check)| args.checks[..index].contains(check)) {
+                return Err(Failure::input("checks must be unique"));
             }
             let graph = if let Some(revision) = args.graph_or_revision.as_u64() {
                 load(store.as_ref(), context, revision)?
             } else { serde_json::from_value::<Graph>(args.graph_or_revision).map_err(Failure::json)? };
-            if graph.has_semantics() { return Err(Failure::new("E_UNSUPPORTED_FEATURE", "semantic graphs require P03 validation")); }
-            let diagnostics = graph.validate_structural();
+            let diagnostics = il_checker::check(&graph);
             let mut response = envelope(tool, current, graph.revision,
-                json!({"valid": diagnostics.is_empty(), "checks": ["schema", "names", "references"]}));
+                json!({"valid": diagnostics.is_empty(), "checks": ["schema", "names", "references", "types", "ownership", "effects", "capabilities", "contracts"]}));
             response["ok"] = json!(diagnostics.is_empty());
             response["diagnostics"] = serde_json::to_value(diagnostics).unwrap();
             Ok(response)
+        }
+        "schema-check" => {
+            let args: SourceText = request(input)?;
+            let graph = il_frontend::parse(&args.source, current).map_err(Failure::diagnostics)?;
+            let diagnostics = il_checker::check(&graph);
+            if !diagnostics.is_empty() { return Err(Failure::diagnostics(diagnostics)); }
+            let source = il_frontend::format(&graph).map_err(Failure::diagnostics)?;
+            Ok(envelope(tool, current, current, json!({"graph": graph, "source": source})))
         }
         "diff" => {
             let args: Diff = request(input)?;
@@ -265,8 +310,12 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let graph = load(store.as_ref(), context, revision)?;
             let index = entity_index(&graph)?;
             if !index.contains_key(&args.entity_id) { return Err(Failure::new("E_NAME_NOT_FOUND", "entity not found")); }
-            if graph.has_semantics() { return Err(Failure::new("E_UNSUPPORTED_FEATURE", "semantic relations require P03")); }
-            let mut ids = if tool == "callers" { vec![] }
+            let mut ids = if tool == "callers" {
+                graph.functions.iter().filter(|function| function.blocks.iter().any(|block|
+                    block.operations.iter().chain(std::iter::once(&block.terminator)).any(|op|
+                        matches!(&op.attributes, Attributes::Call { callee } if *callee == args.entity_id))))
+                    .map(|function| function.entity_id.clone()).collect()
+            }
                 else if direction == "forward" { entity_references(&graph, &args.entity_id) }
                 else { index.keys().filter(|id| entity_references(&graph, id).contains(&args.entity_id)).cloned().collect() };
             ids.sort(); ids.dedup();

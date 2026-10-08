@@ -104,10 +104,29 @@ dependencies = [
 name = "il"
 version = "0.1.0"
 dependencies = [
+ "il-checker",
+ "il-frontend",
  "il-graph",
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "il-checker"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "serde_json",
+]
+
+[[package]]
+name = "il-frontend"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

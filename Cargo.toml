@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "tools/il"]
+members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "tools/il"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,6 +15,8 @@ sha2 = "=0.10.9"
 fs2 = "=0.4.3"
 tempfile = "=3.23.0"
 il-graph = { path = "compiler/graph" }
+il-checker = { path = "compiler/checker" }
+il-frontend = { path = "compiler/frontend" }
 
 [profile.release]
 debug = false

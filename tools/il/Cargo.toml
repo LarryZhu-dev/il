@@ -9,3 +9,5 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 il-graph.workspace = true
+il-checker.workspace = true
+il-frontend.workspace = true
