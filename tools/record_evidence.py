@@ -1,5 +1,6 @@
 """Record actual gate output and artifact identities; never invent passed checks."""
 import argparse
+import gzip
 import hashlib
 import json
 import subprocess
@@ -8,6 +9,19 @@ from pathlib import Path
 
 def digest(data):
     return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+
+def archive_artifact(path):
+    data = Path(path).read_bytes()
+    identity = digest(data)
+    archive = Path('eval/artifacts') / (identity.removeprefix('sha256:') + '.gz')
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    if archive.exists():
+        if gzip.decompress(archive.read_bytes()) != data:
+            raise SystemExit('E_EVIDENCE_INCOMPLETE: corrupt immutable artifact archive')
+    else:
+        archive.write_bytes(gzip.compress(data, compresslevel=9, mtime=0))
+    return {'path': path, 'sha256': identity}
 
 
 def main():
@@ -40,7 +54,7 @@ def main():
         'unavailable_components': unavailable,
         'target': state['target'], 'toolchain_lock_hash': digest(Path('toolchain.lock').read_bytes()),
         'commands': [{'id': g['name'], 'argv_hash': digest(json.dumps(g['command'], separators=(',', ':')).encode()), 'exit_code': g['exit_code']} for g in checks],
-        'artifacts': [{'path': p, 'sha256': digest(Path(p).read_bytes())} for p in args.artifact],
+        'artifacts': [archive_artifact(p) for p in args.artifact],
         'tests': [{'suite': g['name'], 'passed': True, 'count': g.get('test_count', 1)} for g in checks if g.get('is_test', False)],
         'effects_delta': [], 'capabilities_delta': [],
         'known_limits': ['Only the recorded task and gates are verified; later tasks are not verified.'],
@@ -51,7 +65,7 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         raise SystemExit('Evidence is immutable: ' + str(path))
-    path.write_text(json.dumps(evidence, indent=2) + '\n')
+    path.write_text(json.dumps(evidence, indent=2) + '\n', newline='\n')
     print(json.dumps({'ok': True, 'evidence': str(path)}))
 
 

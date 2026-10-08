@@ -7,6 +7,7 @@ implementation. No command supplied by a task or document is executed here.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import re
@@ -214,11 +215,13 @@ def check_evidence(root: Path, record, state, lock):
     validate_file(root, record, "evidence")
     if record["revision"] > state["head_revision"]:
         raise ValidationError("evidence references a future revision")
-    if record["target"] != state["target"]:
+    committed = json.loads(git(root, "show", record["git_commit"] + ":repository_state.json"))
+    if record["target"] != committed["target"]:
         raise ValidationError("evidence target differs from state")
-    if record["toolchain_lock_hash"] != digest(root / "toolchain.lock"):
+    historical_lock = subprocess.check_output(["git", "show", record["git_commit"] + ":toolchain.lock"], cwd=root)
+    if record["toolchain_lock_hash"] != "sha256:" + hashlib.sha256(historical_lock).hexdigest():
         raise ValidationError("evidence toolchain lock hash differs")
-    if record["host_compiler_hash"] != lock["host_compiler_hash"]:
+    if record["host_compiler_hash"] != json.loads(historical_lock)["host_compiler_hash"]:
         raise ValidationError("evidence host compiler differs from locked compiler")
     unavailable = {component for component in ("graph", "compiler", "runtime") if record[component + "_hash"] is None}
     if unavailable != set(record["unavailable_components"]):
@@ -230,13 +233,17 @@ def check_evidence(root: Path, record, state, lock):
     if len({command["id"] for command in record["commands"]}) != len(record["commands"]):
         raise ValidationError("evidence command IDs are not unique")
     for artifact in record["artifacts"]:
-        if digest(safe_artifact(root, artifact["path"])) != artifact["sha256"]:
+        relative = artifact["path"]
+        if Path(relative).is_absolute() or root not in (root / relative).resolve().parents:
+            raise ValidationError("artifact outside repository: " + relative)
+        archive = "eval/artifacts/" + artifact["sha256"].removeprefix("sha256:") + ".gz"
+        data = gzip.decompress(safe_artifact(root, archive).read_bytes())
+        if "sha256:" + hashlib.sha256(data).hexdigest() != artifact["sha256"]:
             raise ValidationError("evidence artifact hash differs: " + artifact["path"])
     artifact_hashes = {artifact["sha256"] for artifact in record["artifacts"]}
     for component in ("graph", "compiler", "runtime"):
         if record[component + "_hash"] is not None and record[component + "_hash"] not in artifact_hashes:
             raise ValidationError("evidence lacks a verified artifact for " + component)
-    committed = json.loads(git(root, "show", record["git_commit"] + ":repository_state.json"))
     if committed["head_revision"] != record["revision"]:
         raise ValidationError("evidence revision differs from its Git commit")
 
