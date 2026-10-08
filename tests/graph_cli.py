@@ -266,6 +266,7 @@ class GraphCliAcceptance(unittest.TestCase):
 
     def test_removing_imported_module_does_not_silently_cascade(self):
         first = transaction(entity_id="dependency", path="dependency")
+        first["operations"][0]["module"]["visibility"] = "public"
         self.invoke("transact", first)
         second = transaction(1)
         second["operations"][0]["module"]["imports"] = ["dependency"]
