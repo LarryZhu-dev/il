@@ -1,0 +1,356 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/mir.schema.json",
+  "title": "Intelligent language explicit control flow and cleanup MIR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "compiler_version",
+    "input_hash",
+    "source_revision",
+    "target",
+    "types",
+    "capabilities",
+    "functions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "compiler_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "source_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "target": {
+      "const": "x86_64-unknown-linux-gnu"
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "$ref": "program_graph.schema.json#/$defs/type"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "program_graph.schema.json#/$defs/capability"
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/function"
+      }
+    }
+  },
+  "$defs": {
+    "drop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value_id",
+        "type_ref"
+      ],
+      "properties": {
+        "value_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "type_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "arguments",
+        "cleanup"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          }
+        },
+        "cleanup": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/drop"
+          }
+        }
+      }
+    },
+    "terminator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity_id",
+            "value",
+            "cleanup"
+          ],
+          "properties": {
+            "kind": {
+              "const": "return"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cleanup": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/drop"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity_id",
+            "code"
+          ],
+          "properties": {
+            "kind": {
+              "const": "trap"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "code": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity_id",
+            "edge"
+          ],
+          "properties": {
+            "kind": {
+              "const": "branch"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "edge": {
+              "$ref": "#/$defs/edge"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity_id",
+            "condition",
+            "then_edge",
+            "else_edge"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cond_branch"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "condition": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "then_edge": {
+              "$ref": "#/$defs/edge"
+            },
+            "else_edge": {
+              "$ref": "#/$defs/edge"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity_id",
+            "value",
+            "cases",
+            "default"
+          ],
+          "properties": {
+            "kind": {
+              "const": "switch"
+            },
+            "entity_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tag",
+                  "edge"
+                ],
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "edge": {
+                    "$ref": "#/$defs/edge"
+                  }
+                }
+              }
+            },
+            "default": {
+              "$ref": "#/$defs/edge"
+            }
+          }
+        }
+      ]
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "name",
+        "parameters",
+        "result",
+        "effects",
+        "capabilities",
+        "blocks"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "program_graph.schema.json#/$defs/parameter"
+          }
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "alloc",
+              "fs",
+              "net",
+              "clock",
+              "process",
+              "unsafe"
+            ]
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          },
+          "uniqueItems": true
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "arguments",
+        "operations",
+        "terminator"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "$ref": "program_graph.schema.json#/$defs/value"
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "program_graph.schema.json#/$defs/operation"
+          }
+        },
+        "terminator": {
+          "$ref": "#/$defs/terminator"
+        }
+      }
+    }
+  }
+}
