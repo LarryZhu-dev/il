@@ -1,0 +1,128 @@
+{
+  "evidence_id": "ev_P02_0",
+  "task_id": "P02",
+  "phase": "graph",
+  "revision": 0,
+  "git_commit": "fc2353d4feb738a01d93465e748e5e6cc19ff716",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:74763754b3f7a040e17cf4408c7ba539aa67de25c490aa079bd7b7bfdc63a486",
+  "runtime_hash": null,
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [
+    "runtime"
+  ],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "toolchain-rust",
+      "argv_hash": "sha256:8486d9561e12a51de5ec438f1458ef70581e599bfa1409d96d0a6e46734a12f5",
+      "exit_code": 0
+    },
+    {
+      "id": "toolchain-llvm",
+      "argv_hash": "sha256:5c218374ff9812343ea5a0c7f52fde7e40fd198706ab2ba639d194f20f90decb",
+      "exit_code": 0
+    },
+    {
+      "id": "environment-packages",
+      "argv_hash": "sha256:367e60807afe55c0de8163e719f8ce2de648917e9122196e7cf7b53c3fddea98",
+      "exit_code": 0
+    },
+    {
+      "id": "git-revision-binding",
+      "argv_hash": "sha256:0572ba01cc3a0f14ccdeca92c0225c15d09e5f0e19139f6bf36b9f3c7bf6c39b",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-tests",
+      "argv_hash": "sha256:795eb7c61d91ef39f1031a69bbf5c569b355ab8bec69bb77b577068b52e94c47",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-release",
+      "argv_hash": "sha256:1edcee5273bd09129a7227d8d31c5757bb447627d32b0698bb3a1cd1725c3f91",
+      "exit_code": 0
+    },
+    {
+      "id": "native-probe",
+      "argv_hash": "sha256:8d2207034ad03cc8fa03c75a571f9b31e9f3ace19383ac879cf63b376876590f",
+      "exit_code": 0
+    },
+    {
+      "id": "graph-cli",
+      "argv_hash": "sha256:016e9cbd04eec4d2ec9c0bae13568826fef7d4b6cb39d7c2fb289ffc9bcd6c16",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-pre-commit",
+      "argv_hash": "sha256:b8fa89c8ce791cba94a1e342d101c0c2bb3a72f73d8e9aeea929ae106d28c28c",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-unit-tests",
+      "argv_hash": "sha256:5964df816921afcf874dbc56a1b0206891d331a603e281c3177b1778d8a97f8a",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-strict",
+      "argv_hash": "sha256:ca7d1f05b24d34fac70f2f54ab737f8ad82f2ec0c5cb6c354c32b4ca73b60fb0",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "target/release/il",
+      "sha256": "sha256:74763754b3f7a040e17cf4408c7ba539aa67de25c490aa079bd7b7bfdc63a486"
+    },
+    {
+      "path": "schema/program_graph.schema.json",
+      "sha256": "sha256:fd6c988ff193e2d458e307d6646e7a0a4f55a99a5fee3a48b088418c623208af"
+    },
+    {
+      "path": "schema/transaction.schema.json",
+      "sha256": "sha256:bb72d4276c70d463f9b9fde44ae38dc0d223f5c8330cee3c6987dfafcca29270"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "rust-tests",
+      "passed": true,
+      "count": 22
+    },
+    {
+      "suite": "native-probe",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "graph-cli",
+      "passed": true,
+      "count": 28
+    },
+    {
+      "suite": "bootstrap-pre-commit",
+      "passed": true,
+      "count": 7
+    },
+    {
+      "suite": "bootstrap-unit-tests",
+      "passed": true,
+      "count": 17
+    },
+    {
+      "suite": "bootstrap-strict",
+      "passed": true,
+      "count": 9
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified."
+  ]
+}
