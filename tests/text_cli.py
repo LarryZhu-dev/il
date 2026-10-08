@@ -150,6 +150,18 @@ class TextCliAcceptance(unittest.TestCase):
         self.assert_code(rejected, "E_SCHEMA_INVALID")
         self.assertEqual(self.head_revision(), 0)
 
+    def test_failed_text_transaction_retains_exact_source_and_diagnostics(self):
+        self.invoke("transact", import_request())
+        request = import_request(SOURCE.replace("= 0;", "= 0"), 1)
+        rejected = self.invoke("transact", request, False)
+        self.assert_code(rejected, "E_SCHEMA_INVALID")
+        self.assertEqual(self.head_revision(), 1)
+        candidate = self.store / rejected["result"]["candidate"]
+        self.assertEqual(json.loads((candidate / "request.json").read_text()), request)
+        self.assertEqual(json.loads((candidate / "diagnostics.json").read_text()), rejected["diagnostics"])
+        repeated = self.invoke("transact", request, False)
+        self.assertEqual(repeated["result"]["candidate"], rejected["result"]["candidate"])
+
     def test_graph_and_text_entrypoints_share_type_diagnostic(self):
         graph = copy.deepcopy(self.preview()["graph"])
         graph["functions"][0]["result"] = "Bool"

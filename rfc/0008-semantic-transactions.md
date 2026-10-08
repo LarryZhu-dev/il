@@ -19,6 +19,11 @@ program, and is deliberately broader than an individual module/function scope.
 Host-injected capabilities must equal the existing graph's capabilities; source
 text or normal graph transactions cannot create authority.
 
+If text parsing fails before a graph can exist, the failed transaction retains
+its exact decoded JSON request and diagnostics in a content-addressed experiment.
+Repeated identical failures reuse the same immutable experiment; no graph
+revision is published. Read-only `schema-check` never writes an experiment.
+
 Individual type/function edits and module declaration-list edits retain their
 exact entity scopes. Every candidate runs structural validation and the mandatory
 semantic checker before publication, regardless of requested checks. The Store

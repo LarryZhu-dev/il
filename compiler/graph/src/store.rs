@@ -224,6 +224,31 @@ impl Store {
         Ok(relative)
     }
 
+    /// Keep rejected text input even when parsing could not construct a graph.
+    /// The published revision is never changed by this operation.
+    pub fn retain_rejected_text(&self, base_revision: u64, request: &serde_json::Value, diagnostics: Vec<Diagnostic>) -> StoreResult<TransactionOutcome> {
+        if diagnostics.is_empty() { return Err(StoreError::new("E_SCHEMA_INVALID", "rejected input requires diagnostics")); }
+        let _lock = self.lock()?;
+        let head = self.read_head()?;
+        let request_bytes = canonical_bytes(request)?;
+        let diagnostic_bytes = canonical_bytes(&diagnostics)?;
+        let mut identity = request_bytes.clone();
+        identity.extend(&diagnostic_bytes);
+        let relative = format!(".il/experiments/{}", &hash_bytes(&identity)[7..]);
+        let directory = self.root.join(&relative);
+        fs::create_dir_all(&directory)?;
+        for (name, bytes) in [("request.json", request_bytes), ("diagnostics.json", diagnostic_bytes)] {
+            let path = directory.join(name);
+            if path.exists() {
+                if fs::read(&path)? != bytes { return Err(StoreError::new("E_STATE_INCONSISTENT", "rejected input differs from its retained identity")); }
+            } else { write_new(&path, &bytes)?; }
+        }
+        sync_directory(&directory)?;
+        sync_directory(&self.metadata().join("experiments"))?;
+        Ok(TransactionOutcome { ok: false, base_revision, result_revision: head.revision,
+            diagnostics, graph_hash: head.graph_hash, candidate: Some(relative) })
+    }
+
     fn publish(&self, graph: &Graph, parent: Option<&Head>, provenance: Provenance, reason: String, fault: Option<FaultPoint>) -> StoreResult<Head> {
         if fault == Some(FaultPoint::BeforeSnapshot) { return Err(StoreError::new("E_TOOLCHAIN_FAILURE", "injected interruption before snapshot")); }
         let directory = self.snapshot(graph.revision);
