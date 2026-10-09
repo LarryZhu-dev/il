@@ -76,7 +76,7 @@ def main() -> int:
             print(f"Recorded installed package versions in {log.relative_to(ROOT).as_posix()}", flush=True)
         else:
             print(process.stdout, end="", flush=True)
-        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli", "ai-protocol-cli"}
+        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "p09-transaction-process", "p09-build-process", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli", "ai-protocol-cli"}
         test_count = 0
         gate_error = None
         report_artifact = {}
@@ -175,10 +175,15 @@ def main() -> int:
             if not (ROOT / "Cargo.lock").exists():
                 raise RuntimeError("locked Rust builds require checked-in Cargo.lock")
             run("rust-tests", ["cargo", "test", "--workspace", "--locked", "--", "--nocapture"])
+            run("p09-fault-build", ["cargo", "build", "--locked", "-p", "il", "--features", "process-test-barriers"])
+            run("p09-transaction-process", [sys.executable, "tests/fault_injection/transaction_process.py", "--binary", "target/debug/il"])
+            run("p09-build-process", [sys.executable, "tests/fault_injection/build_process.py", "--binary", "target/debug/il"])
             if (ROOT / "tests/execution_cli.py").is_file():
-                run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
-                run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
+            run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
+            run("full-runtime-debug", ["cargo", "build", "--locked", "-p", "il-native-runtime"])
+            run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
             run("rust-release", ["cargo", "build", "--workspace", "--release", "--locked"])
+            run("full-runtime-release", ["cargo", "build", "--locked", "-p", "il-native-runtime", "--release"])
             if (ROOT / "runtime/minimal/build.py").is_file():
                 run("minimal-runtime", [sys.executable, "runtime/minimal/build.py", "--output", "target/release/libil_minimal_runtime.a"])
             if native_probe_enabled:

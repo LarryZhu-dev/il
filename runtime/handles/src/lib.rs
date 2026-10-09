@@ -24,12 +24,12 @@ pub struct HandleEvent{pub kind:HandleEventKind,pub handle:HandleId,pub error:Op
 enum Access{Read,Write,Duplex}
 struct Resource{fd:OwnedFd,kind:ResourceKind,access:Access,regular:bool,opened_at:u64}
 struct Slot{generation:u64,resource:Option<Resource>}
-struct IoFaults{successful:u64,max_chunk:Option<u64>,fail_after:Option<u64>}
+struct IoFaults{successful:u64,max_chunk:Option<u64>,fail_after:Option<u64>,accepts:u64,accept_fail_after:Option<u64>}
 pub struct HostResources{policy:ValidatedPolicy,stdio:InheritedStdio,allocator:Allocator,slots:Vec<Slot>,events:Vec<HandleEvent>,faults:IoFaults}
 
 impl HostResources{
     pub fn new(policy:ValidatedPolicy,stdio:InheritedStdio,allocator:Allocator)->Self{
-        let faults=IoFaults{successful:0,max_chunk:policy.faults().and_then(|f|f.io_max_chunk),fail_after:policy.faults().and_then(|f|f.io_fail_after)};
+        let faults=IoFaults{successful:0,max_chunk:policy.faults().and_then(|f|f.io_max_chunk),fail_after:policy.faults().and_then(|f|f.io_fail_after),accepts:0,accept_fail_after:policy.faults().and_then(|f|f.accept_fail_after)};
         Self{policy,stdio,allocator,slots:vec![],events:vec![],faults}
     }
     pub fn allocator(&self)->&Allocator{&self.allocator}
@@ -58,8 +58,10 @@ impl HostResources{
     }
     pub fn net_accept(&mut self,listener:HandleId,deadline:Deadline)->Result<HandleId,IoFailure>{
         self.validate_handle(listener,ResourceKind::Listener)?;let raw=self.lookup(listener)?.fd.as_raw_fd();
-        loop{wait(raw,false,false,deadline)?;let fd=unsafe{libc::accept4(raw,std::ptr::null_mut(),std::ptr::null_mut(),libc::SOCK_NONBLOCK|libc::SOCK_CLOEXEC)};
-            if fd>=0{return Ok(self.insert(Resource{fd:unsafe{OwnedFd::from_raw_fd(fd)},kind:ResourceKind::Stream,access:Access::Duplex,regular:false,opened_at:monotonic_now()?}))}
+        loop{wait(raw,false,false,deadline)?;
+            if self.faults.accept_fail_after.is_some_and(|after|self.faults.accepts>=after){return Err(IoError::Read.into())}
+            let fd=unsafe{libc::accept4(raw,std::ptr::null_mut(),std::ptr::null_mut(),libc::SOCK_NONBLOCK|libc::SOCK_CLOEXEC)};
+            if fd>=0{self.faults.accepts+=1;return Ok(self.insert(Resource{fd:unsafe{OwnedFd::from_raw_fd(fd)},kind:ResourceKind::Stream,access:Access::Duplex,regular:false,opened_at:monotonic_now()?}))}
             let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if error==libc::EINTR||error==libc::EAGAIN{continue}return Err(map_errno(error,Access::Read).into())
         }
     }

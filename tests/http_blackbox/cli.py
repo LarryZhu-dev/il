@@ -17,6 +17,17 @@ def locked():
     from contract import read_contract
     return read_contract(ROOT/'spec/http.yaml')
 
+def internal_http_imports():
+    roots=(ROOT/'tests/http_blackbox').glob('*.py')
+    offenders=[]
+    for path in roots:
+        text=path.read_text(encoding='utf-8')
+        for number,line in enumerate(text.splitlines(),1):
+            stripped=line.strip()
+            if stripped.startswith(('import packages.http','from packages.http','import http_runtime','from http_runtime')):
+                offenders.append(f'{path.relative_to(ROOT)}:{number}')
+    return offenders
+
 def fixture_source():
     source=(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8')
     old='"handler":"demo.hello","parameters":[{"name":"name","type_ref":"String","source":"path","max_utf8_bytes":128}]}]'
@@ -110,6 +121,9 @@ def server(executable,policy,directory):
         write_json(directory/'process.json',{'argv':[str(executable)],'sha256':sha(executable),'exit_code':process.returncode,'stdout_sha256':sha(directory/'stdout.log'),'stderr_sha256':sha(directory/'stderr.log')})
 
 class HttpAcceptance(unittest.TestCase):
+    def test_external_client_has_no_internal_http_imports(self):
+        self.assertEqual(internal_http_imports(),[])
+
     def fixture(self,name,source,*,faults=None):
         fixture=runtime_cli.RuntimeCliAcceptance('test_real_files_handles_and_cleanup');fixture.setUp();self.addCleanup(fixture.doCleanups)
         directory=REPORT.parent/'http-artifacts'/str(time.time_ns())/name;directory.mkdir(parents=True,exist_ok=True);fixture.store=directory/'store'
@@ -186,9 +200,10 @@ class HttpAcceptance(unittest.TestCase):
                     logs=(directory/'stderr.log').read_text();self.assertIn('E_HTTP_REQUEST_FAILED',logs);self.assertIn('E_HTTP_WRITE_TIMEOUT',logs)
                     for line in logs.splitlines():self.assertIn('code',json.loads(line))
     def test_captured_partial_io_uses_real_tcp_and_releases_resources(self):
-        faults={'allocation_fail_after':None,'io_max_chunk':2,'io_fail_after':None}
-        fixture,directory=self.fixture('partial',package_source()+'\n'+(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8'),faults=faults)
+        source=package_source()+'\n'+(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8')
         for profile in ('debug','release'):
+            faults={'allocation_fail_after':None,'io_max_chunk':2,'io_fail_after':None,'accept_fail_after':None}
+            fixture,directory=self.fixture(profile+'-partial',source,faults=faults)
             request_data=fixture.execute_request(isolation='native_'+profile);request_data['suite']['entry']='demo.serve_once';request_data['suite']['limits']['max_steps']=1_000_000;request_data['suite']['limits']['max_output_bytes']=1_048_576
             command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
             process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
@@ -213,6 +228,29 @@ class HttpAcceptance(unittest.TestCase):
                 self.assertGreaterEqual(len(execution['handle_events']),4);write_json(directory/(profile+'-execution.json'),retained)
             finally:
                 if process.poll() is None:process.kill();process.wait(timeout=5)
+
+    def test_captured_accept_failure_is_external_diagnostic_and_cleans_up(self):
+        rules=locked()['responses']['errors']
+        faults={'allocation_fail_after':None,'io_max_chunk':None,'io_fail_after':None,'accept_fail_after':0}
+        fixture,directory=self.fixture('accept-failure',package_source()+'\n'+(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8'),faults=faults)
+        request_data=fixture.execute_request(isolation='captured');request_data['suite']['entry']='demo.serve_once';request_data['suite']['limits']['max_steps']=1_000_000;request_data['suite']['limits']['max_output_bytes']=1_048_576
+        command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
+        completed=subprocess.run(command,input=json.dumps(request_data),capture_output=True,text=True,timeout=180)
+        reply=json.loads(completed.stdout)
+        if reply['ok']:
+            self.assertEqual(completed.returncode,0);retained=reply['result']
+        else:
+            self.assertEqual(completed.returncode,1)
+            self.assertTrue(reply['diagnostics'])
+            retained_path=max(fixture.store.glob('.il/builds/candidates/native-*/test-result.json'),key=lambda path:path.stat().st_mtime_ns)
+            retained=json.loads(retained_path.read_text(encoding='utf-8'))
+        execution=retained['execution']
+        self.assertEqual(execution['status'],'trapped')
+        self.assertEqual(execution['live_handles'],0)
+        self.assertEqual(execution['live_allocations'],0)
+        self.assertTrue(execution['diagnostics'])
+        self.assertEqual(execution['diagnostics'][0]['code'],'E_IO_READ')
+        write_json(directory/'accept-failure.json',{'expected_code':rules.get('accept_failure','E_IO_READ'),'actual_code':execution['diagnostics'][0]['code'],'execution':execution})
 
 def main():
     global REPORT

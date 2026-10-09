@@ -75,7 +75,8 @@ class BootstrapSchemaTests(unittest.TestCase):
         policy = {"schema_version": "1.0.0", "grants": [], "test_faults": None}
         CHECK.validate_file(ROOT, policy, "host_policy")
         for mutation in (dict(policy, shell="command"), dict(policy, test_faults={}),
-                         dict(policy, test_faults={"allocation_fail_after": None, "io_max_chunk": 0, "io_fail_after": None}),
+                         dict(policy, test_faults={"allocation_fail_after": None, "io_max_chunk": 0, "io_fail_after": None, "accept_fail_after": None}),
+                         dict(policy, test_faults={"allocation_fail_after": None, "io_max_chunk": 1, "io_fail_after": None}),
                          dict(policy, grants=[{"entity_id": "grant", "kind": "FileRead", "scope": "relative"}])):
             self.rejects(mutation, "host_policy")
 

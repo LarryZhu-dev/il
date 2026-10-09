@@ -65,7 +65,7 @@ class BytesCliAcceptance(unittest.TestCase):
         for case in LOCKED["cases"]:
             with self.subTest(case=case["id"]), self.scenario(case["id"]) as row:
                 faults = None if "fail_after" not in case else {
-                    "allocation_fail_after":case["fail_after"], "io_max_chunk":None, "io_fail_after":None}
+                    "allocation_fail_after":case["fail_after"], "io_max_chunk":None, "io_fail_after":None,"accept_fail_after":None}
                 self.policy_path = runtime_cli.write_json(self.root/(case["id"]+"-policy.json"),
                     {"schema_version":"1.0.0", "grants":[], "test_faults":faults})
                 self.invoke("transact", {"task_id":"P07-bytes", "base_revision":0, "scope":["program"],

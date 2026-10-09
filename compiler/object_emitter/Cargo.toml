@@ -4,7 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+process-test-barriers = []
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+libc.workspace = true

@@ -6,7 +6,7 @@ struct Candidate(Option<tempfile::TempDir>);
 impl Candidate{fn new()->Self{let root=repository().join("target/package-tests");fs::create_dir_all(&root).unwrap();Self(Some(tempfile::tempdir_in(root).unwrap()))}fn path(&self)->&Path{self.0.as_ref().unwrap().path()}}
 impl Drop for Candidate{fn drop(&mut self){if std::thread::panicking(){let path=self.0.take().unwrap().keep();eprintln!("retained package test failure: {}",path.display());}}}
 fn stream_arguments()->Vec<Value>{vec![Value{type_ref:"Bytes".into(),data:ValueData::Bytes(b"abcde".to_vec())},Value{type_ref:"core.Deadline".into(),data:ValueData::Variant(VariantValue{tag:"Infinite".into(),fields:vec![]})}]}
-fn chunk_policy(fail:Option<u64>)->il_runtime_startup::HostPolicy{let mut policy=il_runtime_startup::HostPolicy::empty();policy.test_faults=Some(il_runtime_startup::Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:fail});policy}
+fn chunk_policy(fail:Option<u64>)->il_runtime_startup::HostPolicy{let mut policy=il_runtime_startup::HostPolicy::empty();policy.test_faults=Some(il_runtime_startup::Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:fail,accept_fail_after:None});policy}
 fn program()->il_mir::Program{let graph=il_frontend::parse(&source(),0).unwrap();il_mir::lower(&il_hir::lower(&graph).unwrap()).unwrap()}
 #[test]
 fn package_sources_parse_check_and_execute(){

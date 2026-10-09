@@ -36,12 +36,12 @@
     {"id":"symlink_escape_write","grant":"write","relative_path":"escape/sentinel.bin","expected_error":"PermissionDenied"}
   ],
   "fault_cases": [
-    {"id":"read_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null},"operation":"file_read_some","maximum":6,"expected":{"tag":"Ok","bytes":[0,65],"live_handles":0}},
-    {"id":"write_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null},"operation":"file_write_some","expected":{"tag":"Ok","count":2,"file_bytes":[65,0],"live_handles":0}},
-    {"id":"second_read_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"two_file_reads","expected":{"first_bytes":[0,65],"tag":"Err","error":"Read","live_handles":0}},
-    {"id":"second_write_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"two_file_writes","expected":{"first_count":2,"tag":"Err","error":"Write","file_bytes":[65,0],"live_handles":0}},
-    {"id":"complete_print_stops_after_partial_failure","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"print_i64","integer":123456,"expected":{"tag":"Err","error":"Write","stdout":[49,50],"live_handles":0}},
-    {"id":"stdin_allocation_failure_is_other","faults":{"allocation_fail_after":0,"io_max_chunk":null,"io_fail_after":null},"operation":"stdin_read","maximum":6,"stdin":[0,65,127,128,255,10],"expected":{"tag":"Err","error":"Other","live_handles":0}}
+    {"id":"read_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null,"accept_fail_after":null},"operation":"file_read_some","maximum":6,"expected":{"tag":"Ok","bytes":[0,65],"live_handles":0}},
+    {"id":"write_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null,"accept_fail_after":null},"operation":"file_write_some","expected":{"tag":"Ok","count":2,"file_bytes":[65,0],"live_handles":0}},
+    {"id":"second_read_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1,"accept_fail_after":null},"operation":"two_file_reads","expected":{"first_bytes":[0,65],"tag":"Err","error":"Read","live_handles":0}},
+    {"id":"second_write_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1,"accept_fail_after":null},"operation":"two_file_writes","expected":{"first_count":2,"tag":"Err","error":"Write","file_bytes":[65,0],"live_handles":0}},
+    {"id":"complete_print_stops_after_partial_failure","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1,"accept_fail_after":null},"operation":"print_i64","integer":123456,"expected":{"tag":"Err","error":"Write","stdout":[49,50],"live_handles":0}},
+    {"id":"stdin_allocation_failure_is_other","faults":{"allocation_fail_after":0,"io_max_chunk":null,"io_fail_after":null,"accept_fail_after":null},"operation":"stdin_read","maximum":6,"stdin":[0,65,127,128,255,10],"expected":{"tag":"Err","error":"Other","live_handles":0}}
   ],
   "stream_cases": [
     {"id":"blocking_stdin_finite_deadline","nonblocking":false,"writer_open":true,"deadline_after_ms":100,"expected":{"tag":"Err","error":"InvalidData","elapsed_max_ms":2000}},
@@ -61,6 +61,7 @@
     {"id":"policy_unknown_field","reason":"host-policy schema is closed"},
     {"id":"policy_exceeds_64kib","reason":"host-policy byte limit is enforced before parsing"},
     {"id":"fault_zero_io_chunk","reason":"non-null io_max_chunk must be positive"},
+    {"id":"fault_missing_accept_field","reason":"accept_fail_after is required even when no accept fault is injected"},
     {"id":"request_injects_faults","reason":"ordinary tool request cannot supply trusted faults"},
     {"id":"application_fault_policy","reason":"test faults require captured execution"},
     {"id":"startup_missing_policy","reason":"required native authority must be injected on descriptor 4"},

@@ -67,7 +67,8 @@
           "required": [
             "allocation_fail_after",
             "io_max_chunk",
-            "io_fail_after"
+            "io_fail_after",
+            "accept_fail_after"
           ],
           "properties": {
             "allocation_fail_after": {
@@ -104,6 +105,12 @@
                   "minimum": 0,
                   "maximum": 18446744073709551615
                 }
+              ]
+            },
+            "accept_fail_after": {
+              "oneOf": [
+                {"type": "null"},
+                {"type": "integer", "minimum": 0, "maximum": 18446744073709551615}
               ]
             }
           }

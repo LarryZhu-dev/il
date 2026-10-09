@@ -7,7 +7,8 @@ fn grant(id:&str,kind:CapabilityKind,scope:Option<String>)->Capability{Capabilit
 #[test]
 fn closed_policy_schema_and_faults(){
     let good=br#"{"schema_version":"1.0.0","grants":[],"test_faults":null}"#;assert_eq!(HostPolicy::parse(good).unwrap(),HostPolicy::empty());
-    for json in [r#"{"schema_version":"1.0.0","grants":[]}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":null,"extra":1}"#,r#"{"schema_version":"1.0.0","schema_version":"1.0.0","grants":[],"test_faults":null}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_max_chunk":0,"io_fail_after":null}}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_max_chunk":1}}"#]{assert!(HostPolicy::parse(json.as_bytes()).is_err(),"accepted {json}");}
+    for json in [r#"{"schema_version":"1.0.0","grants":[]}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":null,"extra":1}"#,r#"{"schema_version":"1.0.0","schema_version":"1.0.0","grants":[],"test_faults":null}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_max_chunk":0,"io_fail_after":null,"accept_fail_after":null}}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_max_chunk":1,"io_fail_after":null}}"#,r#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_fail_after":null,"accept_fail_after":null}}"#]{assert!(HostPolicy::parse(json.as_bytes()).is_err(),"accepted {json}");}
+    assert!(HostPolicy::parse(br#"{"schema_version":"1.0.0","grants":[],"test_faults":{"allocation_fail_after":null,"io_max_chunk":1,"io_fail_after":null,"accept_fail_after":null}}"#).is_ok());
     assert!(HostPolicy::parse(&vec![b' ';POLICY_MAX_BYTES+1]).is_err());
     let mut policy=HostPolicy::empty();let clock=grant("clock",CapabilityKind::ClockRead,None);policy.grants=vec![clock.clone(),clock];assert!(policy.validate().is_err());
     policy.grants=vec![grant("file",CapabilityKind::FileRead,Some("relative".into()))];assert!(policy.validate().is_err());
@@ -20,7 +21,8 @@ fn exact_grants_and_stable_indices_are_checked_before_start(){
     let mut policy=HostPolicy::empty();policy.grants=vec![read.clone(),clock.clone()];
     let checked=ValidatedPolicy::new(policy.clone(),&[read.clone(),clock.clone()],false).unwrap();assert_eq!(checked.grant_id("a_clock"),Some(GrantId(0)));assert_eq!(checked.grant_id("z_read"),Some(GrantId(1)));assert!(checked.directory(GrantId(1),CapabilityKind::FileRead).is_ok());assert!(checked.directory(GrantId(0),CapabilityKind::FileRead).is_err());
     let mut wrong=read.clone();wrong.scope=Some("/".into());assert!(ValidatedPolicy::new(policy.clone(),&[wrong],true).is_err());assert!(ValidatedPolicy::new(policy.clone(),&[read.clone(),read],true).is_err());
-    policy.test_faults=Some(Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None});assert!(ValidatedPolicy::new(policy.clone(),&[],false).is_err());assert!(ValidatedPolicy::new(policy,&[],true).is_ok());
+    policy.test_faults=Some(Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None,accept_fail_after:None});assert!(ValidatedPolicy::new(policy.clone(),&[],false).is_err());assert!(ValidatedPolicy::new(policy,&[],true).is_ok());
+    let mut policy=HostPolicy::empty();policy.test_faults=Some(Faults{allocation_fail_after:None,io_max_chunk:None,io_fail_after:None,accept_fail_after:Some(0)});assert!(ValidatedPolicy::new(policy.clone(),&[],false).is_err());assert!(ValidatedPolicy::new(policy,&[],true).is_ok());
 }
 
 #[test]

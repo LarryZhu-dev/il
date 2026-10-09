@@ -15,6 +15,8 @@ pub struct Faults{
     pub io_max_chunk:Option<u64>,
     #[serde(deserialize_with="required_nullable")]
     pub io_fail_after:Option<u64>,
+    #[serde(deserialize_with="required_nullable")]
+    pub accept_fail_after:Option<u64>,
 }
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]

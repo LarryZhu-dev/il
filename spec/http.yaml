@@ -66,6 +66,7 @@ responses:
     connect: 405
     unsupported_http_version: 505
     handler_error: 500
+    accept_failure: 500
   error_body: empty
   method_not_allowed_header: 'Allow: GET'
 io:

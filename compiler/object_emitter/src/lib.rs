@@ -23,6 +23,10 @@ pub fn save_json(path:&Path,value:&impl Serialize)->Result<(),String>{let bytes=
 pub fn invoke(commands:&mut Vec<CommandRecord>,directory:&Path,stage:&str,program:&str,args:Vec<String>)->Result<(),String>{
     if !["/usr/bin/opt-14","/usr/bin/llc-14","/usr/bin/clang-14"].contains(&program){return Err("tool is outside the fixed LLVM allowlist".into())}
     let mut command=Command::new(program);command.args(&args).current_dir(directory).env_clear().env("PATH","/usr/bin:/bin");
+    #[cfg(feature = "process-test-barriers")]
+    let output=process::bounded_command_for_stage(command,Duration::from_secs(60),
+        if stage == "link_runtime" { Some(stage) } else { None });
+    #[cfg(not(feature = "process-test-barriers"))]
     let output=bounded_command(command,Duration::from_secs(60));
     let (exit_code,stdout,stderr)=match output{Ok(v)=>v,Err(v)=>{
         commands.push(CommandRecord{stage:stage.into(),program:program.into(),arguments:args,exit_code:v.exit_code,stdout:String::from_utf8_lossy(&v.stdout).into_owned(),stderr:String::from_utf8_lossy(&v.stderr).into_owned()});let _=save_json(&directory.join("commands.json"),commands);return Err(v.message);

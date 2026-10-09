@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+process-test-barriers = ["il-object-emitter/process-test-barriers"]
+
 [dependencies]
 il-execution-model.workspace = true
 serde.workspace = true

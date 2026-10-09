@@ -236,7 +236,7 @@ fn io_types()->Vec<TypeDef>{
     vec![error]
 }
 fn faults(allocation:Option<u64>,chunk:Option<u64>,io:Option<u64>)->il_runtime_startup::HostPolicy{
-    il_runtime_startup::HostPolicy{test_faults:Some(il_runtime_startup::Faults{allocation_fail_after:allocation,io_max_chunk:chunk,io_fail_after:io}),..il_runtime_startup::HostPolicy::empty()}
+    il_runtime_startup::HostPolicy{test_faults:Some(il_runtime_startup::Faults{allocation_fail_after:allocation,io_max_chunk:chunk,io_fail_after:io,accept_fail_after:None}),..il_runtime_startup::HostPolicy::empty()}
 }
 #[test]
 fn host_print_partial_failure_and_shared_allocation_faults(){

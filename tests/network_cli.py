@@ -78,7 +78,7 @@ class NetworkCliAcceptance(unittest.TestCase):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1",0));listener.listen();listener.settimeout(1)
             endpoint="127.0.0.1:"+str(listener.getsockname()[1])
-            faults={"allocation_fail_after":None,"io_max_chunk":LOCKED["io_max_chunk"],"io_fail_after":None}
+            faults={"allocation_fail_after":None,"io_max_chunk":LOCKED["io_max_chunk"],"io_fail_after":None,"accept_fail_after":None}
             body='let stream:net.Stream=runtime.net_connect[endpoint](core.Deadline::Infinite())?;let until:core.Deadline=core.Deadline::At(runtime.net_opened_at(stream)+5000000000);let mut offset:Usize=0;while offset<runtime.bytes_len(data){let count:Usize=runtime.net_write(stream,data,offset,until)?;if count==0{return Err(core.IoError::Write());}offset=offset+count;}let mut output:Bytes=runtime.bytes_slice(data,0,0)?;while runtime.bytes_len(output)<cast<Usize>(5){let chunk:Bytes=runtime.net_read(stream,5,until)?;if runtime.bytes_len(chunk)==cast<Usize>(0){return Err(core.IoError::Closed());}output=runtime.bytes_concat(output,chunk)?;}return Ok(output);'
             with self.scenario("connect_roundtrip") as row:
                 self.policy_path=runtime_cli.write_json(self.root/"connect-policy.json",policy("Connect",endpoint,faults));self.publish(source("Connect",endpoint,body));row["executions"]={}

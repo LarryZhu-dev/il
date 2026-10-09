@@ -589,7 +589,8 @@ class RuntimeCliAcceptance(unittest.TestCase):
         malformed = {
             "policy_duplicate_grant_id": duplicate,
             "policy_unknown_field": dict(empty, command="forbidden"),
-            "fault_zero_io_chunk": dict(empty, test_faults={"allocation_fail_after": None, "io_max_chunk": 0, "io_fail_after": None}),
+            "fault_zero_io_chunk": dict(empty, test_faults={"allocation_fail_after": None, "io_max_chunk": 0, "io_fail_after": None, "accept_fail_after": None}),
+            "fault_missing_accept_field": dict(empty, test_faults={"allocation_fail_after": None, "io_max_chunk": 1, "io_fail_after": None}),
         }
         for identity, policy in malformed.items():
             with self.subTest(case=identity), self.scenario(identity):
@@ -677,7 +678,7 @@ class RuntimeCliAcceptance(unittest.TestCase):
             malformed.write_text("{", encoding="utf-8")
             insufficient = self.host.write_policy([], filename="insufficient-policy.json")
             fault_policy = self.host.write_policy(["write"], {"allocation_fail_after": None,
-                "io_max_chunk": 1, "io_fail_after": None}, filename="application-fault-policy.json")
+                "io_max_chunk": 1, "io_fail_after": None, "accept_fail_after": 0}, filename="application-fault-policy.json")
             policies = {"missing": None, "malformed": malformed, "insufficient": insufficient, "faults": fault_policy}
             row["rejected"] = {}
             for name, path in policies.items():

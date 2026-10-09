@@ -8,7 +8,7 @@ fn cloned_allocator_shares_attempts_quota_and_release(){
 
 #[test]
 fn allocation_fault_thresholds_are_execution_local_and_zero_based(){
-    for threshold in [0,1,2]{let faults=Faults{allocation_fail_after:Some(threshold),io_max_chunk:None,io_fail_after:None};let allocator=Allocator::new(Some(&faults),None);for _ in 0..threshold{drop(allocator.allocate(1).unwrap());}assert_eq!(allocator.allocate(1).err(),Some(AllocFailure::OutOfMemory));assert_eq!(allocator.allocate(1).err(),Some(AllocFailure::OutOfMemory));assert_eq!(allocator.attempts(),threshold+2);}
+    for threshold in [0,1,2]{let faults=Faults{allocation_fail_after:Some(threshold),io_max_chunk:None,io_fail_after:None,accept_fail_after:None};let allocator=Allocator::new(Some(&faults),None);for _ in 0..threshold{drop(allocator.allocate(1).unwrap());}assert_eq!(allocator.allocate(1).err(),Some(AllocFailure::OutOfMemory));assert_eq!(allocator.allocate(1).err(),Some(AllocFailure::OutOfMemory));assert_eq!(allocator.attempts(),threshold+2);}
     assert!(Allocator::new(None,None).allocate(1).is_ok());
 }
 

@@ -18,10 +18,16 @@ pub fn kill_on_parent_death(command:&mut Command){
     #[cfg(not(target_os="linux"))]let _=command;
 }
 pub fn bounded_command(mut command:Command,timeout:Duration)->Result<(Option<i32>,Vec<u8>,Vec<u8>),ProcessFailure>{
+    bounded_command_for_stage(command, timeout, None)
+}
+pub fn bounded_command_for_stage(mut command:Command,timeout:Duration,stage:Option<&str>)->Result<(Option<i32>,Vec<u8>,Vec<u8>),ProcessFailure>{
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(unix)]{use std::os::unix::process::CommandExt;command.process_group(0);}
     kill_on_parent_death(&mut command);
+    let process_directory=command.get_current_dir().map(|path| path.to_path_buf());
     let mut child=command.spawn().map_err(|e|ProcessFailure{message:e.to_string(),exit_code:None,stdout:vec![],stderr:vec![]})?;
+    #[cfg(all(feature = "process-test-barriers", target_os = "linux"))]
+    if let Some(stage) = stage { process_barrier(stage, child.id(), process_directory); }
     let out=child.stdout.take().unwrap();let err=child.stderr.take().unwrap();
     let capped=Arc::new(AtomicBool::new(false));
     let read=|mut stream:Box<dyn Read+Send>,capped:Arc<AtomicBool>|{let mut bytes=vec![];let result=stream.by_ref().take(OUTPUT_LIMIT+1).read_to_end(&mut bytes);if bytes.len() as u64>OUTPUT_LIMIT{capped.store(true,Ordering::Release);} (result,bytes)};
@@ -42,6 +48,28 @@ pub fn bounded_command(mut command:Command,timeout:Duration)->Result<(Option<i32
     if out.len() as u64>OUTPUT_LIMIT||err.len() as u64>OUTPUT_LIMIT{out.truncate(OUTPUT_LIMIT as usize);err.truncate(OUTPUT_LIMIT as usize);failed=Some("native output limit exceeded".into())}
     if out_read.is_err()||err_read.is_err(){failed=Some("cannot read native output".into())}
     if let Some(message)=failed{Err(ProcessFailure{message,exit_code:code,stdout:out,stderr:err})}else{Ok((code,out,err))}
+}
+
+#[cfg(all(feature = "process-test-barriers", target_os = "linux"))]
+fn process_barrier(stage: &str, child: u32, directory: Option<std::path::PathBuf>) {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::fd::FromRawFd;
+    const FD: i32 = 198;
+    if unsafe { libc::fcntl(FD, libc::F_GETFD) } < 0 { return; }
+    let stream = unsafe { std::fs::File::from_raw_fd(FD) };
+    let Ok(read_stream) = stream.try_clone() else { return; };
+    let mut reader = BufReader::new(read_stream);
+    let mut phase = String::new();
+    if reader.read_line(&mut phase).is_err() || phase.trim_end() != stage { return; }
+    let mut stream = stream;
+    let event = format!("{{\"stage\":\"{stage}\",\"parent_pid\":{},\"worker_pid\":{child}}}\n", std::process::id());
+    let marker = directory.unwrap_or_else(|| std::env::current_dir().unwrap_or_default()).join("process-interrupted.json");
+    let _ = std::fs::write(marker, format!("{{\"schema_version\":\"1.0.0\",\"status\":\"INTERRUPTED\",\"diagnostics\":[{{\"code\":\"E_PROCESS_INTERRUPTED\",\"stage\":\"{stage}\",\"worker_pid\":{child}}}]}}\n"));
+    if stream.write_all(event.as_bytes()).is_ok() {
+        let mut release = String::new();
+        let _ = reader.read_line(&mut release);
+    }
+    std::mem::forget(stream);
 }
 
 fn terminate(child:&mut std::process::Child){

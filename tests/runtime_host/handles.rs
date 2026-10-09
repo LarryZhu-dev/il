@@ -32,13 +32,13 @@ fn containment_and_held_directory_authority(){
 
 #[test]
 fn actual_partial_io_and_failure_counters(){
-    let dir=tempfile::tempdir().unwrap();let(r,w)=pipe(true);let faults=Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2)};let mut host=host(dir.path(),Some(faults),InheritedStdio::new(Some(r),Some(w),None),None);
+    let dir=tempfile::tempdir().unwrap();let(r,w)=pipe(true);let faults=Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2),accept_fail_after:None};let mut host=host(dir.path(),Some(faults),InheritedStdio::new(Some(r),Some(w),None),None);
     assert_eq!(host.stdout_write(b"hello",0,Deadline::Infinite),Ok(2));assert_eq!(host.stdin_read(5,Deadline::Infinite).unwrap().as_slice(),b"he");assert_eq!(host.successful_io_calls(),2);assert_eq!(host.stdout_write(b"hello",2,Deadline::Infinite),Err(IoError::Write.into()));assert_eq!(host.stdin_read(1,Deadline::Infinite).err(),Some(IoError::Read.into()));
 }
 
 #[test]
 fn allocation_fault_is_typed_and_quota_is_distinct(){
-    let dir=tempfile::tempdir().unwrap();fs::write(dir.path().join("input"),b"x").unwrap();let faults=Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);let h=failing.open_read(read_grant(&failing),"input").unwrap();assert_eq!(failing.read_some(h,1,Deadline::Infinite).err(),Some(IoError::Other.into()));failing.close(h,ResourceKind::File).unwrap();
+    let dir=tempfile::tempdir().unwrap();fs::write(dir.path().join("input"),b"x").unwrap();let faults=Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None,accept_fail_after:None};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);let h=failing.open_read(read_grant(&failing),"input").unwrap();assert_eq!(failing.read_some(h,1,Deadline::Infinite).err(),Some(IoError::Other.into()));failing.close(h,ResourceKind::File).unwrap();
     let mut quota=host(dir.path(),None,no_stdio(),Some(0));let h=quota.open_read(read_grant(&quota),"input").unwrap();assert_eq!(quota.read_some(h,1,Deadline::Infinite).err(),Some(IoFailure::ResourceLimit));quota.close(h,ResourceKind::File).unwrap();
 }
 
@@ -74,8 +74,8 @@ fn whole_file_helpers_close_on_every_path_and_allocate_one_guest_result(){
     let dir=tempfile::tempdir().unwrap();let data=vec![b'x';20001];fs::write(dir.path().join("large"),&data).unwrap();let mut resource=host(dir.path(),None,no_stdio(),Some(30000));
     let output=resource.read_all(read_grant(&resource),"large").unwrap();assert_eq!(output.as_slice(),data);assert_eq!(resource.allocator().attempts(),1);assert_eq!(resource.allocator().live_allocations(),1);assert_eq!(resource.allocator().peak_bytes(),data.len()as u64);assert_eq!(resource.live_handles(),0);drop(output);
     let mut quota=host(dir.path(),None,no_stdio(),Some(10));assert_eq!(quota.read_all(read_grant(&quota),"large").err(),Some(IoFailure::ResourceLimit));assert_eq!(quota.live_handles(),0);assert_eq!(quota.allocator().attempts(),0);
-    let faults=Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2)};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);assert_eq!(failing.write_all(write_grant(&failing),"partial",b"abcdef"),Err(IoError::Write.into()));assert_eq!(fs::read(dir.path().join("partial")).unwrap(),b"abcd");assert_eq!(failing.live_handles(),0);
-    let faults=Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);assert_eq!(failing.read_all(read_grant(&failing),"large").err(),Some(IoError::Other.into()));assert_eq!(failing.live_handles(),0);assert_eq!(failing.allocator().attempts(),1);
+    let faults=Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2),accept_fail_after:None};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);assert_eq!(failing.write_all(write_grant(&failing),"partial",b"abcdef"),Err(IoError::Write.into()));assert_eq!(fs::read(dir.path().join("partial")).unwrap(),b"abcd");assert_eq!(failing.live_handles(),0);
+    let faults=Faults{allocation_fail_after:Some(0),io_max_chunk:None,io_fail_after:None,accept_fail_after:None};let mut failing=host(dir.path(),Some(faults),no_stdio(),None);assert_eq!(failing.read_all(read_grant(&failing),"large").err(),Some(IoError::Other.into()));assert_eq!(failing.live_handles(),0);assert_eq!(failing.allocator().attempts(),1);
 }
 
 #[test]
@@ -91,15 +91,40 @@ fn within()->Deadline{Deadline::At(monotonic_now().unwrap()+1_000_000_000)}
 fn connected(host:&mut HostResources)->(HandleId,HandleId,HandleId){let listener=host.net_listen(host.policy().grant_id("listen").unwrap()).unwrap();let client=host.net_connect(host.policy().grant_id("connect").unwrap(),within()).unwrap();let server=host.net_accept(listener,within()).unwrap();assert!(host.net_opened_at(client).unwrap()<=host.net_opened_at(server).unwrap());assert!(host.net_opened_at(server).unwrap()<=monotonic_now().unwrap());assert_eq!(host.net_opened_at(listener),Err(IoError::InvalidData.into()));(listener,client,server)}
 #[test]
 fn actual_ipv4_ipv6_partial_tcp_io_and_resource_kind_guards(){
-    for ip in ["127.0.0.1","[::1]"]{let mut host=network_host(ip,Some(Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:None}));let(listener,client,server)=connected(&mut host);assert_eq!(host.live_handles(),3);
+    for ip in ["127.0.0.1","[::1]"]{let mut host=network_host(ip,Some(Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:None,accept_fail_after:None}));let(listener,client,server)=connected(&mut host);assert_eq!(host.live_handles(),3);
         assert_eq!(host.close(client,ResourceKind::File),Err(IoError::InvalidData.into()));assert_eq!(host.read_some(client,1,within()).err(),Some(IoError::InvalidData.into()));assert_eq!(host.net_read(listener,1,within()).err(),Some(IoError::InvalidData.into()));assert_eq!(host.net_write(client,b"abcde",0,within()),Ok(2));assert_eq!(host.net_read(server,10,within()).unwrap().as_slice(),b"ab");assert_eq!(host.net_write(server,b"reply",0,within()),Ok(2));assert_eq!(host.net_read(client,10,within()).unwrap().as_slice(),b"re");assert_eq!(host.successful_io_calls(),4);assert_eq!(host.net_write(client,b"abcde",5,within()),Ok(0));assert_eq!(host.net_write(client,b"abcde",6,within()),Err(IoError::InvalidData.into()));
         host.close(client,ResourceKind::Stream).unwrap();assert!(host.net_read(server,10,within()).unwrap().is_empty());host.drop_handle(server,ResourceKind::Stream).unwrap();host.close(listener,ResourceKind::Listener).unwrap();assert_eq!(host.live_handles(),0);assert_eq!(host.close(listener,ResourceKind::Listener),Err(IoError::Closed.into()));
     }
 }
 #[test]
+fn tcp_accept_syscall_fault_thresholds_preserve_listener_and_cleanup(){
+    for threshold in [0,1]{
+        let mut host=network_host("127.0.0.1",Some(Faults{allocation_fail_after:None,io_max_chunk:None,io_fail_after:None,accept_fail_after:Some(threshold)}));
+        let listener=host.net_listen(host.policy().grant_id("listen").unwrap()).unwrap();
+        let first=host.net_connect(host.policy().grant_id("connect").unwrap(),within()).unwrap();
+        let mut accepted=Vec::new();
+        if threshold==1{
+            accepted.push(host.net_accept(listener,within()).unwrap());
+            let second=host.net_connect(host.policy().grant_id("connect").unwrap(),within()).unwrap();
+            assert_eq!(host.net_accept(listener,within()),Err(IoError::Read.into()));
+            assert_eq!(host.live_handles(),4);
+            for stream in [first,second]{host.close(stream,ResourceKind::Stream).unwrap();}
+        }else{
+            assert_eq!(host.net_accept(listener,within()),Err(IoError::Read.into()));
+            assert_eq!(host.live_handles(),2);
+            host.close(first,ResourceKind::Stream).unwrap();
+        }
+        assert_eq!(host.validate_handle(listener,ResourceKind::Listener),Ok(()));
+        for stream in accepted{host.close(stream,ResourceKind::Stream).unwrap();}
+        host.close(listener,ResourceKind::Listener).unwrap();
+        assert_eq!(host.live_handles(),0);
+    }
+}
+
+#[test]
 fn tcp_deadlines_and_shared_positive_syscall_fault_counter(){
     let mut host=network_host("127.0.0.1",None);let listener=host.net_listen(host.policy().grant_id("listen").unwrap()).unwrap();let start=Instant::now();assert_eq!(host.net_accept(listener,Deadline::At(monotonic_now().unwrap()+30_000_000)),Err(IoError::Timeout.into()));assert!(start.elapsed()>=Duration::from_millis(25));assert!(start.elapsed()<Duration::from_secs(1));assert_eq!(host.net_connect(host.policy().grant_id("connect").unwrap(),Deadline::At(0)),Err(IoError::Timeout.into()));assert_eq!(host.live_handles(),1);host.close(listener,ResourceKind::Listener).unwrap();
-    let mut host=network_host("127.0.0.1",Some(Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2)}));let(listener,client,server)=connected(&mut host);assert_eq!(host.successful_io_calls(),0);assert_eq!(host.net_write(client,b"abc",0,within()),Ok(2));assert_eq!(host.net_read(server,8,within()).unwrap().as_slice(),b"ab");assert_eq!(host.net_write(server,b"x",0,within()),Err(IoError::Write.into()));assert_eq!(host.net_read(client,1,within()).err(),Some(IoError::Read.into()));for(handle,kind)in [(listener,ResourceKind::Listener),(client,ResourceKind::Stream),(server,ResourceKind::Stream)]{host.close(handle,kind).unwrap();}assert_eq!(host.live_handles(),0);
+    let mut host=network_host("127.0.0.1",Some(Faults{allocation_fail_after:None,io_max_chunk:Some(2),io_fail_after:Some(2),accept_fail_after:None}));let(listener,client,server)=connected(&mut host);assert_eq!(host.successful_io_calls(),0);assert_eq!(host.net_write(client,b"abc",0,within()),Ok(2));assert_eq!(host.net_read(server,8,within()).unwrap().as_slice(),b"ab");assert_eq!(host.net_write(server,b"x",0,within()),Err(IoError::Write.into()));assert_eq!(host.net_read(client,1,within()).err(),Some(IoError::Read.into()));for(handle,kind)in [(listener,ResourceKind::Listener),(client,ResourceKind::Stream),(server,ResourceKind::Stream)]{host.close(handle,kind).unwrap();}assert_eq!(host.live_handles(),0);
 }
 
 #[test]

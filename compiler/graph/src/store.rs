@@ -274,7 +274,11 @@ impl Store {
         if temporary.exists() { fs::remove_file(&temporary)?; }
         write_new(&temporary, &canonical_bytes(&head)?)?;
         if fault == Some(FaultPoint::BeforeHeadPublication) { return Err(StoreError::new("E_TOOLCHAIN_FAILURE", "injected interruption before HEAD publication")); }
+        #[cfg(feature = "process-test-barriers")]
+        process_barrier("transaction_before_head_rename");
         fs::rename(temporary, self.metadata().join("HEAD"))?;
+        #[cfg(feature = "process-test-barriers")]
+        process_barrier("transaction_after_head_rename");
         if fault == Some(FaultPoint::AfterHeadPublication) {
             return Err(StoreError::durability(graph.revision, "HEAD published; injected interruption before directory synchronization; reload HEAD before taking further action"));
         }
@@ -338,6 +342,29 @@ impl Store {
         Ok(result)
     }
 }
+
+#[cfg(all(feature = "process-test-barriers", target_os = "linux"))]
+fn process_barrier(stage: &str) {
+    use std::io::Write;
+    use std::os::fd::FromRawFd;
+    const FD: i32 = 198;
+    if unsafe { libc::fcntl(FD, libc::F_GETFD) } < 0 { return; }
+    let stream = unsafe { std::fs::File::from_raw_fd(FD) };
+    let mut phase = String::new();
+    let mut byte=[0u8;1];
+    loop { if std::io::Read::read_exact(&mut &stream, &mut byte).is_err() { return; } if byte[0]==b'\n' { break; } phase.push(byte[0] as char); if phase.len()>128{return;} }
+    if phase.trim_end() != stage { return; }
+    let message = format!("{{\"stage\":\"{stage}\",\"pid\":{}}}\n", std::process::id());
+    let mut stream = stream;
+    if stream.write_all(message.as_bytes()).is_ok() {
+        let mut release = String::new();
+        loop { if std::io::Read::read_exact(&mut &stream, &mut byte).is_err() { break; } if byte[0]==b'\n' { break; } release.push(byte[0] as char); }
+    }
+    std::mem::forget(stream);
+}
+
+#[cfg(all(feature = "process-test-barriers", not(target_os = "linux")))]
+fn process_barrier(_: &str) {}
 
 /// Locate one entity and serialize only requested fields of large containers.
 pub fn entity_view(graph: &Graph, id: &str, fields: Option<&[String]>) -> StoreResult<serde_json::Value> {

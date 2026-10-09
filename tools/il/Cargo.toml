@@ -21,3 +21,6 @@ il-link-driver.workspace = true
 tempfile.workspace = true
 il-object-emitter.workspace = true
 il-runtime-startup.workspace = true
+
+[features]
+process-test-barriers = ["il-graph/process-test-barriers", "il-link-driver/process-test-barriers"]
