@@ -4,11 +4,11 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-P00–P04 are verified, including a successful
-[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37772237811).
+P00–P06 are verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37876306998).
 The verified implementation includes the shared static checker, structured text
 frontend, semantic graph transactions, HIR/MIR, bounded interpreter and LLVM native
-compiler. Operating-system runtime, HTTP packages, extensions and self-hosting
+compiler and operating-system runtime. HTTP packages, extensions and self-hosting
 are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
 No release is available until all of its gates pass.
@@ -36,7 +36,7 @@ P05 native compilation is verified on Linux x86-64, including interpreter/native
 parity, real debug/release ELF execution, output failures and reproducible native
 artifacts. Immutable evidence is in `eval/evidence/ev_P05_0.json`; the matching
 [hosted acceptance run](https://github.com/LarryZhu-dev/il/actions/runs/37871320400)
-passed. P06 operating-system resources and runtime modes remain under development.
+passed. P06 operating-system resources and runtime modes are also verified.
 Build the CLI and native runtime
 archive together with `./tools/dev.ps1 build`. To publish and compile
 an application into a real Linux ELF in Docker:
@@ -66,7 +66,9 @@ execution and persistent candidate records.
 
 ## P06 runtime integration
 
-P06 is under acceptance. RFC 0018 defines owned `core.File` resources, absolute
+P06 is verified with immutable evidence in `eval/evidence/ev_P06_0.json` and
+the matching [hosted acceptance run](https://github.com/LarryZhu-dev/il/actions/runs/37876306998).
+RFC 0018 defines owned `core.File` resources, absolute
 `core.Deadline` values, partial I/O, failure injection and independent runtime
 profiles. The checked source packages in `packages/core`, `packages/alloc` and
 `packages/io` compose with `examples/hello/main.il`; their manifests describe the

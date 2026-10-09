@@ -1,0 +1,1706 @@
+{
+  "evidence_id": "ev_P06_0",
+  "task_id": "P06",
+  "phase": "runtime",
+  "revision": 0,
+  "git_commit": "97cc3bd2141275ecbb149b6c03293bbb5a8a2ebf",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:8f9054b308dd849a4754a645419e22e1b881a7344574dc099027068f134952c4",
+  "runtime_hash": "sha256:cb4ec97003865e0061041fbe374d2b5d50351e0812865fbd78c48511937df57f",
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "toolchain-rust",
+      "argv_hash": "sha256:8486d9561e12a51de5ec438f1458ef70581e599bfa1409d96d0a6e46734a12f5",
+      "exit_code": 0
+    },
+    {
+      "id": "toolchain-llvm",
+      "argv_hash": "sha256:5c218374ff9812343ea5a0c7f52fde7e40fd198706ab2ba639d194f20f90decb",
+      "exit_code": 0
+    },
+    {
+      "id": "environment-packages",
+      "argv_hash": "sha256:367e60807afe55c0de8163e719f8ce2de648917e9122196e7cf7b53c3fddea98",
+      "exit_code": 0
+    },
+    {
+      "id": "git-revision-binding",
+      "argv_hash": "sha256:0572ba01cc3a0f14ccdeca92c0225c15d09e5f0e19139f6bf36b9f3c7bf6c39b",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-tests",
+      "argv_hash": "sha256:b8758b5fda73b97335daeec6e51944a6f7f6bc67183fbeaca92bd893cbd2a69f",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-debug",
+      "argv_hash": "sha256:8372ed38fa4fbd2e29ed3626a55fc80e06e31527c3dc66b79b57d1c94d6dfb5f",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli-debug",
+      "argv_hash": "sha256:e5bba993afc90822cf23b9c0c99833ef6b4f0e2af0a10d2b1680f138b7c77154",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-release",
+      "argv_hash": "sha256:1edcee5273bd09129a7227d8d31c5757bb447627d32b0698bb3a1cd1725c3f91",
+      "exit_code": 0
+    },
+    {
+      "id": "minimal-runtime",
+      "argv_hash": "sha256:5d152054617289fe7cbcd0e7f1916abc1522111cc80c0ec8369995a46c4bc34e",
+      "exit_code": 0
+    },
+    {
+      "id": "native-probe",
+      "argv_hash": "sha256:8d2207034ad03cc8fa03c75a571f9b31e9f3ace19383ac879cf63b376876590f",
+      "exit_code": 0
+    },
+    {
+      "id": "graph-cli",
+      "argv_hash": "sha256:016e9cbd04eec4d2ec9c0bae13568826fef7d4b6cb39d7c2fb289ffc9bcd6c16",
+      "exit_code": 0
+    },
+    {
+      "id": "semantic-cli",
+      "argv_hash": "sha256:e65b17c3e5364dcd1ecfdf8d7c6d9c57269a7df687939c642e52d5ab4e9d80be",
+      "exit_code": 0
+    },
+    {
+      "id": "text-cli",
+      "argv_hash": "sha256:7c6678f69c8c4ca741e587a0227bcbdfe00eef88af45b056a8c6310076bc9818",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli",
+      "argv_hash": "sha256:cbd9c7fefdf5ec7c75a8f67e8f148ed9c8b3b11dcdea010058d3106c5ae4193d",
+      "exit_code": 0
+    },
+    {
+      "id": "native-cli",
+      "argv_hash": "sha256:b742f39d46fc82d5401685a6cb3d9548d91324dfd6f1b8b1c5bfec16072ef44f",
+      "exit_code": 0
+    },
+    {
+      "id": "runtime-cli",
+      "argv_hash": "sha256:3de374d619d47694b844287146faf85d690134488c9a7eb01716cf6af6f532a8",
+      "exit_code": 0
+    },
+    {
+      "id": "interpreter-profile-parity",
+      "argv_hash": "sha256:ac3bba6d57e03ae222b7fcf18ff96a359249371a04d95022abbaee5ce2a8368e",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-pre-commit",
+      "argv_hash": "sha256:b8fa89c8ce791cba94a1e342d101c0c2bb3a72f73d8e9aeea929ae106d28c28c",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-unit-tests",
+      "argv_hash": "sha256:5964df816921afcf874dbc56a1b0206891d331a603e281c3177b1778d8a97f8a",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-strict",
+      "argv_hash": "sha256:ca7d1f05b24d34fac70f2f54ab737f8ad82f2ec0c5cb6c354c32b4ca73b60fb0",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "build/ci/bootstrap-pre-commit.log",
+      "sha256": "sha256:eaa25290a18c70b7c8bc5a838044ba66189fddc04ac0cb5c9a2a1533298d887a"
+    },
+    {
+      "path": "build/ci/bootstrap-strict.log",
+      "sha256": "sha256:3c8d942e90b1a03f8b00e981aa20799dfd8652b3f88b3d2799425474a0746b72"
+    },
+    {
+      "path": "build/ci/bootstrap-unit-tests.log",
+      "sha256": "sha256:c872f36da956377e6b211459d2f38b524aed3a280f2709478c67a02affd4a562"
+    },
+    {
+      "path": "build/ci/environment-packages.log",
+      "sha256": "sha256:51b7d23f8153cf840b9de5ca67ca3f5fe8fec3c0b108c3282707034a60d87e37"
+    },
+    {
+      "path": "build/ci/execution-cli-debug.log",
+      "sha256": "sha256:6af2889181875f14dfe8506730c4df4de36df456d696a7ea5799bf1abce07cd7"
+    },
+    {
+      "path": "build/ci/execution-cli.log",
+      "sha256": "sha256:ac8e1b0f9ad566232cf516b9d5d75db60b2ef3a180edf3ad0be0b85443c37d8e"
+    },
+    {
+      "path": "build/ci/git-revision-binding.log",
+      "sha256": "sha256:1a056daf288b06ea1347849b1ade898b7e6c15c214e2b03ddeaa6b0108e51841"
+    },
+    {
+      "path": "build/ci/graph-cli.log",
+      "sha256": "sha256:7a52bc31c8927351fc82835f71b1c96d8568998cebc1dfd27576854b6698ab13"
+    },
+    {
+      "path": "build/ci/interpreter-profile-parity.log",
+      "sha256": "sha256:9fd1cbcbfa3349c485407c5cd99733b441eb7ca5049c1bd1028141b9c692bfba"
+    },
+    {
+      "path": "build/ci/minimal-runtime.log",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/ci/native-cli.log",
+      "sha256": "sha256:1c88391d43256d4af98b447277a18ec992af7011764e8eb4f0cfe9503839a4dc"
+    },
+    {
+      "path": "build/ci/native-probe.log",
+      "sha256": "sha256:6302522a4a5be2d11746eac49c3354dc4421d7e0fa133fd325f80a672f7236c3"
+    },
+    {
+      "path": "build/ci/result.json",
+      "sha256": "sha256:5b427437f85b98eb06d2964b5b26417fcef040273b4881385eef6199e2a73943"
+    },
+    {
+      "path": "build/ci/runtime-cli.log",
+      "sha256": "sha256:7de98447f81bc355addd0764c87b5b94113a39e0e7d73ffaff7afbe3899cfb79"
+    },
+    {
+      "path": "build/ci/rust-debug.log",
+      "sha256": "sha256:e1e068c1d45144c7e8b5d26b11f0797fed8be0525275fd4e888994601a7fdf6d"
+    },
+    {
+      "path": "build/ci/rust-release.log",
+      "sha256": "sha256:c14ccb8f88bac9a6d25561fcaf1cabd2d6cc354ae3b0a4515915ab33e3ded65b"
+    },
+    {
+      "path": "build/ci/rust-tests.log",
+      "sha256": "sha256:7052b8423113acdfd1246d65380c7a5e6aef659bac68170075b57be29fb4ce88"
+    },
+    {
+      "path": "build/ci/semantic-cli.log",
+      "sha256": "sha256:4b110466bbfd12e5b95bea111ac68387483bf16cfb1f36eb0c31fcb260b921eb"
+    },
+    {
+      "path": "build/ci/text-cli.log",
+      "sha256": "sha256:dc7c5cf980ef3f3d59dbe8e3bf4745e525fc1036edf384aae702fab7877e3edd"
+    },
+    {
+      "path": "build/ci/toolchain-llvm.log",
+      "sha256": "sha256:ac8e51b307c8a1ebea55f839ee57b5e0327716084e9c5b37d7e8ea9434b3a82a"
+    },
+    {
+      "path": "build/ci/toolchain-rust.log",
+      "sha256": "sha256:938db28b83089ab88301ca425f99fa1d8b61ee66e0371babe1db6373ae9810a3"
+    },
+    {
+      "path": "build/execution_cli_debug_report.json",
+      "sha256": "sha256:a74a6083725f3820047be76f5f0555e89dd021d73ca0ff0f9f0f87f8614566fe"
+    },
+    {
+      "path": "build/execution_cli_report.json",
+      "sha256": "sha256:a74a6083725f3820047be76f5f0555e89dd021d73ca0ff0f9f0f87f8614566fe"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/environment-packages.log",
+      "sha256": "sha256:51b7d23f8153cf840b9de5ca67ca3f5fe8fec3c0b108c3282707034a60d87e37"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/execution-cli-debug.log",
+      "sha256": "sha256:856869d7b9d4d36b6fa5c38245ed6320a47008b23793798335da17ab06e430a8"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/execution-cli.log",
+      "sha256": "sha256:12af0768aacdaee830f04e3945ce3729b6470281a2b169c6ed76e19b3e3873bd"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/git-revision-binding.log",
+      "sha256": "sha256:c6c75e5ca7780cec2f7da03554d0a29e63297fd96656bc612fdff5073164555b"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/graph-cli.log",
+      "sha256": "sha256:157baca269e35136f095c1eda9e76abdc57d219e33c397f19deb662f502efdd8"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/minimal-runtime.log",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/native-cli.log",
+      "sha256": "sha256:9030afb5abde4da70e34934f7719066e240a8b520b3fa271538df5c083e1a339"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/native-probe.log",
+      "sha256": "sha256:6302522a4a5be2d11746eac49c3354dc4421d7e0fa133fd325f80a672f7236c3"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/result.json",
+      "sha256": "sha256:d0e7d7c4c9c78001258b08d7c7b00407ce24f839892a9e1f3785344c103497b5"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/rust-debug.log",
+      "sha256": "sha256:5b52fa3b3596708e94d72a48dcaf8828bd8a2afa45e189888486753bcd1a889a"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/rust-release.log",
+      "sha256": "sha256:cb2a8151f1e2ebcb2512152a36aca1867f12d0c0223c1a9bbfaa5486e21dfb6e"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/rust-tests.log",
+      "sha256": "sha256:342f44da93750cf4331a78e7014f2daa7edd8a2d74351a97960818cb72e7e67a"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/semantic-cli.log",
+      "sha256": "sha256:f6f5eebd7442e316db166110bd5ac23502da33fae73b2a30a51ea5c813d1e50d"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/text-cli.log",
+      "sha256": "sha256:e7ec9b85b356e00b38a7ae2730111cbcabb702a8933cf575c593f8c2aced92d4"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/toolchain-llvm.log",
+      "sha256": "sha256:ac8e51b307c8a1ebea55f839ee57b5e0327716084e9c5b37d7e8ea9434b3a82a"
+    },
+    {
+      "path": "build/failures/P06-integration/clean-7176e3f/ci/toolchain-rust.log",
+      "sha256": "sha256:938db28b83089ab88301ca425f99fa1d8b61ee66e0371babe1db6373ae9810a3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/fault_zero_io_chunk.json",
+      "sha256": "sha256:83fe8fbd670e484a6684163e473650587078f8c44f755c33af45cd88690fe62c"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/policy_duplicate_grant_id.json",
+      "sha256": "sha256:1deef0eebedf653821a199220184b3e3895903b43ad18972f243228c201e9079"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/policy_unknown_field.json",
+      "sha256": "sha256:11ef17700c2c40d829124452856ae108f301be84160d0c17f9b5ad0dcbe2bad8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:14c1fe678fac43d01cf862528c6c859583a0e504cf95616376a05575e39ba558"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/index",
+      "sha256": "sha256:a2baf37f08479b8d617f2aa79dc68c54c9f777869a0f77723e1615d5ff373727"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/logs/HEAD",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/d1/336675dfc40e81f87ee55e1e0c43403c68a446",
+      "sha256": "sha256:7ef3434cd314eb494323e4d5a63aa2868a3e05929c81ff566c2d51666fcba902"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/.git/refs/heads/main",
+      "sha256": "sha256:79cc7191c4e5dd44ed0b8edf5d751eebbf4b12151606820f897adfab0d9d25df"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/fault_zero_io_chunk/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/policy_duplicate_grant_id.json",
+      "sha256": "sha256:1deef0eebedf653821a199220184b3e3895903b43ad18972f243228c201e9079"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:14c1fe678fac43d01cf862528c6c859583a0e504cf95616376a05575e39ba558"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/index",
+      "sha256": "sha256:a2baf37f08479b8d617f2aa79dc68c54c9f777869a0f77723e1615d5ff373727"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/logs/HEAD",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/d1/336675dfc40e81f87ee55e1e0c43403c68a446",
+      "sha256": "sha256:7ef3434cd314eb494323e4d5a63aa2868a3e05929c81ff566c2d51666fcba902"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/.git/refs/heads/main",
+      "sha256": "sha256:79cc7191c4e5dd44ed0b8edf5d751eebbf4b12151606820f897adfab0d9d25df"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_duplicate_grant_id/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/fault_zero_io_chunk.json",
+      "sha256": "sha256:83fe8fbd670e484a6684163e473650587078f8c44f755c33af45cd88690fe62c"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/oversize-policy.json",
+      "sha256": "sha256:61a7bbeb94d355fff1d09c9086685c4562c7c0f7d2d8cff91ef70b698c7f8b6b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/policy_duplicate_grant_id.json",
+      "sha256": "sha256:1deef0eebedf653821a199220184b3e3895903b43ad18972f243228c201e9079"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/policy_unknown_field.json",
+      "sha256": "sha256:11ef17700c2c40d829124452856ae108f301be84160d0c17f9b5ad0dcbe2bad8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:14c1fe678fac43d01cf862528c6c859583a0e504cf95616376a05575e39ba558"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/index",
+      "sha256": "sha256:a2baf37f08479b8d617f2aa79dc68c54c9f777869a0f77723e1615d5ff373727"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/logs/HEAD",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/d1/336675dfc40e81f87ee55e1e0c43403c68a446",
+      "sha256": "sha256:7ef3434cd314eb494323e4d5a63aa2868a3e05929c81ff566c2d51666fcba902"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/.git/refs/heads/main",
+      "sha256": "sha256:79cc7191c4e5dd44ed0b8edf5d751eebbf4b12151606820f897adfab0d9d25df"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_exceeds_64kib/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/policy_duplicate_grant_id.json",
+      "sha256": "sha256:1deef0eebedf653821a199220184b3e3895903b43ad18972f243228c201e9079"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/policy_unknown_field.json",
+      "sha256": "sha256:11ef17700c2c40d829124452856ae108f301be84160d0c17f9b5ad0dcbe2bad8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:14c1fe678fac43d01cf862528c6c859583a0e504cf95616376a05575e39ba558"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/index",
+      "sha256": "sha256:a2baf37f08479b8d617f2aa79dc68c54c9f777869a0f77723e1615d5ff373727"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/logs/HEAD",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:6b15b82ee91fcfeafb93421954e7eef0fb209a13d4e040e7e22e8abf0fed5e40"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/d1/336675dfc40e81f87ee55e1e0c43403c68a446",
+      "sha256": "sha256:7ef3434cd314eb494323e4d5a63aa2868a3e05929c81ff566c2d51666fcba902"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/.git/refs/heads/main",
+      "sha256": "sha256:79cc7191c4e5dd44ed0b8edf5d751eebbf4b12151606820f897adfab0d9d25df"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-failed-artifacts/policy_unknown_field/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:0a200705a5afd6e77ce549cd90c42cb7f646eb0fb22b41c3111ae6fd4d5426d4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/index",
+      "sha256": "sha256:485890806c631413ff123d94ac1bcf59b7e061de7336c26ba9fa999962b785fb"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/logs/HEAD",
+      "sha256": "sha256:8f1b2648aba243d2a6c967725f12eac80735aded14c04cf3ebdbcdb6c8593dc8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:8f1b2648aba243d2a6c967725f12eac80735aded14c04cf3ebdbcdb6c8593dc8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/51/c0055b5bf2ea1da37da4d53242ba21c82c5fa3",
+      "sha256": "sha256:3147009a30b935e1fa9783780d7cc8c3bf848f269c4d3be933f101b6738f8ef4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/.git/refs/heads/main",
+      "sha256": "sha256:898149da37c839eb140014371e811ed5da2c9db5a23e17d6ced0cf57f616e8c7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/experiments/c6941133a16bdc0cc3d4e3f82283597f8428aef5cf64af47ec80d56e5e08fb96/diagnostics.json",
+      "sha256": "sha256:c4760c7b411a67195cd2fcfe303038791e6836f43dce8d64ba0b8dbd10d6c68f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/experiments/c6941133a16bdc0cc3d4e3f82283597f8428aef5cf64af47ec80d56e5e08fb96/request.json",
+      "sha256": "sha256:b9367a16fc7fe254f0590cc57877820f53615d4a5f898eb4b5dcf42143ecc409"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/HEAD",
+      "sha256": "sha256:1a05e5a7e2db3b6f87a8f250a3a73fdee9f617baba6ed811297b8e902a0e8b6d"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/lock",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/revisions/00000000000000000000/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final-failed-artifacts/long_recursive_stack_budget/store-long_recursive_stack_budget/.il/revisions/00000000000000000000/manifest.json",
+      "sha256": "sha256:e8439fc27f959062b95f2095f476225f852dc1b57119d32bcd6fdc4b1d92deaf"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-final.json",
+      "sha256": "sha256:6cd61ec40a9f902a16ca9d24d2473594f9cacfee4de90fa6217715dd45a40015"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-first-failed.json",
+      "sha256": "sha256:2d203d4379b83f1d60943a99332c05af37e3beb1bbc44965876d4b76e28958c0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-acceptance-verified.json",
+      "sha256": "sha256:147bb5da9631275018f38a1a9d6d20ca983b802b426ba50c8ae69b35f5228e4b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/host-policy.json",
+      "sha256": "sha256:d24c0f7e1de00ba15c0d0e1c250267b03e42fe7e4b55b1595e99002bd655e4b6"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/other-read/input.bin",
+      "sha256": "sha256:484d5b97b642400c616534a1b27803040a15034ec1de69553e136730158daef0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/outside/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/read/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/read/input.bin",
+      "sha256": "sha256:a1b85a7ccc528fd9a7a95e0e01f52d6847757cb53b0f47c2fa7460bcf0d81f96"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/write/escape/sentinel.bin",
+      "sha256": "sha256:31207a2065f46a5b948fce6fe5c13e85abaf5631e2f894b47dcd4fce14f6c57b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/host/write/output.bin",
+      "sha256": "sha256:8fa970c46907bd541e3db63e41551a7c75eaa4933ed8e25e24fbfca8bd21d83f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/COMMIT_EDITMSG",
+      "sha256": "sha256:bde17f55edea62c40ec4e37a8a0370da7677faf09408093552cf0a15d2f70d43"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/config",
+      "sha256": "sha256:cfe7ba1238c9a78be7535d7c63bcaf5a4d5011d46b07c9b45d3bbf7d6c312dfe"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/description",
+      "sha256": "sha256:85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/HEAD",
+      "sha256": "sha256:28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/applypatch-msg.sample",
+      "sha256": "sha256:0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/commit-msg.sample",
+      "sha256": "sha256:1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/fsmonitor-watchman.sample",
+      "sha256": "sha256:e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/post-update.sample",
+      "sha256": "sha256:81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-applypatch.sample",
+      "sha256": "sha256:e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-commit.sample",
+      "sha256": "sha256:f9af7d95eb1231ecf2eba9770fedfa8d4797a12b02d7240e98d568201251244a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-merge-commit.sample",
+      "sha256": "sha256:d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-push.sample",
+      "sha256": "sha256:ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-rebase.sample",
+      "sha256": "sha256:4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/pre-receive.sample",
+      "sha256": "sha256:a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/prepare-commit-msg.sample",
+      "sha256": "sha256:e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/push-to-checkout.sample",
+      "sha256": "sha256:a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/hooks/update.sample",
+      "sha256": "sha256:8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/il/revision_bindings.json",
+      "sha256": "sha256:71f197e1d6905b64287fab88589e41ae05b0096a18eed76c4c6f29dcbc717d6c"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/index",
+      "sha256": "sha256:0fa2c4e23ae102943212444a6211d7cc8e8c6291d1548f39c49ad1ab544db8ef"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/info/exclude",
+      "sha256": "sha256:6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/logs/HEAD",
+      "sha256": "sha256:287ef23c9ed0be42e3d680d267ce1433227ecf51220c129b32f40e71443c1d2a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/logs/refs/heads/main",
+      "sha256": "sha256:287ef23c9ed0be42e3d680d267ce1433227ecf51220c129b32f40e71443c1d2a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/70/102c8537ba4cb01ef17a6c439be30af31ae501",
+      "sha256": "sha256:c10249273d0234eea02ab054cd97eb96236139c65b6f86c2a587a1af53291afc"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/83/3f7ac4c66cfb71100f4f80ca7c4d34a361af0d",
+      "sha256": "sha256:097a7ef9e27d1912876ee242bbd1d8c2e7340102a6521ae1c0d4cd33df0f5a7b"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/bb/a4a6b7d3e560f2208858b2ffd19d8b021d0136",
+      "sha256": "sha256:03a5797a3b0228fb73daec00810a05c0ed138740d502a57f77db881e24e265e4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/d2/75c48cc349667a3cf885a373f545e3ae24d2a9",
+      "sha256": "sha256:6f40695da4b58ea9f7a020b0a2ac0d90e26ddcb4e33e9a1528cc3b5fec55901e"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/e4/9753b0c2d55ea73560b53dcc20e185b7536f6f",
+      "sha256": "sha256:03d3fab368f24fa927ef241d583b1ba039e9760834c359ca3c077a9e1ed6dd20"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/e6/05d8bd82ae9a297779b97c9ae847723737dfa4",
+      "sha256": "sha256:efdab660bd78be237e67bad90debb522c4b2de7582cfd19862749acb0e212487"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/objects/f5/0c3750465fefed773b61737f9a112d069b8182",
+      "sha256": "sha256:781090de0970de7504fa2f5d24bbae5f8b9d4364b2f706a03e2c345141cb2518"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/.git/refs/heads/main",
+      "sha256": "sha256:5601d93ed8f99eacd76f62f0dd239975535ef1e592645ba35dba6a43bb84b83c"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/repository_state.json",
+      "sha256": "sha256:00a367087c3241998b11a28fd38ef6878d0053aa5053275494a30e7aeb63e2c8"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/source/toolchain.lock",
+      "sha256": "sha256:f1291018b62afe755c23fb7b517807d408777a5c8bbdfeb1a643880b739628e9"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/build-report.json",
+      "sha256": "sha256:8d7a04dc71bd4645accb9ca07f6b9a0a7b25d51310b24e70d9efcc490d6f6cc7"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/commands.json",
+      "sha256": "sha256:a889a45806ecefa2d9d417067dc093a0a6dad79c2cc2bfcc1b7f95fe3d16a719"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/compiler-input.json",
+      "sha256": "sha256:311c49f484a0d3636bcaa430892125345d471af8b25d0e54cb20b69d146ccc2a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/entities.json",
+      "sha256": "sha256:88854dd38dce342cb3520fbdc4a11cd73380fc659a788e8c9bcebb62c52497dd"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/execution.json",
+      "sha256": "sha256:26c79ad9f51ad34400b646a93302d41533d8f7d3615318b7e0009a7d6ee1f197"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/graph.json",
+      "sha256": "sha256:dbc79a30fb98328eeda976a9524a3070904da2e0785256be97f3443ec1d88188"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/input.json",
+      "sha256": "sha256:4d2c9c832cd48f3f8f20a4764653a80a6d5369c629613033b1dc579f1e546ab0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/native.json",
+      "sha256": "sha256:5ee63d9ae72e201a79ba16f9156a4a5a617c1e999feb064c4effa71b42a3fed0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/optimized.ll",
+      "sha256": "sha256:06fe669bcc1dfd56b85816e73412d7ebe3ae8020cab97a17135637e8dc388599"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/policy.json",
+      "sha256": "sha256:d24c0f7e1de00ba15c0d0e1c250267b03e42fe7e4b55b1595e99002bd655e4b6"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/program.elf",
+      "sha256": "sha256:e2c9e51a2751394a4290130af166d2953de18e39062831d7880eaaba52f8b64a"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/program.ll",
+      "sha256": "sha256:3c084ca1fb7a789930d3932fca77062be6fc703215266e53c6f0c5d14448e15d"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/program.o",
+      "sha256": "sha256:f384d2309d1b97a26a9046e3fefc9a2eaed60586b2ca206541f5ff04baf43dc4"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/request.json",
+      "sha256": "sha256:15e97912f358021a97725419af26da4ecfff3bcbb73616473aa9b84591203762"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/test-result.json",
+      "sha256": "sha256:8bf899fd4c1b882ca87648a725a86b235a49fdbaee86c84bde30e9769c652b92"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/builds/candidates/native-2AsPbp/verified.json",
+      "sha256": "sha256:03be84e2329bec6bae9ec9c4169cd9207c1787b6a7da0c6e915ec56faa6a8ec0"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/HEAD",
+      "sha256": "sha256:a442375efd4123a9f9d6750349bc5072ceb4d9614fd880a11ebea0182d510872"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/lock",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/revisions/00000000000000000000/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/revisions/00000000000000000000/manifest.json",
+      "sha256": "sha256:86d829ba898c6445634dc29283bf4d19d39f15d532c280e33dd841cdc2eefd47"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/revisions/00000000000000000001/graph.json",
+      "sha256": "sha256:dbc79a30fb98328eeda976a9524a3070904da2e0785256be97f3443ec1d88188"
+    },
+    {
+      "path": "build/failures/P06-integration/p06-runtime-smoke-failures/file_read_all_bytes/store-file_read_all_bytes/.il/revisions/00000000000000000001/manifest.json",
+      "sha256": "sha256:1889961f51da5266d186df1fba063d10daaf7d403b1fdf3f745c2a47e1fc4d28"
+    },
+    {
+      "path": "build/graph_cli_report.json",
+      "sha256": "sha256:f6f4fee287e0ffcf6e2843ccae74c9f2d5be0cc29137ea73be4cd2a8da0dd649"
+    },
+    {
+      "path": "build/native_cli_report.json",
+      "sha256": "sha256:7d8d3acc74cf5b00cc4d6f006afe4dbc01459ab94b4c7a2b4136530c998182ad"
+    },
+    {
+      "path": "build/P06-github-jobs.json",
+      "sha256": "sha256:959c71056429d0bf69bf652d614d18c445112c4851869c3b97028cdd958640d2"
+    },
+    {
+      "path": "build/P06-github-success.json",
+      "sha256": "sha256:9c42eafd1e0e5a7c8aeb3c632caef71275c7a528deb016fe7ee1beca64994638"
+    },
+    {
+      "path": "build/p06-runtime-example/hello.il",
+      "sha256": "sha256:ab8d10d2d912ff3f4f8443df5b2799c8a2289ff8fc69d3b44eefc30f939027d9"
+    },
+    {
+      "path": "build/p06-runtime-example/result.json",
+      "sha256": "sha256:26327c7d65334bd31282a894a25fd8abd1bec3bc25baa29dd9f1ab8f561063df"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/build-report.json",
+      "sha256": "sha256:b0e99d7487db1ca6dfd8477bafb7b3a0e6f9a59004a5dd2c84155d6ff90a1278"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/commands.json",
+      "sha256": "sha256:a889a45806ecefa2d9d417067dc093a0a6dad79c2cc2bfcc1b7f95fe3d16a719"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/compiler-input.json",
+      "sha256": "sha256:39ef3e0c14b8bc7f5bce65d24b71da7a36803233662af457e94a1c78683931c3"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/entities.json",
+      "sha256": "sha256:3b8f71bfa5a21dbd82590bbd0687365b413ad037b00f8074ebfb901ac4ac52c0"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/graph.json",
+      "sha256": "sha256:b793f6e7f7dae81964d41711c1397898445c1bf93fbdec0129b6cc1817ad3a6b"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/input.json",
+      "sha256": "sha256:576f577cce5c218c91cc050bf14adbb0b3a4a29ebd8de6c63eee9d2fbd913227"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/native.json",
+      "sha256": "sha256:9508a6270b63133e033620807e6e378c8c25157d48a840a13dce3baa6a2f31ba"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/optimized.ll",
+      "sha256": "sha256:8e24eaa53952292b7bc701afb1b6fd365b66b30d67c577b8cf94aecd7096bef8"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/policy.json",
+      "sha256": "sha256:ac1986696dc4322442a5cb5299ad67e200f6f0c2ac9ea38417524ff3efda48cd"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/program.elf",
+      "sha256": "sha256:812ab388a9770d5c2c54685ceac98434f757d0e18650304e990081d5da94d936"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/program.ll",
+      "sha256": "sha256:4d7ae2e02013d2a8de9fbf9ac363d777261b8f29439c0a9dc919d64c4c0f3a62"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/program.o",
+      "sha256": "sha256:c3c75e172d398c3c32b5fccb0a6ddd16754c5580d940649e154d59bcb753a30d"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/request.json",
+      "sha256": "sha256:b4e7de151fe11ef44c420bbdeb25b7756d97ca0e2edf1fb35132b4871dd62673"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-7KVW7c/verified.json",
+      "sha256": "sha256:f41f7600b6db6795dd002f1e4d378f133fc633d13d5a1509caea11d2369be73b"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/build-report.json",
+      "sha256": "sha256:bb0f347910dc9792663b88ed7cc55c0fb3231bba3becc1cf137bd077addaab93"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/commands.json",
+      "sha256": "sha256:1dcdde4895cb876dcc05e6e20e4ea2b7bc2a33148b6bea88f30362012736d98c"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/compiler-input.json",
+      "sha256": "sha256:12fc06d10f7e4293ffd14546e2382b6c07f614a348846a2370cf688c7d7a27a3"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/entities.json",
+      "sha256": "sha256:3b8f71bfa5a21dbd82590bbd0687365b413ad037b00f8074ebfb901ac4ac52c0"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/graph.json",
+      "sha256": "sha256:b793f6e7f7dae81964d41711c1397898445c1bf93fbdec0129b6cc1817ad3a6b"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/input.json",
+      "sha256": "sha256:3ded25a7022acb7b26900c8b81082f4a818bcf76f3b1aaedcdb82f382e8a71c3"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/native.json",
+      "sha256": "sha256:9508a6270b63133e033620807e6e378c8c25157d48a840a13dce3baa6a2f31ba"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/optimized.ll",
+      "sha256": "sha256:c786534f0e1f43e931c9eaa5eb4a94b1523ef3ea987ced31781fdf50e04a8491"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/policy.json",
+      "sha256": "sha256:ac1986696dc4322442a5cb5299ad67e200f6f0c2ac9ea38417524ff3efda48cd"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/program.elf",
+      "sha256": "sha256:91835ab554927b1c4314889b9a59e6466a54c6f47d03539e9da4b0cb3bfa044a"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/program.ll",
+      "sha256": "sha256:4d7ae2e02013d2a8de9fbf9ac363d777261b8f29439c0a9dc919d64c4c0f3a62"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/program.o",
+      "sha256": "sha256:ae3d426f2aef492f0f2816caf9d6f54a3fd122510870547ce675672e549e4030"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/request.json",
+      "sha256": "sha256:dfea551196017ce9105edc9f9b5c3808092f1dcc2314968bab9576a9e31d85d1"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/builds/candidates/native-A5qrb6/verified.json",
+      "sha256": "sha256:3cafa77659e98206bda49b08401305b66b3b2b121461859c1ffdb3bcdaa7f607"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/HEAD",
+      "sha256": "sha256:cf189171b9da65cecc14f54a719c997b077c72028b44c62d381862f04cc8d24b"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/lock",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/revisions/00000000000000000000/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/revisions/00000000000000000000/manifest.json",
+      "sha256": "sha256:7abe5bbd7c7f3955f743c60d04373076479a156ad5c4562db122ea23498a3a08"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/revisions/00000000000000000001/graph.json",
+      "sha256": "sha256:b793f6e7f7dae81964d41711c1397898445c1bf93fbdec0129b6cc1817ad3a6b"
+    },
+    {
+      "path": "build/p06-runtime-example/store/.il/revisions/00000000000000000001/manifest.json",
+      "sha256": "sha256:f1900de87dcb346cba90cebf0d29d8c59f7afb5d6e042d05b6acdebe784707d0"
+    },
+    {
+      "path": "build/probe_gate_report.json",
+      "sha256": "sha256:d9fd9ab62469491a370781ad1d0c4e07a3d1f471df564c5faf08be02c66bb1fe"
+    },
+    {
+      "path": "build/runtime_cli_report.json",
+      "sha256": "sha256:f8fa58cf3967d33adb6c9c8334ee47d5189bd075c5b137d533f8782efdb076c4"
+    },
+    {
+      "path": "build/semantic_cli_report.json",
+      "sha256": "sha256:8caa8f1767a803f727080a47e059b3a9f9a6e9e7b4508108329e54c1f5ae0299"
+    },
+    {
+      "path": "build/text_cli_report.json",
+      "sha256": "sha256:407ae59936315ed7990454570c5104747b221b2bc6d9f035fde97e17b36973e3"
+    },
+    {
+      "path": "examples/hello/main.il",
+      "sha256": "sha256:3d54708ac21b4e761af4f2167634e069a18acb3fcb897c1ccf2b9844fd625d57"
+    },
+    {
+      "path": "examples/hello/README.md",
+      "sha256": "sha256:9d08854c30842608c52fe44518c772d7d8a6af4a88a0507c99cfe1a77c5e9efa"
+    },
+    {
+      "path": "packages/alloc/lib.il",
+      "sha256": "sha256:91cf98443f08472d7615d1d09cddf1bbdae9302c7154e9ec88111397c708c696"
+    },
+    {
+      "path": "packages/alloc/package_manifest.json",
+      "sha256": "sha256:d273740fa28f686601551115a135721756a19b49dc446bac4e126f267b49f023"
+    },
+    {
+      "path": "packages/alloc/README.md",
+      "sha256": "sha256:6554aac25a073545684407e6b739b81bdc19823f049aad023662824ee700b6b6"
+    },
+    {
+      "path": "packages/core/lib.il",
+      "sha256": "sha256:1c4e3c52ac3faafd60d2dd9ec8f7803e23aac1aa1f35aa87c02d92a8e195ebc8"
+    },
+    {
+      "path": "packages/core/package_manifest.json",
+      "sha256": "sha256:ca6157005c8c3bfab46a2882e4aeeb0866dd4046a06f039b680eda17d164339d"
+    },
+    {
+      "path": "packages/core/README.md",
+      "sha256": "sha256:47422deebd18acd445c9f7c4c30c78c294e01dbae3a1baa67d2eb0ef75faa4a6"
+    },
+    {
+      "path": "packages/io/lib.il",
+      "sha256": "sha256:a6a9e0f93a0804da7f052c4a7ea7d8a8733f0c4c1eb79e75ff2e83bbc6c85d28"
+    },
+    {
+      "path": "packages/io/package_manifest.json",
+      "sha256": "sha256:12f30b831bbe4d8d1c6c6ffbf4cba31e1839f589a614bddd94a5d26eec0cdbe6"
+    },
+    {
+      "path": "packages/io/README.md",
+      "sha256": "sha256:37482b35f3e40098f106bfffa0f282ecae1bff654d70c72bacbf8a4620e7900c"
+    },
+    {
+      "path": "rfc/0018-host-runtime-and-profiles.md",
+      "sha256": "sha256:68fc378e83bd9e87c08cd838f19820f29fcfaa13964753d3fb9a025c55a461eb"
+    },
+    {
+      "path": "rfc/0019-runtime-acceptance.md",
+      "sha256": "sha256:dd2ba498f4ffb6d62f185db5d14a671d126de2fa488ef5c631bfa1e2b99619bb"
+    },
+    {
+      "path": "schema/host_policy.schema.json",
+      "sha256": "sha256:562efb19f3116c31cb64d8b397c6a2db8515ade50449d59137e4461e07e846e5"
+    },
+    {
+      "path": "target/release/il",
+      "sha256": "sha256:8f9054b308dd849a4754a645419e22e1b881a7344574dc099027068f134952c4"
+    },
+    {
+      "path": "target/release/libil_minimal_runtime.a",
+      "sha256": "sha256:773116af6cab2691cd63e5bb19f7eeb7e5fc4f05047d2cb6ebb7b9304a1b9389"
+    },
+    {
+      "path": "target/release/libil_minimal_runtime.build.json",
+      "sha256": "sha256:82e2111f238a66ae826efbb19653402d2773f25dbc1d0cba4d62080208b4ec6c"
+    },
+    {
+      "path": "target/release/libil_native_runtime.a",
+      "sha256": "sha256:cb4ec97003865e0061041fbe374d2b5d50351e0812865fbd78c48511937df57f"
+    },
+    {
+      "path": "tests/runtime_cli.py",
+      "sha256": "sha256:2e29984d3c3c8a1b174888aae4ad607f08ac01f4c2a37c2cfd0c849cbd0a6e5d"
+    },
+    {
+      "path": "tests/runtime_cli_contracts.json",
+      "sha256": "sha256:de297f824c367cfe6c99981c679e83245d47bfb3268bf8bd9e8425bbafbe2d60"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "rust-tests",
+      "passed": true,
+      "count": 179
+    },
+    {
+      "suite": "execution-cli-debug",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-probe",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "graph-cli",
+      "passed": true,
+      "count": 28
+    },
+    {
+      "suite": "semantic-cli",
+      "passed": true,
+      "count": 231
+    },
+    {
+      "suite": "text-cli",
+      "passed": true,
+      "count": 14
+    },
+    {
+      "suite": "execution-cli",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-cli",
+      "passed": true,
+      "count": 9
+    },
+    {
+      "suite": "runtime-cli",
+      "passed": true,
+      "count": 19
+    },
+    {
+      "suite": "interpreter-profile-parity",
+      "passed": true,
+      "count": 180
+    },
+    {
+      "suite": "bootstrap-pre-commit",
+      "passed": true,
+      "count": 7
+    },
+    {
+      "suite": "bootstrap-unit-tests",
+      "passed": true,
+      "count": 21
+    },
+    {
+      "suite": "bootstrap-strict",
+      "passed": true,
+      "count": 9
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified."
+  ]
+}

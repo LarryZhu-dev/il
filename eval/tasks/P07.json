@@ -35,5 +35,5 @@
     "tests/http_blackbox"
   ],
   "rollback_revision": 0,
-  "status": "BLOCKED"
+  "status": "RUNNING"
 }
