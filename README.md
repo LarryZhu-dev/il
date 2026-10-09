@@ -105,7 +105,7 @@ formatting shows the complete generated operations, and graph transactions
 enforce scope for the generated changes. Clean local and hosted acceptance passed
 23 gates, including 213 Rust tests and 84 external TCP wire cases. The recorded
 scope is Linux x86-64; dedicated real connect-timeout and socket-EINTR tests are
-not claimed. P08 AI protocol integration is now the active task.
+not claimed. P08 AI protocol integration is verified for the recorded target.
 
 The P08 implementation adds exact-scoped `add_route` transactions, immutable
 tool receipts, `explain`, `blackbox` and `evidence`. Each admitted call returns a
@@ -114,8 +114,10 @@ diagnostic ID. Evidence accepts registered run/role selectors and executed test
 runs, and preserves the compiler, runtime, graph and policy for reconstruction.
 The bounded Linux task launcher and acceptance procedure are documented in
 [eval/runner](eval/runner/README.md) and [RFC 0022](rfc/0022-ai-tool-protocol.md).
-Its implementation remains under acceptance until P08 has immutable verified
-evidence and a matching hosted run.
+Its immutable evidence records 24 clean local gates and a successful matching
+hosted run for commit `2df2056b64ec2d7044f8831e5431985bc41a742a`. P09 is now
+ready to start; P08 evidence covers Linux x86-64 only and does not claim the
+independent fault-injection or cross-platform checks assigned to later tasks.
 
 - The development document is
   [il_execution_spec_v1.md](il_execution_spec_v1.md). Its product spelling was

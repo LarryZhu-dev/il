@@ -7,7 +7,7 @@
   "runtime_version": "0.1.0",
   "target": "x86_64-unknown-linux-gnu",
   "open_tasks": [
-    "P08"
+    "P09"
   ],
   "blocked_tasks": [
     "P09",
