@@ -160,6 +160,10 @@
   ],
   "artifacts": [
     {
+      "path": "examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
       "path": "build/ci/result.json",
       "sha256": "sha256:eea993e44ae470e470ac1f511c780c270b58483437f0207c7eefa039d7f8de6b"
     },
