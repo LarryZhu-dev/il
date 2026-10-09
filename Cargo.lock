@@ -244,6 +244,7 @@ version = "0.1.0"
 dependencies = [
  "il-execution-model",
  "il-graph",
+ "libc",
  "serde",
  "serde_json",
 ]

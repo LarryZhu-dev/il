@@ -104,6 +104,47 @@ fn forged_payload_pointer_is_rejected_before_reading(){
     }
 }
 
+#[cfg(target_os="linux")]
+#[test]
+fn failed_stdout_child(){
+    let Ok(mode)=std::env::var("IL_RUNTIME_STDOUT_FAILURE")else{return};
+    use std::os::fd::IntoRawFd;
+    let captured=mode!="application_pipe";
+    let fd=if captured{std::fs::OpenOptions::new().write(true).create_new(true).open(std::env::var("IL_RUNTIME_STDOUT_REPORT").unwrap()).unwrap().into_raw_fd()}else{-1};
+    unsafe{
+        // Rust's test harness ordinarily ignores SIGPIPE before running tests;
+        // restore a native C/LLVM startup signal disposition before the call.
+        let mut action:libc::sigaction=std::mem::zeroed();action.sa_sigaction=libc::SIG_DFL;
+        assert_eq!(libc::sigemptyset(&mut action.sa_mask),0);assert_eq!(libc::sigaction(libc::SIGPIPE,&action,ptr::null_mut()),0);
+        let failed_fd=if mode=="captured_full"{std::fs::OpenOptions::new().write(true).open("/dev/full").unwrap().into_raw_fd()}else{
+            let mut pipe=[-1;2];assert_eq!(libc::pipe(pipe.as_mut_ptr()),0);assert_eq!(libc::close(pipe[0]),0);pipe[1]
+        };
+        assert_eq!(libc::dup2(failed_fd,libc::STDOUT_FILENO),libc::STDOUT_FILENO);assert_eq!(libc::close(failed_fd),0);
+        let ctx=il_rt_context_new(captured as u32,100,8,100,10000,0,fd);
+        let status=il_rt_print_i64(ctx,42);assert_eq!(status,2,"write must return IoError::Write + 1");
+        if captured{
+            let start=br#"{"type":"U32","data":{"kind":"integer","value":"#;
+            il_rt_json_raw(ctx,start.as_ptr(),start.len() as u64);il_rt_json_u64(ctx,status as u64);il_rt_json_raw(ctx,b"}}".as_ptr(),2);
+        }
+        il_rt_finish(ctx);
+    }
+    std::process::exit(0);
+}
+
+#[cfg(target_os="linux")]
+#[test]
+fn startup_turns_broken_pipe_into_typed_error_without_false_capture(){
+    for mode in ["application_pipe","captured_pipe","captured_full"]{
+        let path=std::env::temp_dir().join(format!("il-native-runtime-{}-{mode}.json",std::process::id()));
+        let output=std::process::Command::new(std::env::current_exe().unwrap()).args(["--exact","failed_stdout_child","--nocapture"]).env("IL_RUNTIME_STDOUT_FAILURE",mode).env("IL_RUNTIME_STDOUT_REPORT",&path).output().unwrap();
+        assert_eq!(output.status.code(),Some(0),"{mode}: {:?}",output);assert!(output.stderr.is_empty());
+        if mode!="application_pipe"{
+            let report:il_execution_model::Execution=serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();std::fs::remove_file(path).unwrap();
+            assert_eq!(report.status,il_execution_model::ExecutionStatus::Returned);assert_eq!(report.value,Some(il_execution_model::Value::integer("U32",2)));assert!(report.stdout.is_empty(),"OS rejected every byte; captured stdout must be empty");assert!(report.stderr.is_empty());
+        }
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn resource_trap_exit_and_no_unwind(){

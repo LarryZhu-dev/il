@@ -98,6 +98,14 @@ write failures produce the typed IoError result; captured output budget
 exhaustion is an executor `E_RESOURCE_LIMIT` trap. Concat returns its declared
 typed allocation error, while direct constants/clone allocation failures trap.
 
+Linux runtime startup explicitly ignores SIGPIPE, including when entered from
+LLVM's native main without Rust standard-library startup. A closed output pipe
+therefore returns EPIPE and the stable `IoError::Write` value instead of killing
+the process. Printing uses unbuffered descriptor writes, retries EINTR, and
+charges/records only the byte count actually accepted by the OS. It never counts
+bytes merely accepted into a userspace output buffer. Test subprocesses reset
+SIGPIPE to its default before calling runtime startup to exercise this policy.
+
 Budget limits match RFC0012. Guest heap counts live payload lengths. Capture
 charges raw print bytes, compact JSON events with inter-event commas, and exact
 generated Value JSON bytes including escaping. Fixed Execution envelope bytes

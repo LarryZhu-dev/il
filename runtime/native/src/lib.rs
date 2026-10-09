@@ -64,14 +64,18 @@ impl Context {
     }
     fn print(&mut self,data:&[u8])->u32{
         if self.captured&&data.len() as u64>self.limits.max_output_bytes.saturating_sub(self.capture_bytes){self.fail("E_RESOURCE_LIMIT","capture budget exhausted",None)}
-        let mut stream=std::io::stdout().lock();let mut written=0;
+        let mut written=0;
         while written<data.len(){
-            match stream.write(&data[written..]){
-                Ok(0)=>break,Ok(count)=>{if self.captured{self.stdout.extend_from_slice(&data[written..written+count]);self.capture_bytes+=count as u64;}written+=count;},
-                Err(error)if error.kind()==std::io::ErrorKind::Interrupted=>continue,Err(_)=>break,
-            }
+            // Only the OS write result establishes progress. A buffered writer
+            // could accept bytes and subsequently lose them on a failed flush.
+            let count=unsafe{libc::write(libc::STDOUT_FILENO,data[written..].as_ptr().cast(),data.len()-written)};
+            if count<0{if std::io::Error::last_os_error().kind()==std::io::ErrorKind::Interrupted{continue}break}
+            if count==0{break}
+            let count=count as usize;
+            if self.captured{self.stdout.extend_from_slice(&data[written..written+count]);self.capture_bytes+=count as u64;}
+            written+=count;
         }
-        if written==data.len()&&stream.flush().is_ok(){0}else{2}
+        if written==data.len(){0}else{2}
     }
 }
 
@@ -83,6 +87,12 @@ unsafe fn text<'a>(pointer:*const u8,length:u64)->&'a str{std::str::from_utf8(un
 pub extern "C" fn il_rt_context_new(mode:u32,max_steps:u64,max_depth:u32,max_heap:u64,max_output:u64,revision:u64,report_fd:i32)->*mut Context{
     let limits=Limits{max_steps,max_call_depth:max_depth,max_heap_bytes:max_heap,max_output_bytes:max_output};
     if mode>1||(mode==1&&(!limits.valid()||report_fd<0)){std::process::exit(102)}
+    // LLVM supplies main, so Rust's usual std startup does not install its
+    // SIGPIPE policy. Closed output pipes must return EPIPE to the typed API.
+    #[cfg(unix)]unsafe{
+        let mut action:libc::sigaction=std::mem::zeroed();action.sa_sigaction=libc::SIG_IGN;
+        if libc::sigemptyset(&mut action.sa_mask)!=0||libc::sigaction(libc::SIGPIPE,&action,ptr::null_mut())!=0{std::process::exit(102)}
+    }
     Box::into_raw(Box::new(Context{captured:mode==1,limits,revision,report_fd,steps:0,depth:0,heap:0,peak:0,next_id:1,allocations:BTreeMap::new(),stdout:vec![],events:vec![],capture_bytes:0,current:"entry".into(),json:vec![],pending:None,shape_nodes:0,shape_depth:0,shape_kind:0}))
 }
 
