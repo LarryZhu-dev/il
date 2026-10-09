@@ -279,9 +279,29 @@ pub fn delivery(tool: &str, request: &Value, response: &Value) -> Value {
         "explain" => request["context_budget"].as_u64().unwrap_or(16_384),
         _ => 262_144,
     };
+    // Native execution reports can contain thousands of lifecycle moves. The
+    // complete report is retained in the receipt and execution_report blob;
+    // the wire response may use the bounded execution projection below.
+    let mut delivered = response.clone();
+    let full_required = serde_json::to_vec(&deliver(delivered.clone(),&format!("run_{}","0".repeat(64)))).unwrap().len() as u64;
+    if full_required > budget && tool == "test"
+        && response["ok"] == true
+        && response["result"]["execution"]["status"] == "returned"
+    {
+        let execution = delivered["result"]["execution"].as_object_mut();
+        if let Some(execution) = execution {
+            // Lifecycle is detailed provenance, not a semantic result. Keep
+            // the schema-required field present while retaining the exact
+            // unbounded sequence in the receipt artifact.
+            execution.insert("lifecycle".into(), json!([]));
+            delivered["result"]["execution_report_artifact"] = json!("execution_report");
+        }
+        let projected_required = serde_json::to_vec(&deliver(delivered.clone(),&format!("run_{}","0".repeat(64)))).unwrap().len() as u64;
+        if projected_required <= budget { return delivered; }
+    }
     // Content-addressed IDs have a fixed width. Account for the eventual ID
     // before hashing the receipt, so budget diagnostics are themselves durable.
-    let required = serde_json::to_vec(&deliver(response.clone(),&format!("run_{}","0".repeat(64)))).unwrap().len() as u64;
+    let required = full_required;
     if required > budget {
         let mut error = failed(tool,subject(tool,request).unwrap_or_else(||response["result_revision"].as_u64().unwrap_or(0)),&Failure::new("E_CONTEXT_INSUFFICIENT","complete response exceeds context budget; retained receipt is available"));
         error["base_revision"]=response["base_revision"].clone();

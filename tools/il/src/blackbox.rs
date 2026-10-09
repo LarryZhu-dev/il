@@ -31,9 +31,10 @@ fn rules(context: &Context) -> Result<BTreeMap<String, String>, Failure> {
     let mut stack: Vec<(usize, &str)> = vec![];
     let mut values = BTreeMap::new();
     for line in text.lines() {
-        if line.trim().is_empty() { continue; }
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') { continue; }
         let indent = line.len()-line.trim_start().len();
-        let (key,value) = line.trim().split_once(':').ok_or_else(||Failure::input("invalid locked HTTP contract mapping"))?;
+        let (key,value) = trimmed.split_once(':').ok_or_else(||Failure::input("invalid locked HTTP contract mapping"))?;
         while stack.last().is_some_and(|(level,_)| *level>=indent) { stack.pop(); }
         let value = value.trim();
         if value.is_empty() { stack.push((indent,key)); continue; }

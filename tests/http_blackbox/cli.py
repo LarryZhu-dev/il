@@ -283,11 +283,11 @@ class HttpAcceptance(unittest.TestCase):
                     diagnostic=json.loads(bytes(execution['stderr']))
                     self.assertEqual(diagnostic,{'code':diagnostic_code})
                     events=execution['handle_events']
-                    # The injected syscall is performed before allocating a
-                    # stream, so only the first real TCP connection produces
-                    # an opened/dropped pair.
-                    self.assertEqual(sum(event['kind']=='opened' for event in events),1)
-                    self.assertEqual(sum(event['kind']=='dropped' for event in events),1)
+                    # Every owned resource is reported: the listener plus one
+                    # accepted stream when the positive threshold is used.
+                    expected_resources=1 + (1 if threshold else 0)
+                    self.assertEqual(sum(event['kind']=='opened' for event in events),expected_resources)
+                    self.assertEqual(sum(event['kind']=='dropped' for event in events),expected_resources)
                     native=retained['native'];executable=Path(native['argv'][0])
                     self.assertTrue(executable.is_file())
                     executable_sha=sha(executable);policy_sha=sha(fixture.policy_path)
