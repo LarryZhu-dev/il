@@ -8,7 +8,7 @@ fn op(id:&str,code:Opcode,inputs:&[&str],outputs:&[(&str,&str)],attributes:Attri
     Operation { entity_id:id.into(),opcode:code,inputs:inputs.iter().map(|s|s.to_string()).collect(),outputs:outputs.iter().map(|(id,ty)|value(id,ty)).collect(),attributes,effects:vec![],consumes:vec![],produces:vec![] }
 }
 fn program(ty:&str,params:&[(&str,&str)],operations:Vec<Operation>,result:Option<&str>)->Program {
-    Program { schema_version:"1.0.0".into(),compiler_version:"0.1.0".into(),input_hash:format!("sha256:{}","0".repeat(64)),source_revision:0,target:il_graph::TARGET.into(),types:vec![],capabilities:vec![],functions:vec![Function {
+    Program { schema_version:"1.0.0".into(),compiler_version:"0.1.0".into(),input_hash:format!("sha256:{}","0".repeat(64)),source_revision:0,target:il_graph::TARGET.into(),types:vec![],capabilities:vec![],public_functions:vec![],functions:vec![Function {
         entity_id:"main".into(),name:"main".into(),parameters:params.iter().map(|(id,ty)|Parameter{entity_id:id.to_string(),name:id.replace('.',"_"),type_ref:ty.to_string()}).collect(),result:ty.into(),effects:vec![],capabilities:vec![],blocks:vec![Block {
             entity_id:"main.entry".into(),arguments:vec![],operations,terminator:Terminator::Return{entity_id:"main.return".into(),value:result.map(str::to_owned),cleanup:vec![]}
         }]
@@ -112,8 +112,8 @@ fn typedef(id:&str,kind:TypeKind,parameters:Vec<String>)->TypeDef{TypeDef{entity
 
 #[test]
 fn captured_print_utf8_nul_and_lengths() {
-    let mut print=op("print",Opcode::RuntimeCall,&["arg"],&[("printed","PrintResult")],Attributes::RuntimeCall{symbol:"print_string".into()});print.effects=vec![Effect::Process];
-    let mut p=program("Usize",&[("arg","String")],vec![print,op("len",Opcode::RuntimeCall,&["arg"],&[("length","Usize")],Attributes::RuntimeCall{symbol:"string_len".into()})],Some("length"));
+    let mut print=op("print",Opcode::RuntimeCall,&["arg"],&[("printed","PrintResult")],Attributes::RuntimeCall{symbol:"print_string".into(),capability:None});print.effects=vec![Effect::Process];
+    let mut p=program("Usize",&[("arg","String")],vec![print,op("len",Opcode::RuntimeCall,&["arg"],&[("length","Usize")],Attributes::RuntimeCall{symbol:"string_len".into(),capability:None})],Some("length"));
     p.functions[0].effects=vec![Effect::Process];
     let mut io=typedef("core.IoError",TypeKind::Sum,vec![]);io.variants=il_checker::runtime_error_variants("core.IoError").unwrap().iter().map(|name|il_graph::Variant{name:name.to_string(),fields:vec![]}).collect();
     p.types=vec![io,typedef("PrintResult",TypeKind::Result,vec!["Unit".into(),"core.IoError".into()])];
@@ -158,7 +158,7 @@ fn borrowed_and_cloned_owned_values_have_distinct_allocations() {
 
 #[test]
 fn concat_result_and_typed_budget_failure() {
-    let mut concat=op("concat",Opcode::RuntimeCall,&["a","b"],&[("joined","ConcatResult")],Attributes::RuntimeCall{symbol:"string_concat".into()});concat.effects=vec![Effect::Alloc];concat.produces=concat.outputs.clone();
+    let mut concat=op("concat",Opcode::RuntimeCall,&["a","b"],&[("joined","ConcatResult")],Attributes::RuntimeCall{symbol:"string_concat".into(),capability:None});concat.effects=vec![Effect::Alloc];concat.produces=concat.outputs.clone();
     let mut p=program("ConcatResult",&[("a","String"),("b","String")],vec![concat],Some("joined"));p.functions[0].effects=vec![Effect::Alloc];
     let mut error=typedef("core.AllocError",TypeKind::Sum,vec![]);error.variants=il_checker::runtime_error_variants("core.AllocError").unwrap().iter().map(|name|il_graph::Variant{name:name.to_string(),fields:vec![]}).collect();p.types=vec![error,typedef("ConcatResult",TypeKind::Result,vec!["String".into(),"core.AllocError".into()])];
     if let Terminator::Return{cleanup,..}=&mut p.functions[0].blocks[0].terminator{*cleanup=vec![DropAction{value_id:"b".into(),type_ref:"String".into()},DropAction{value_id:"a".into(),type_ref:"String".into()}];}
@@ -221,10 +221,61 @@ fn owned_variant_payload_and_tag() {
 
 #[test]
 fn bytes_mutable_borrow_and_exact_capture_encoding_budget() {
-    let mut p=program("Usize",&[("arg","Bytes")],vec![op("borrow",Opcode::BorrowMut,&["arg"],&[("view","Bytes")],Attributes::Empty{}),op("length",Opcode::RuntimeCall,&["view"],&[("len","Usize")],Attributes::RuntimeCall{symbol:"bytes_len".into()}),op("end",Opcode::EndBorrow,&["view"],&[],Attributes::Empty{})],Some("len"));
+    let mut p=program("Usize",&[("arg","Bytes")],vec![op("borrow",Opcode::BorrowMut,&["arg"],&[("view","Bytes")],Attributes::Empty{}),op("length",Opcode::RuntimeCall,&["view"],&[("len","Usize")],Attributes::RuntimeCall{symbol:"bytes_len".into(),capability:None}),op("end",Opcode::EndBorrow,&["view"],&[],Attributes::Empty{})],Some("len"));
     if let Terminator::Return{cleanup,..}=&mut p.functions[0].blocks[0].terminator{cleanup.push(DropAction{value_id:"arg".into(),type_ref:"Bytes".into()});}
     let args=[Value{type_ref:"Bytes".into(),data:ValueData::Bytes(vec![0,255,1])}];let e=execute(&p,"main",&args,Limits::default());success(&e,Value::integer("Usize",3));assert_eq!(e.live_allocations,0);
     let cost=serde_json::to_vec(&e.lifecycle).unwrap().len()-2+serde_json::to_vec(e.value.as_ref().unwrap()).unwrap().len();
     success(&execute(&p,"main",&args,Limits{max_output_bytes:cost as u64,..Limits::default()}),Value::integer("Usize",3));
     trapped(&execute(&p,"main",&args,Limits{max_output_bytes:cost as u64-1,..Limits::default()}),"E_RESOURCE_LIMIT");
+}
+
+
+fn io_types()->Vec<TypeDef>{
+    let mut error=typedef("core.IoError",TypeKind::Sum,vec![]);
+    error.variants=il_checker::runtime_error_variants("core.IoError").unwrap().iter().map(|name|il_graph::Variant{name:name.to_string(),fields:vec![]}).collect();
+    vec![error]
+}
+fn faults(allocation:Option<u64>,chunk:Option<u64>,io:Option<u64>)->il_runtime_startup::HostPolicy{
+    il_runtime_startup::HostPolicy{test_faults:Some(il_runtime_startup::Faults{allocation_fail_after:allocation,io_max_chunk:chunk,io_fail_after:io}),..il_runtime_startup::HostPolicy::empty()}
+}
+#[test]
+fn host_print_partial_failure_and_shared_allocation_faults(){
+    let mut print=op("print",Opcode::RuntimeCall,&["arg"],&[("result","PrintResult")],Attributes::RuntimeCall{symbol:"print_i64".into(),capability:None});print.effects=vec![Effect::Process];
+    let mut p=program("PrintResult",&[("arg","I64")],vec![print],Some("result"));p.functions[0].effects=vec![Effect::Process];p.types=io_types();p.types.push(typedef("PrintResult",TypeKind::Result,vec!["Unit".into(),"core.IoError".into()]));
+    let e=il_interpreter::execute_with_policy(&p,"main",&[Value::integer("I64",123456)],Limits::default(),&faults(None,Some(2),Some(1)));
+    assert_eq!(e.status,ExecutionStatus::Returned,"{:?}",e.diagnostics);assert_eq!(e.stdout,b"12");
+    let result=serde_json::to_value(e.value).unwrap();assert_eq!(result["data"]["value"]["tag"],"Err");assert_eq!(result["data"]["value"]["fields"][0]["data"]["value"]["tag"],"Write");
+    let p=program("String",&[("arg","String")],vec![],Some("arg"));
+    let e=il_interpreter::execute_with_policy(&p,"main",&[Value::string("abc")],Limits::default(),&faults(Some(0),None,None));trapped(&e,"E_ALLOCATION_FAILED");assert_eq!(e.live_allocations,0);
+}
+#[test]
+fn real_file_read_requires_exact_authority_and_releases_handles(){
+    let directory=std::env::temp_dir().join(format!("il-interpreter-{}",std::process::id()));std::fs::create_dir_all(&directory).unwrap();std::fs::write(directory.join("input"),[0,65,128,255]).unwrap();
+    let grant=il_graph::Capability{entity_id:"fs.read".into(),kind:il_graph::CapabilityKind::FileRead,scope:Some(directory.to_str().unwrap().into())};
+    let mut read=op("read",Opcode::RuntimeCall,&["path"],&[("result","ReadResult")],Attributes::RuntimeCall{symbol:"file_read".into(),capability:Some("fs.read".into())});read.effects=vec![Effect::Fs,Effect::Alloc];read.produces=read.outputs.clone();
+    let mut p=program("ReadResult",&[("path","String")],vec![read],Some("result"));p.functions[0].effects=vec![Effect::Fs,Effect::Alloc];p.functions[0].capabilities=vec!["fs.read".into()];p.capabilities=vec![grant.clone()];p.types=io_types();p.types.push(typedef("ReadResult",TypeKind::Result,vec!["Bytes".into(),"core.IoError".into()]));
+    if let Terminator::Return{cleanup,..}=&mut p.functions[0].blocks[0].terminator{cleanup.push(DropAction{value_id:"path".into(),type_ref:"String".into()});}
+    let denied=execute(&p,"main",&[Value::string("input")],Limits::default());assert_eq!(denied.status,ExecutionStatus::Rejected);assert_eq!(denied.steps,0);
+    let policy=il_runtime_startup::HostPolicy{grants:vec![grant],..faults(None,Some(2),None)};
+    let e=il_interpreter::execute_with_policy(&p,"main",&[Value::string("input")],Limits::default(),&policy);
+    assert_eq!(e.status,ExecutionStatus::Returned,"{:?}",e.diagnostics);let result=serde_json::to_value(&e.value).unwrap();assert_eq!(result["data"]["value"]["tag"],"Ok");assert_eq!(result["data"]["value"]["fields"][0]["data"]["value"],serde_json::json!([0,65,128,255]));assert_eq!(e.live_handles,0);assert_eq!(e.live_allocations,1);assert_eq!(e.handle_events.len(),2);assert_eq!(e.handle_events[0].kind,il_execution_model::HandleEventKind::Open);assert_eq!(e.handle_events[1].kind,il_execution_model::HandleEventKind::Close);
+    let e=il_interpreter::execute_with_policy(&p,"main",&[Value::string("../outside")],Limits::default(),&policy);let result=serde_json::to_value(e.value).unwrap();assert_eq!(result["data"]["value"]["fields"][0]["data"]["value"]["tag"],"PermissionDenied");
+    std::fs::remove_file(directory.join("input")).unwrap();std::fs::remove_dir(directory).unwrap();
+}
+#[test]
+fn nested_language_stack_records_caller_and_fault_location(){
+    let mut p=program("Unit",&[],vec![op("invoke",Opcode::Call,&[],&[],Attributes::Call{callee:"helper".into()})],None);
+    let mut helper=program("Unit",&[],vec![],None).functions.remove(0);helper.entity_id="helper".into();helper.name="helper".into();helper.blocks[0].entity_id="helper.entry".into();helper.blocks[0].terminator=Terminator::Trap{entity_id:"helper.panic".into(),code:"PANIC".into()};p.functions.push(helper);
+    let e=execute(&p,"main",&[],Limits::default());trapped(&e,"E_EXPLICIT_TRAP");assert_eq!(e.stack_trace.len(),2);assert_eq!(e.stack_trace[0].function_id,"helper");assert_eq!(e.stack_trace[0].call_site.as_deref(),Some("invoke"));assert_eq!(e.stack_trace[0].entity_id,"helper.panic");assert_eq!(e.stack_trace[1].function_id,"main");assert_eq!(e.stack_trace[1].call_site,None);assert_eq!(e.stack_trace[1].entity_id,"invoke");
+}
+
+#[test]
+fn repeated_long_ids_have_a_bounded_complete_stack_report(){
+    let large_id=format!("call_{}","x".repeat(20_000));
+    let p=program("Unit",&[],vec![op(&large_id,Opcode::Call,&[],&[],Attributes::Call{callee:"main".into()})],None);
+    let e=execute(&p,"main",&[],Limits::default());trapped(&e,"E_RESOURCE_LIMIT");assert_eq!(e.diagnostics[0].cause,"stack trace budget exhausted");
+    assert!(e.stack_trace.len()>1);assert!(e.stack_trace.len()<128);assert!(serde_json::to_vec(&e.stack_trace).unwrap().len()<=il_execution_model::STACK_TRACE_MAX_BYTES as usize);
+    assert_eq!(e.stack_trace.last().unwrap().function_id,"main");assert!(e.stack_trace.last().unwrap().call_site.is_none());
+    assert!(e.stack_trace[..e.stack_trace.len()-1].iter().all(|frame|frame.call_site.as_deref()==Some(&large_id)));
+    assert_eq!(e.diagnostics[0].entity_id.as_deref(),Some(e.stack_trace[0].entity_id.as_str()));
 }

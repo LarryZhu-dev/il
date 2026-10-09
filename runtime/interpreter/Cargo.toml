@@ -8,6 +8,9 @@ license.workspace = true
 il-execution-model.workspace = true
 il-graph.workspace = true
 il-checker.workspace = true
+il-runtime-startup.workspace = true
+il-runtime-allocator.workspace = true
+il-runtime-handles.workspace = true
 il-mir = { path = "../../compiler/mir" }
 serde.workspace = true
 serde_json.workspace = true

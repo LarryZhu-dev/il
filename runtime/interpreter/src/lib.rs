@@ -1,4 +1,4 @@
 //! Deterministic execution of verified il MIR with bounded captured host effects.
 mod machine;
 mod numbers;
-pub use machine::execute;
+pub use machine::{execute,execute_with_policy};
