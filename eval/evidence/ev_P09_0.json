@@ -164,6 +164,14 @@
       "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
     },
     {
+      "path": "target/release/il",
+      "sha256": "sha256:2c5dae642707bc9c3b4528410694e5d3121e3df7c2ab088e3641f6f7084fb038"
+    },
+    {
+      "path": "target/release/libil_native_runtime.a",
+      "sha256": "sha256:5b7f107b91304d8e5e68c8a05d3ccfa3cd5b70689afe18749cad89bb6f146f95"
+    },
+    {
       "path": "build/ci/result.json",
       "sha256": "sha256:eea993e44ae470e470ac1f511c780c270b58483437f0207c7eefa039d7f8de6b"
     },
