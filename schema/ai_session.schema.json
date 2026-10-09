@@ -1,0 +1,453 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/ai_session.schema.json",
+  "title": "Persistent bounded AI task session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "task_id",
+    "base_revision",
+    "current_revision",
+    "status",
+    "tool_calls",
+    "context_bytes",
+    "cpu_seconds",
+    "graph_nodes",
+    "environment_retries",
+    "phases",
+    "runs",
+    "history",
+    "pending",
+    "related_types",
+    "known_entities",
+    "base_authority",
+    "effects_delta",
+    "capabilities_delta",
+    "authority_revision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_hash",
+        "compiler_hash",
+        "repository",
+        "store",
+        "policy_hash"
+      ],
+      "properties": {
+        "task_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "compiler_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "store": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "task_id": {
+      "$ref": "tool.schema.json#/$defs/id"
+    },
+    "base_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "current_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "status": {
+      "enum": [
+        "RUNNING",
+        "BLOCKED",
+        "DESIGN_REQUIRED"
+      ]
+    },
+    "tool_calls": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "context_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "cpu_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "graph_nodes": {
+      "const": 4096
+    },
+    "environment_retries": {
+      "const": 0
+    },
+    "phases": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "contract",
+          "target_entities",
+          "direct_dependencies",
+          "callers",
+          "related_types",
+          "related_tests",
+          "current_diagnostics",
+          "relevant_rfc_fragments"
+        ]
+      },
+      "maxItems": 8
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^run_[0-9a-f]{64}$"
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "tool",
+          "kind",
+          "run_id",
+          "request_hash",
+          "response_hash",
+          "response_bytes",
+          "ok",
+          "subject_revision"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tool": {
+            "enum": [
+              "state",
+              "schema-check",
+              "inspect",
+              "callers",
+              "dependencies",
+              "slice",
+              "validate",
+              "transact",
+              "diff",
+              "build",
+              "test",
+              "blackbox",
+              "explain",
+              "restore",
+              "evidence"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "step",
+              "preflight",
+              "mutation_preflight"
+            ]
+          },
+          "run_id": {
+            "type": "string",
+            "pattern": "^run_[0-9a-f]{64}$"
+          },
+          "request_hash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "response_hash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "response_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "subject_revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          }
+        }
+      }
+    },
+    "pending": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "index",
+            "tool",
+            "request",
+            "kind"
+          ],
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tool": {
+              "enum": [
+                "state",
+                "schema-check",
+                "inspect",
+                "callers",
+                "dependencies",
+                "slice",
+                "validate",
+                "transact",
+                "diff",
+                "build",
+                "test",
+                "blackbox",
+                "explain",
+                "restore",
+                "evidence"
+              ]
+            },
+            "request": {
+              "type": "object"
+            },
+            "kind": {
+              "enum": [
+                "step",
+                "preflight",
+                "mutation_preflight"
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "related_types": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "tool.schema.json#/$defs/id"
+      }
+    },
+    "known_entities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "tool.schema.json#/$defs/id"
+      }
+    },
+    "base_authority": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "effects",
+            "capabilities"
+          ],
+          "properties": {
+            "effects": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "propertyNames": {
+                "$ref": "tool.schema.json#/$defs/id"
+              }
+            },
+            "capabilities": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "program_graph.schema.json#/$defs/capability"
+              },
+              "propertyNames": {
+                "$ref": "tool.schema.json#/$defs/id"
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "effects_delta": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_id",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "entity_id": {
+            "$ref": "tool.schema.json#/$defs/id"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "capabilities_delta": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_id",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "entity_id": {
+            "$ref": "tool.schema.json#/$defs/id"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "program_graph.schema.json#/$defs/capability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "program_graph.schema.json#/$defs/capability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "authority_revision": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "design_failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "request_hash",
+        "run_id",
+        "explained"
+      ],
+      "properties": {
+        "tool": {
+          "enum": [
+            "state",
+            "schema-check",
+            "inspect",
+            "callers",
+            "dependencies",
+            "slice",
+            "validate",
+            "transact",
+            "diff",
+            "build",
+            "test",
+            "blackbox",
+            "explain",
+            "restore",
+            "evidence"
+          ]
+        },
+        "request_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^run_[0-9a-f]{64}$"
+        },
+        "explained": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
