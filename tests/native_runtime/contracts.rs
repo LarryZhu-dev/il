@@ -60,6 +60,7 @@ fn captured_trap_child(){
     let mode=std::env::var("IL_RUNTIME_TRAP_MODE").unwrap_or_default();
     unsafe{let ctx=il_rt_context_new(1,1,8,100,if mode=="capture"{1}else{10000},0,fd);let mut buffer=Buffer{pointer:ptr::null_mut(),length:0,capacity:0};
         if mode=="shape"{il_rt_shape_begin(ctx,1);for _ in 0..66{il_rt_shape_enter(ctx);}}
+        if mode=="forged_clone"||mode=="forged_json"{let forged=Buffer{pointer:1usize as *mut u8,length:16,capacity:16};if mode=="forged_clone"{il_rt_buffer_clone(ctx,&mut buffer,&forged,b"clone".as_ptr(),5)}else{il_rt_json_buffer(ctx,&forged,1)}}
         il_rt_buffer_new(ctx,&mut buffer,b"live".as_ptr(),4,b"owner".as_ptr(),5);il_rt_tick(ctx,b"first".as_ptr(),5);il_rt_tick(ctx,b"exhausted".as_ptr(),9);}
     panic!("resource trap returned");
 }
@@ -83,6 +84,25 @@ fn depth64_result_and_clone_shape_boundary(){unsafe{
     let bytes=std::fs::read(&path).unwrap();let mut decoder=serde_json::Deserializer::from_slice(&bytes);decoder.disable_recursion_limit();let report=il_execution_model::Execution::deserialize(&mut decoder).unwrap();assert_eq!(report.status,il_execution_model::ExecutionStatus::Returned);std::fs::remove_file(path).unwrap();
     let path=std::env::temp_dir().join(format!("il-native-runtime-{}-shape-trap.json",std::process::id()));let output=std::process::Command::new(std::env::current_exe().unwrap()).args(["--exact","captured_trap_child","--nocapture"]).env("IL_RUNTIME_TRAP_REPORT",&path).env("IL_RUNTIME_TRAP_MODE","shape").output().unwrap();assert_eq!(output.status.code(),Some(101));let report:il_execution_model::Execution=serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();std::fs::remove_file(path).unwrap();assert_eq!(report.diagnostics[0].code,"E_RESOURCE_LIMIT");assert_eq!(report.diagnostics[0].cause,"clone shape budget exceeded");
 }}
+
+#[cfg(unix)]
+#[test]
+fn registered_buffer_clone_and_result_encoding(){unsafe{
+    let(path,fd)=report_file("clone");let ctx=il_rt_context_new(1,100,8,100,10000,0,fd);let text="中\0";
+    let mut original=Buffer{pointer:ptr::null_mut(),length:0,capacity:0};let mut copy=original;
+    il_rt_buffer_new(ctx,&mut original,text.as_ptr(),text.len() as u64,b"original".as_ptr(),8);
+    il_rt_buffer_clone(ctx,&mut copy,&original,b"clone".as_ptr(),5);assert_ne!(original.pointer,copy.pointer);il_rt_buffer_free(ctx,&mut original);
+    let start=br#"{"type":"String","data":{"kind":"string","value":"#;il_rt_json_raw(ctx,start.as_ptr(),start.len() as u64);il_rt_json_buffer(ctx,&copy,1);il_rt_json_raw(ctx,b"}}".as_ptr(),2);il_rt_finish(ctx);
+    let report:il_execution_model::Execution=serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();std::fs::remove_file(path).unwrap();assert_eq!(report.value,Some(il_execution_model::Value::string(text)));assert_eq!(report.live_allocations,1);assert_eq!(report.peak_heap_bytes,8);
+}}
+
+#[cfg(unix)]
+#[test]
+fn forged_payload_pointer_is_rejected_before_reading(){
+    for mode in ["forged_clone","forged_json"]{
+        let path=std::env::temp_dir().join(format!("il-native-runtime-{}-{mode}.json",std::process::id()));let output=std::process::Command::new(std::env::current_exe().unwrap()).args(["--exact","captured_trap_child","--nocapture"]).env("IL_RUNTIME_TRAP_REPORT",&path).env("IL_RUNTIME_TRAP_MODE",mode).output().unwrap();assert_eq!(output.status.code(),Some(101));let report:il_execution_model::Execution=serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();std::fs::remove_file(path).unwrap();assert_eq!(report.diagnostics[0].code,"E_STATE_INCONSISTENT");assert_eq!(report.live_allocations,0);
+    }
+}
 
 #[cfg(unix)]
 #[test]

@@ -45,6 +45,7 @@ length; strings passed as text must be UTF-8. C ABI functions never unwind.
 | location | entity:text | restore diagnostic location without charging a step |
 | trap | code:text, message:text, entity:text | report then exit 101; no unwind |
 | buffer_new | out:Buffer*, bytes:text, entity:text | new managed buffer; resource trap on failure |
+| buffer_clone | out:Buffer*, source:Buffer*, entity:text | validate registered buffer then clone its payload |
 | buffer_free | buffer:Buffer* | release allocation; no implicit lifecycle event |
 | concat | out:Buffer*, a:Buffer*, b:Buffer*, entity:text | u32: 0 success, 1 OutOfMemory, 2 CapacityOverflow |
 | print_i64 | value:i64 | u32: 0 success, otherwise IoError tag + 1 |
@@ -56,6 +57,7 @@ length; strings passed as text must be UTF-8. C ABI functions never unwind.
 | json_quoted | value:text | append a JSON-escaped UTF-8 string |
 | json_i64 / json_u64 | value:i64 / u64 | append a quoted canonical decimal integer |
 | json_bytes | bytes:text | append a decimal JSON byte array |
+| json_buffer | source:Buffer*, utf8:u32 | validate registered buffer; encode bytes (0) or UTF-8 string (1) |
 | shape_begin | kind:u32 | reset traversal budget; 0 export, 1 clone |
 | shape_enter / shape_leave | none | enforce depth 64 and 100000 expanded nodes |
 
@@ -64,6 +66,12 @@ Return=5. Buffer creation records Allocate itself. Generated typed traversal
 flattens aggregate owners into their active buffer leaves for other events.
 Free does not duplicate Drop, and returned owners stay live until report
 statistics have been collected. A trap exits without running pending cleanup.
+
+Dynamic owned buffer inputs use `buffer_clone` and `json_buffer`, which check the
+pointer/length/capacity against the allocation registry before reading payload
+memory. Raw source/JSON pointer primitives are restricted by NativeIR verification
+to static generated constants. A forged dynamic payload pointer must diagnose a
+state error rather than enter unchecked raw memory traversal.
 
 ## Application versus captured harness
 

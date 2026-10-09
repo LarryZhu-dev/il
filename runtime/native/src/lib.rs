@@ -115,6 +115,13 @@ pub unsafe extern "C" fn il_rt_buffer_new(pointer:*mut Context,out:*mut Buffer,s
     unsafe{out.write(buffer);}
 }
 #[no_mangle]
+pub unsafe extern "C" fn il_rt_buffer_clone(pointer:*mut Context,out:*mut Buffer,source:*const Buffer,entity:*const u8,entity_len:u64){
+    let ctx=unsafe{context(pointer)};let source=unsafe{*source};ctx.checked_buffer(source);
+    let entity=unsafe{text(entity,entity_len)};
+    let buffer=ctx.try_buffer(unsafe{bytes(source.pointer,source.length)},entity).unwrap_or_else(||ctx.fail("E_RESOURCE_LIMIT","heap budget exhausted",Some(entity)));
+    unsafe{out.write(buffer);}
+}
+#[no_mangle]
 pub unsafe extern "C" fn il_rt_buffer_free(pointer:*mut Context,buffer:*mut Buffer){
     let ctx=unsafe{context(pointer)};let value=unsafe{*buffer};ctx.checked_buffer(value);
     let allocation=ctx.allocations.remove(&(value.pointer as usize)).unwrap_or_else(||ctx.fail("E_DOUBLE_DROP","native buffer already released",None));
@@ -168,6 +175,15 @@ pub unsafe extern "C" fn il_rt_json_bytes(pointer:*mut Context,value:*const u8,l
     let ctx=unsafe{context(pointer)};if !ctx.captured{return}let value=unsafe{bytes(value,length)};
     let length=2+value.iter().map(|b|if *b>=100{3}else if *b>=10{2}else{1}).sum::<u64>()+value.len().saturating_sub(1) as u64;ctx.charge(length);
     let encoded=serde_json::to_vec(value).unwrap_or_else(|_|ctx.fail("E_STATE_INCONSISTENT","byte encoding failed",None));ctx.json.extend(encoded);
+}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_json_buffer(pointer:*mut Context,source:*const Buffer,utf8:u32){
+    let ctx=unsafe{context(pointer)};let source=unsafe{*source};ctx.checked_buffer(source);
+    match utf8{
+        0=>unsafe{il_rt_json_bytes(pointer,source.pointer,source.length)},
+        1=>unsafe{il_rt_json_quoted(pointer,source.pointer,source.length)},
+        _=>ctx.fail("E_STATE_INCONSISTENT","invalid buffer encoding mode",None),
+    }
 }
 #[no_mangle]
 pub unsafe extern "C" fn il_rt_shape_begin(pointer:*mut Context,kind:u32){let ctx=unsafe{context(pointer)};ctx.shape_nodes=0;ctx.shape_depth=0;ctx.shape_kind=kind;}
