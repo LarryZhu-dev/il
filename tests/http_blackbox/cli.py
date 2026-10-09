@@ -79,6 +79,8 @@ def response(wire):
 def server(executable,policy,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     probe=socket.socket()
+    # Match the listener's bind rules: TIME_WAIT is reusable, a live listener is not.
+    probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     try:probe.bind(('127.0.0.1',8080))
     finally:probe.close()
     import fcntl
