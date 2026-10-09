@@ -109,6 +109,18 @@
       "source": "module app { @id(\"Choice\") type Choice=sum {Empty,Data(I8,U64,String)};@id(\"main\") fn main(value:Choice)->U64 {match value {Empty=>{return 0;}Data(small,wide,text)=>{drop(text);return wide;}}} }",
       "arguments": [{"type":"Choice","data":{"kind":"variant","value":{"tag":"Data","fields":[{"type":"I8","data":{"kind":"integer","value":"-128"}},{"type":"U64","data":{"kind":"integer","value":"18446744073709551615"}},{"type":"String","data":{"kind":"string","value":"owned"}}]}}}],
       "expected": {"status":"returned","value":{"type":"U64","data":{"kind":"integer","value":"18446744073709551615"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "24byte_string_constant",
+      "source": "module app { @id(\"main\") fn main()->String effects [alloc] {return \"abcdefghijklmnopqrstuvwx\";} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":"abcdefghijklmnopqrstuvwx"}},"stdout":"","live_allocations":1}
+    },
+    {
+      "id": "24byte_utf8_string_length_and_return",
+      "source": "module app { @id(\"main\") fn main()->String effects [alloc,process] {let text:String=\"世界世界世界世界\";let n:Usize=runtime.string_len(text);runtime.print_i64(cast<I64>(n));return text;} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":"世界世界世界世界"}},"stdout":"24","live_allocations":1}
     }
   ]
 }

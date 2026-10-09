@@ -75,14 +75,14 @@ fn call_safety(program:&Program)->Vec<Diagnostic>{
                         else if arguments.first().is_none_or(|ctx|!matches!(address(ctx,&map),Some(Address::Context))){report(&i.entity_id,"call requires the live function runtime context");}
                         if let Some(callee)=requirements.get(symbol){for(argument,need)in arguments.iter().zip(callee){if need.bytes>0{needs.push((argument.clone(),need.bytes,need.align,need.write));}}}
                         else{
-                            let mut add=|index:usize,bytes:u64,write:bool|{if let Some(value)=arguments.get(index){needs.push((value.clone(),bytes,if bytes==24{8}else{1},write));}};
+                            let mut add=|index:usize,bytes:u64,align:u32,write:bool|{if let Some(value)=arguments.get(index){needs.push((value.clone(),bytes,align,write));}};
                             match symbol.as_str(){
-                                "il_rt_buffer_new"=>{add(1,24,true);let bytes=arguments.get(3).and_then(constant);if let Some(bytes)=bytes{add(2,bytes,false);}else{report(&i.entity_id,"buffer construction requires a constant source extent");}},
-                                "il_rt_buffer_free"|"il_rt_trace_buffer"|"il_rt_print_buffer"=>add(1,24,symbol=="il_rt_buffer_free"),
-                                "il_rt_buffer_clone"=>{add(1,24,true);add(2,24,false);},
-                                "il_rt_json_buffer"=>add(1,24,false),
-                                "il_rt_concat"=>{add(1,24,true);add(2,24,false);add(3,24,false);},
-                                "il_rt_json_raw"|"il_rt_json_quoted"|"il_rt_json_bytes"=>{if let Some(bytes)=arguments.get(2).and_then(constant){add(1,bytes,false);}else{report(&i.entity_id,"raw JSON input requires a static proven extent");}},
+                                "il_rt_buffer_new"=>{add(1,24,8,true);let bytes=arguments.get(3).and_then(constant);if let Some(bytes)=bytes{add(2,bytes,1,false);}else{report(&i.entity_id,"buffer construction requires a constant source extent");}},
+                                "il_rt_buffer_free"|"il_rt_trace_buffer"|"il_rt_print_buffer"=>add(1,24,8,symbol=="il_rt_buffer_free"),
+                                "il_rt_buffer_clone"=>{add(1,24,8,true);add(2,24,8,false);},
+                                "il_rt_json_buffer"=>add(1,24,8,false),
+                                "il_rt_concat"=>{add(1,24,8,true);add(2,24,8,false);add(3,24,8,false);},
+                                "il_rt_json_raw"|"il_rt_json_quoted"|"il_rt_json_bytes"=>{if let Some(bytes)=arguments.get(2).and_then(constant){add(1,bytes,1,false);}else{report(&i.entity_id,"raw JSON input requires a static proven extent");}},
                                 _=>{}
                             }
                         }

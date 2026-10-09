@@ -27,3 +27,11 @@ fn program(source:&str)->Program{
     let original=program("module a { fn main()->I32 { return 1; } }");
     for index in 0..128{let mut p=original.clone();match index%6{0=>p.layouts.get_mut("I32").unwrap().size=index as u64*100000000,1=>p.layouts.get_mut("I32").unwrap().align=index,2=>p.functions[0].signature.parameters.push(Type::Void),3=>p.functions[0].blocks[0].name=format!("x{index} bad"),4=>p.externs[0].signature.parameters.clear(),_=>p.input_hash="é".repeat(index as usize)}let result=std::panic::catch_unwind(||verify(&p));assert!(result.is_ok(),"mutation {index}");assert!(!result.unwrap().is_empty());}
 }
+#[test]fn raw_twenty_four_byte_data_keeps_byte_alignment(){
+    let p=program("module a { fn main()->String effects [alloc] { return \"123456789012345678901234\"; } }");
+    assert!(verify(&p).is_empty());
+    let global=p.globals.iter().find(|g|g.bytes==b"123456789012345678901234").unwrap().name.clone();
+    let mut p=p;let json=p.functions.iter_mut().flat_map(|f|&mut f.blocks).flat_map(|b|&mut b.instructions).find(|i|matches!(&i.operation,InstructionKind::Call{symbol,..} if symbol=="il_rt_json_quoted")).unwrap();
+    if let InstructionKind::Call{arguments,..}=&mut json.operation{arguments[1]=Operand::Global{name:global};arguments[2]=Operand::int(64,24);}
+    assert!(verify(&p).is_empty());
+}
