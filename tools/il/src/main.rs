@@ -412,6 +412,16 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
     }
 }
 
+fn receipt_failure(tool: &str, request: &Value, response: &Value, observed: u64, mut error: Failure) -> Value {
+    if matches!(tool,"transact"|"restore") && (response["ok"]==true || response["result"]["committed"]==true) {
+        error.committed_revision=response["result_revision"].as_u64();
+    }
+    let mut failure=failed(tool,journal::subject(tool,request).unwrap_or(observed),&error);
+    failure["base_revision"]=response["base_revision"].clone();
+    failure["result_revision"]=response["result_revision"].clone();
+    failure
+}
+
 fn main() {
     let mut tool = "unknown".to_owned();
     let mut base_revision = 0;
@@ -434,13 +444,7 @@ fn main() {
         let delivery = journal::delivery(&tool,&parsed,&response);
         match journal::record(&options.store,&context,&options.host_policy,&tool,&parsed,&response,&delivery,base_revision) {
             Ok(id) => Ok(journal::deliver(delivery,&id)),
-            Err(mut error) => {
-                if response["ok"] == true && matches!(tool.as_str(),"transact"|"restore") { error.committed_revision = response["result_revision"].as_u64(); }
-                let mut failure=failed(&tool,journal::subject(&tool,&parsed).unwrap_or(base_revision),&error);
-                failure["base_revision"]=response["base_revision"].clone();
-                failure["result_revision"]=response["result_revision"].clone();
-                Ok(failure)
-            }
+            Err(error) => Ok(receipt_failure(&tool,&parsed,&response,base_revision,error)),
         }
     })();
     let mut response = match result {
@@ -454,4 +458,22 @@ fn main() {
     }
     println!("{encoded}");
     if response["ok"] != true { std::process::exit(1); }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn receipt_failure_preserves_an_uncertain_committed_revision() {
+        let mut uncertainty=Failure::new("E_COMMIT_DURABILITY_UNCERTAIN","publication sync failed");
+        uncertainty.committed_revision=Some(7);
+        let previous=failed("transact",6,&uncertainty);
+        let response=receipt_failure("transact",&json!({"base_revision":6}),&previous,6,
+            Failure::new("E_TOOLCHAIN_FAILURE","journal publication failed"));
+        assert_eq!(response["ok"],false);
+        assert_eq!(response["base_revision"],6);
+        assert_eq!(response["result_revision"],7);
+        assert_eq!(response["result"]["committed"],true);
+        assert_eq!(response["result"]["revision"],7);
+    }
 }
