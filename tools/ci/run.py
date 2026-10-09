@@ -54,7 +54,7 @@ def main() -> int:
             print(f"Recorded installed package versions in {log.relative_to(ROOT).as_posix()}", flush=True)
         else:
             print(process.stdout, end="", flush=True)
-        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli"}
+        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli"}
         test_count = 0
         if name in {"bootstrap-pre-commit", "bootstrap-strict", "native-probe"}:
             test_count = 1
@@ -72,7 +72,7 @@ def main() -> int:
                     r"test result: \w+\. (\d+) passed; (\d+) failed;", process.stdout
                 )
             )
-        elif name in {"bootstrap-unit-tests", "graph-cli", "text-cli", "execution-cli", "execution-cli-debug", "native-cli"}:
+        elif name in {"bootstrap-unit-tests", "graph-cli", "text-cli", "execution-cli", "execution-cli-debug", "native-cli", "runtime-cli"}:
             counts = re.findall(r"Ran (\d+) tests? in", process.stdout)
             test_count = int(counts[-1]) if counts else 0
         elif name == "semantic-cli":
@@ -133,16 +133,18 @@ def main() -> int:
         if manifest.exists():
             if not (ROOT / "Cargo.lock").exists():
                 raise RuntimeError("locked Rust builds require checked-in Cargo.lock")
-            run("rust-tests", ["cargo", "test", "--workspace", "--locked"])
+            run("rust-tests", ["cargo", "test", "--workspace", "--locked", "--", "--nocapture"])
             if (ROOT / "tests/execution_cli.py").is_file():
                 run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
                 run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
             run("rust-release", ["cargo", "build", "--workspace", "--release", "--locked"])
+            if (ROOT / "runtime/minimal/build.py").is_file():
+                run("minimal-runtime", [sys.executable, "runtime/minimal/build.py", "--output", "target/release/libil_minimal_runtime.a"])
             if native_probe_enabled:
                 run("native-probe", [sys.executable, "tools/test_native_probe.py"])
             if (ROOT / "tests/graph_cli.py").is_file():
                 run("graph-cli", [sys.executable, "tests/graph_cli.py", "--binary", "target/release/il", "--report", "build/graph_cli_report.json"])
-            for suite in ("semantic", "text", "execution", "native"):
+            for suite in ("semantic", "text", "execution", "native", "runtime"):
                 if (ROOT / f"tests/{suite}_cli.py").is_file():
                     run(f"{suite}-cli", [sys.executable, f"tests/{suite}_cli.py", "--binary", "target/release/il", "--report", f"build/{suite}_cli_report.json"])
             if (ROOT / "tests/execution_cli.py").is_file():

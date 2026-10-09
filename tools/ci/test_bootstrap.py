@@ -71,6 +71,27 @@ class BootstrapSchemaTests(unittest.TestCase):
         task["acceptance"] = []
         self.rejects(task, "task")
 
+    def test_host_policy_schema_rejects_unknown_and_unsafe_fault_controls(self):
+        policy = {"schema_version": "1.0.0", "grants": [], "test_faults": None}
+        CHECK.validate_file(ROOT, policy, "host_policy")
+        for mutation in (dict(policy, shell="command"), dict(policy, test_faults={}),
+                         dict(policy, test_faults={"allocation_fail_after": None, "io_max_chunk": 0, "io_fail_after": None}),
+                         dict(policy, grants=[{"entity_id": "grant", "kind": "FileRead", "scope": "relative"}])):
+            self.rejects(mutation, "host_policy")
+
+    def test_runtime_build_request_rejects_mismatched_exports(self):
+        schema_path = ROOT / "schema/tool.schema.json"
+        schema = CHECK.read_json(schema_path)
+        build = schema["$defs"]["build"]
+        request = {"revision": 1, "target": CHECK.TARGET, "profile": "release"}
+        CHECK.validate_instance(request, build, schema_path, root_schema=schema)
+        CHECK.validate_instance(dict(request, runtime_profile="none", exports=["main"]), build, schema_path, root_schema=schema)
+        for mutation in (dict(request, exports=["main"]), dict(request, runtime_profile="none"),
+                         dict(request, runtime_profile="minimal", exports=["main"]),
+                         dict(request, runtime_profile="none", exports=[])):
+            with self.assertRaises(CHECK.ValidationError):
+                CHECK.validate_instance(mutation, build, schema_path, root_schema=schema)
+
     def test_duplicate_keys_and_non_json_numbers_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "input.json"

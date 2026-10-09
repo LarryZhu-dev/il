@@ -7,7 +7,8 @@ The bootstrap compiler is written in Rust and the native backend is LLVM.
 P00–P04 are verified, including a successful
 [GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37772237811).
 The verified implementation includes the shared static checker, structured text
-frontend, semantic graph transactions, HIR/MIR and bounded interpreter. The full compiler, runtime, HTTP package, extensions and self-hosting
+frontend, semantic graph transactions, HIR/MIR, bounded interpreter and LLVM native
+compiler. Operating-system runtime, HTTP packages, extensions and self-hosting
 are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
 No release is available until all of its gates pass.
@@ -62,6 +63,29 @@ compilation requires the runtime archive beside the CLI executable. The request'
 `test` also accepts `native_debug` and `native_release` isolation with the same
 explicit suite arguments and limits as `captured`. RFC 0017 defines the build,
 execution and persistent candidate records.
+
+## P06 runtime integration
+
+P06 is under acceptance. RFC 0018 defines owned `core.File` resources, absolute
+`core.Deadline` values, partial I/O, failure injection and independent runtime
+profiles. The checked source packages in `packages/core`, `packages/alloc` and
+`packages/io` compose with `examples/hello/main.il`; their manifests describe the
+available APIs and ownership. Package dependency resolution remains E04 work.
+
+A trusted launcher supplies `--host-policy /absolute/policy.json` before the CLI
+command. `schema/host_policy.schema.json` defines the closed policy. Graph
+capabilities must exactly match injected IDs, kinds and scopes; privileged calls
+name a selector, for example `runtime.file_read[read_grant](path)`. File paths are
+relative to held directory grants. Standalone Full executables receive policy
+JSON on fd 4; captured reports use fd 3. Fault injection is captured-test-only.
+
+Build requests may set `runtime_profile` independently of `profile`: `full`
+(default), `minimal` (static syscall runtime), or `none` (freestanding object).
+`none` requires a nonempty `exports` list of public scalar-ABI functions and
+returns null executable/runtime artifacts. `./tools/dev.ps1 build` also builds
+the Minimal archive beside the CLI. The independent P06 process suite checks
+real file and pipe behavior, authorization, resource cleanup and clean-build
+hashes; workflow configuration is not evidence that these gates passed.
 
 ## Normative inputs
 

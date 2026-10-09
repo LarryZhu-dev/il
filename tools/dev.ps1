@@ -39,5 +39,11 @@ if ($Action -eq 'il') {
 } else {
     docker @containerArguments
 }
-exit $LASTEXITCODE
+$actionExit = $LASTEXITCODE
+if ($actionExit -eq 0 -and $Action -eq 'build') {
+    $buildProfile = if ($ToolArguments -contains '--release') { 'release' } else { 'debug' }
+    docker run --rm --platform linux/amd64 --mount "type=bind,source=$workspace,target=/workspace" --workdir /workspace il-toolchain:1.90.0-llvm14 python3 runtime/minimal/build.py --output "target/$buildProfile/libil_minimal_runtime.a"
+    $actionExit = $LASTEXITCODE
+}
+exit $actionExit
 }
