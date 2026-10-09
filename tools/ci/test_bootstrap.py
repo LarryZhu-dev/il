@@ -293,5 +293,60 @@ class AiProtocolGateReportTests(unittest.TestCase):
                 self.gates.protocol_report_count(report)
 
 
+class P09FaultGateReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("ci_gate_runner_p09", ROOT / "tools/ci/run.py")
+        cls.gates = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.gates)
+
+    def transaction(self):
+        return {
+            "schema_version": "1.0.0", "suite": "transaction_process", "status": "PASSED",
+            "case_count": 4, "cases": [
+                {"stage": stage, "event": {"stage": stage}, "pid": index + 101,
+                 "signal": "SIGKILL", "retry_revision": index + 2,
+                 "cleanup": {"owned_process_reaped": True}}
+                for index, stage in enumerate(("transaction_before_snapshot", "transaction_after_snapshot",
+                                               "transaction_before_head_rename", "transaction_after_head_rename"))
+            ],
+        }
+
+    def build(self):
+        return {
+            "schema_version": "1.0.0", "suite": "build_process", "status": "PASSED",
+            "worker": {"stage": "link_runtime", "parent_pid": 101, "worker_pid": 202},
+            "signal": "SIGKILL", "failure_reports": [{"schema_valid": True}],
+            "retry": {"verified": True},
+        }
+
+    def test_complete_process_receipts_have_nonzero_counts(self):
+        self.assertEqual(self.gates.p09_report_count(self.transaction(), "transaction_process"), 4)
+        self.assertEqual(self.gates.p09_report_count(self.build(), "build_process"), 2)
+
+    def test_receipts_reject_missing_real_fault_observations(self):
+        variants = []
+        report = self.transaction(); report["cases"] = []; variants.append((report, "transaction_process"))
+        report = self.transaction(); report["cases"][1]["pid"] = True; variants.append((report, "transaction_process"))
+        report = self.transaction(); report["cases"][2]["retry_revision"] = 0; variants.append((report, "transaction_process"))
+        report = self.build(); report["worker"].pop("worker_pid"); variants.append((report, "build_process"))
+        report = self.build(); report["retry"]["verified"] = False; variants.append((report, "build_process"))
+        report = self.build(); report["schema_version"] = "0.1.0"; variants.append((report, "build_process"))
+        for report, suite in variants:
+            with self.subTest(report=report), self.assertRaises(ValueError):
+                self.gates.p09_report_count(report, suite)
+
+    def test_output_parser_uses_matching_json_receipt(self):
+        report = self.transaction()
+        output = "diagnostic line\n" + json.dumps(report) + "\n"
+        self.assertEqual(self.gates.p09_report_from_output(output, "transaction_process"), report)
+        with self.assertRaises(ValueError):
+            self.gates.p09_report_from_output("diagnostic line\n", "transaction_process")
+
+    def test_locked_fault_contract_is_checked_before_gate_acceptance(self):
+        value = self.gates.p09_contract_hash()
+        self.assertRegex(value, r"^[0-9a-f]{64}$")
+
+
 if __name__ == "__main__":
     unittest.main()

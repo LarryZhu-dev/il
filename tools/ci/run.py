@@ -17,6 +17,98 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "build" / "ci"
 
 
+def p09_report_count(report: dict, suite: str) -> int:
+    """Validate the complete, machine emitted P09 process-fault report.
+
+    The fault runners intentionally print a small JSON receipt instead of a
+    unittest summary.  Treating a zero count as success would allow a runner
+    which never reached its barrier to satisfy the CI gate, so the receipt is
+    checked against the locked fault contract here.
+    """
+    if not isinstance(report, dict) or report.get("schema_version") != "1.0.0":
+        raise ValueError("P09 report must use schema version 1.0.0")
+    if report.get("suite") != suite or report.get("status") != "PASSED":
+        raise ValueError(f"P09 {suite} report is not a passed receipt")
+    if suite == "transaction_process":
+        cases = report.get("cases")
+        stages = ["transaction_before_snapshot", "transaction_after_snapshot",
+                  "transaction_before_head_rename", "transaction_after_head_rename"]
+        if (not isinstance(cases, list) or len(cases) != len(stages)
+                or report.get("case_count") != len(stages)):
+            raise ValueError("P09 transaction receipt lacks all four interruption cases")
+        for case, stage in zip(cases, stages):
+            event = case.get("event") if isinstance(case, dict) else None
+            if (not isinstance(case, dict) or case.get("stage") != stage
+                    or not isinstance(event, dict) or event.get("stage") != stage
+                    or type(case.get("pid")) is not int or case["pid"] <= 0
+                    or case.get("signal") != "SIGKILL"
+                    or type(case.get("retry_revision")) is not int
+                    or case["retry_revision"] <= 0
+                    or case.get("cleanup", {}).get("owned_process_reaped") is not True):
+                raise ValueError("P09 transaction receipt lacks a real interruption or retry observation")
+        return len(cases)
+    if suite == "build_process":
+        worker = report.get("worker")
+        if (not isinstance(worker, dict) or worker.get("stage") != "link_runtime"
+                or type(worker.get("parent_pid")) is not int or worker["parent_pid"] <= 0
+                or type(worker.get("worker_pid")) is not int or worker["worker_pid"] <= 0
+                or report.get("signal") != "SIGKILL"
+                or not isinstance(report.get("failure_reports"), list)
+                or not report["failure_reports"]
+                or not isinstance(report.get("retry"), dict)
+                or report["retry"].get("verified") is not True):
+            raise ValueError("P09 build receipt lacks the real link worker or verified retry")
+        return 1 + len(report["failure_reports"])
+    raise ValueError(f"unknown P09 report suite: {suite}")
+
+
+def p09_report_from_output(output: str, suite: str) -> dict:
+    """Extract the final JSON receipt without accepting launcher diagnostics."""
+    for line in reversed(output.splitlines()):
+        try:
+            value = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, dict) and value.get("suite") == suite:
+            return value
+    raise ValueError(f"P09 {suite} gate did not emit a JSON receipt")
+
+
+def p09_contract_hash() -> str:
+    """Validate the locked fault contract before accepting either process gate."""
+    path = ROOT / "tests/fault_injection/contracts.json"
+    data = path.read_bytes()
+    contract = json.loads(data)
+    suites = contract.get("suites") if isinstance(contract, dict) else None
+    if (not isinstance(contract, dict) or contract.get("schema_version") != "1.0.0"
+            or not isinstance(suites, list)):
+        raise ValueError("P09 fault contract is not a valid schema 1.0.0 document")
+    by_id = {item.get("id"): item for item in suites if isinstance(item, dict)}
+    required = {
+        "transaction_process": {
+            "events": ["transaction_before_head_rename", "transaction_after_head_rename"],
+            "assertions": ["SIGKILL", "fresh_process_reopen", "monotonic_revision", "no_revision_reuse"],
+        },
+        "build_process": {
+            "events": ["link_runtime"],
+            "assertions": ["SIGKILL_real_worker", "retained_failure_diagnostic", "old_verified_executable_runs", "successful_retry"],
+        },
+        "accept_failure_external_tcp": {
+            "events": ["accept_fail_after_zero", "accept_fail_after_one"],
+            "assertions": ["captured_native_debug_and_release", "real_tcp_health_before_second_accept",
+                            "E_HTTP_ACCEPT_FAILED", "listener_released", "zero_live_allocations",
+                            "execution_schema_valid", "process_binary_policy_hashes"],
+        },
+    }
+    if set(by_id) != set(required) or len(by_id) != len(suites):
+        raise ValueError("P09 fault contract is missing or duplicating a required suite")
+    for suite, expected in required.items():
+        value = by_id[suite]
+        if value.get("events") != expected["events"] or value.get("assertions") != expected["assertions"]:
+            raise ValueError(f"P09 fault contract changed required cases for {suite}")
+    return hashlib.sha256(data).hexdigest()
+
+
 def protocol_report_count(report: dict) -> int:
     """Require actual compiler acceptance, not just the launcher worker fixture."""
     if not isinstance(report, dict):
@@ -120,6 +212,24 @@ def main() -> int:
                 if process.returncode == 0:
                     test_count = protocol_report_count(report)
             except (OSError, ValueError, AttributeError) as error:
+                gate_error = str(error)
+        elif name in {"p09-transaction-process", "p09-build-process"}:
+            suite = "transaction_process" if name == "p09-transaction-process" else "build_process"
+            try:
+                report = p09_report_from_output(process.stdout, suite)
+                test_count = p09_report_count(report, suite)
+                encoded = json.dumps(report, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                contract_hash = p09_contract_hash()
+                report_path = OUTPUT / f"{name}_report.json"
+                report_bytes = encoded + b"\n"
+                report_path.write_bytes(report_bytes)
+                report_artifact = {
+                    "report": report_path.relative_to(ROOT).as_posix(),
+                    "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+                    "contract": "tests/fault_injection/contracts.json",
+                    "contract_sha256": contract_hash,
+                }
+            except (OSError, ValueError, TypeError, KeyError) as error:
                 gate_error = str(error)
         result["gates"].append({
             "name": name,
