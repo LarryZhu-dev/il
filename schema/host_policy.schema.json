@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/host_policy.schema.json",
+  "title": "Trusted process host policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "grants",
+    "test_faults"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "grants": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "program_graph.schema.json#/$defs/capability"
+          },
+          {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "FileRead",
+                  "FileWrite",
+                  "ClockRead"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "FileRead",
+                    "FileWrite"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "pattern": "^/[^\\u0000]*$"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "test_faults": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allocation_fail_after",
+            "io_max_chunk",
+            "io_fail_after"
+          ],
+          "properties": {
+            "allocation_fail_after": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 18446744073709551615
+                }
+              ]
+            },
+            "io_max_chunk": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 18446744073709551615
+                }
+              ]
+            },
+            "io_fail_after": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 18446744073709551615
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

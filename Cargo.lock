@@ -115,6 +115,7 @@ dependencies = [
  "il-mir",
  "il-native-ir",
  "il-object-emitter",
+ "il-runtime-startup",
  "serde",
  "serde_json",
  "sha2",
@@ -133,9 +134,13 @@ dependencies = [
 name = "il-codegen-x86-64"
 version = "0.1.0"
 dependencies = [
+ "il-frontend",
  "il-graph",
  "il-hir",
+ "il-link-driver",
+ "il-mir",
  "il-native-ir",
+ "il-object-emitter",
  "serde",
 ]
 
@@ -191,6 +196,9 @@ dependencies = [
  "il-execution-model",
  "il-graph",
  "il-mir",
+ "il-runtime-allocator",
+ "il-runtime-handles",
+ "il-runtime-startup",
  "serde",
  "serde_json",
 ]
@@ -200,6 +208,7 @@ name = "il-link-driver"
 version = "0.1.0"
 dependencies = [
  "il-execution-model",
+ "il-native-ir",
  "il-object-emitter",
  "serde",
  "serde_json",
@@ -242,11 +251,23 @@ dependencies = [
 name = "il-native-runtime"
 version = "0.1.0"
 dependencies = [
+ "il-codegen-x86-64",
  "il-execution-model",
+ "il-frontend",
  "il-graph",
+ "il-hir",
+ "il-interpreter",
+ "il-link-driver",
+ "il-mir",
+ "il-native-ir",
+ "il-object-emitter",
+ "il-runtime-allocator",
+ "il-runtime-handles",
+ "il-runtime-startup",
  "libc",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -261,6 +282,35 @@ dependencies = [
 [[package]]
 name = "il-probe-runtime"
 version = "0.1.0"
+
+[[package]]
+name = "il-runtime-allocator"
+version = "0.1.0"
+dependencies = [
+ "il-runtime-startup",
+]
+
+[[package]]
+name = "il-runtime-handles"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "il-runtime-allocator",
+ "il-runtime-startup",
+ "libc",
+ "tempfile",
+]
+
+[[package]]
+name = "il-runtime-startup"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "itoa"

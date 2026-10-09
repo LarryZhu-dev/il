@@ -21,6 +21,7 @@ pub enum ValueData {
     Record(Vec<Value>),
     Tuple(Vec<Value>),
     Variant(VariantValue),
+    Resource(ResourceValue),
 }
 
 impl<'de> Deserialize<'de> for ValueData {
@@ -39,10 +40,14 @@ impl<'de> Deserialize<'de> for ValueData {
             "bool" => decode(payload).map(Self::Bool), "integer" => decode(payload).map(Self::Integer),
             "string" => decode(payload).map(Self::String), "bytes" => decode(payload).map(Self::Bytes),
             "record" => decode(payload).map(Self::Record), "tuple" => decode(payload).map(Self::Tuple),
-            "variant" => decode(payload).map(Self::Variant), _ => Err(D::Error::custom("unknown value data kind")),
+            "variant" => decode(payload).map(Self::Variant), "resource" => decode(payload).map(Self::Resource), _ => Err(D::Error::custom("unknown value data kind")),
         }
     }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceValue { pub kind: String, pub slot: u64, pub generation: u64 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -87,6 +92,33 @@ pub struct LifecycleEvent { pub kind: LifecycleKind, pub entity_id: String, pub 
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct StackFrame {
+    pub function_id: String,
+    #[serde(deserialize_with = "required_nullable")]
+    pub call_site: Option<String>,
+    pub entity_id: String,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum HandleEventKind {
+    #[serde(rename = "opened")] Open,
+    #[serde(rename = "closed")] Close,
+    #[serde(rename = "dropped")] Drop,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct HandleEvent {
+    pub kind: HandleEventKind,
+    pub entity_id: String,
+    pub slot: u64,
+    pub generation: u64,
+    #[serde(deserialize_with = "required_nullable")]
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Execution {
     pub status: ExecutionStatus,
     #[serde(deserialize_with = "required_nullable")]
@@ -98,15 +130,68 @@ pub struct Execution {
     pub peak_heap_bytes: u64,
     pub live_allocations: u64,
     pub lifecycle: Vec<LifecycleEvent>,
+    pub live_handles: u64,
+    pub handle_events: Vec<HandleEvent>,
+    pub stack_trace: Vec<StackFrame>,
 }
 
-fn required_nullable<'de,D:serde::Deserializer<'de>>(deserializer:D)->Result<Option<Value>,D::Error> {
-    Option::<Value>::deserialize(deserializer)
+fn required_nullable<'de,D:serde::Deserializer<'de>,T:Deserialize<'de>>(deserializer:D)->Result<Option<T>,D::Error> {
+    Option::<T>::deserialize(deserializer)
 }
 
 impl Execution {
     pub fn rejected(diagnostics: Vec<Diagnostic>) -> Self {
         Self { status: ExecutionStatus::Rejected, value: None, stdout: vec![], stderr: vec![], diagnostics,
-            steps: 0, peak_heap_bytes: 0, live_allocations: 0, lifecycle: vec![] }
+            steps: 0, peak_heap_bytes: 0, live_allocations: 0, lifecycle: vec![], live_handles: 0, handle_events: vec![], stack_trace: vec![] }
+    }
+}
+
+
+/// Independent diagnostic reserve, measured as the compact JSON stack array.
+pub const STACK_TRACE_MAX_BYTES: u64 = 1_048_576;
+pub fn json_string_bytes(value: &str) -> u64 {
+    value.bytes().fold(2u64, |size, byte| size.saturating_add(match byte {
+        b'"' | b'\\' | b'\x08' | b'\x0c' | b'\n' | b'\r' | b'\t' => 2,
+        0..=0x1f => 6, _ => 1,
+    }))
+}
+pub fn stack_frame_json_bytes(function_id: &str, call_site: Option<&str>, entity_id: &str) -> u64 {
+    let overhead = br#"{"function_id":,"call_site":,"entity_id":}"#.len() as u64;
+    overhead.saturating_add(json_string_bytes(function_id)).saturating_add(call_site.map(json_string_bytes).unwrap_or(4)).saturating_add(json_string_bytes(entity_id))
+}
+pub fn stack_trace_push_bytes(active_bytes: u64, depth: usize, frame_bytes: u64) -> Option<u64> {
+    let next = active_bytes.checked_add(frame_bytes)?.checked_add(u64::from(depth > 0))?;
+    (active_bytes >= 2 && next <= STACK_TRACE_MAX_BYTES).then_some(next)
+}
+pub fn stack_trace_replace_bytes(active_bytes: u64, previous_frame_bytes: u64, new_frame_bytes: u64) -> Option<u64> {
+    let next = active_bytes.checked_sub(previous_frame_bytes)?.checked_add(new_frame_bytes)?;
+    (next >= 2 && next <= STACK_TRACE_MAX_BYTES).then_some(next)
+}
+
+#[cfg(test)]
+mod stack_budget_tests {
+    use super::*;
+    #[test]
+    fn borrowed_size_matches_json_with_escapes_and_utf8() {
+        let samples = ["", "function.id", "\"\\\n\r\t\x08\x0c\x00\x1f", "智能语言😀"];
+        for value in samples {
+            assert_eq!(json_string_bytes(value), serde_json::to_vec(value).unwrap().len() as u64);
+            for call_site in [None, Some(value)] {
+                let frame = StackFrame { function_id: value.into(), call_site: call_site.map(str::to_owned), entity_id: value.into() };
+                assert_eq!(stack_frame_json_bytes(value, call_site, value), serde_json::to_vec(&frame).unwrap().len() as u64);
+            }
+        }
+    }
+    #[test]
+    fn stack_budget_boundaries_account_for_arrays_replacement_and_overflow() {
+        assert_eq!(stack_trace_push_bytes(2, 0, STACK_TRACE_MAX_BYTES - 2), Some(STACK_TRACE_MAX_BYTES));
+        assert_eq!(stack_trace_push_bytes(2, 0, STACK_TRACE_MAX_BYTES - 1), None);
+        assert_eq!(stack_trace_push_bytes(STACK_TRACE_MAX_BYTES - 10, 1, 9), Some(STACK_TRACE_MAX_BYTES));
+        assert_eq!(stack_trace_push_bytes(STACK_TRACE_MAX_BYTES - 10, 1, 10), None);
+        assert_eq!(stack_trace_replace_bytes(STACK_TRACE_MAX_BYTES, 10, 10), Some(STACK_TRACE_MAX_BYTES));
+        assert_eq!(stack_trace_replace_bytes(STACK_TRACE_MAX_BYTES, 10, 11), None);
+        assert_eq!(stack_trace_replace_bytes(STACK_TRACE_MAX_BYTES, 10, 5), Some(STACK_TRACE_MAX_BYTES - 5));
+        assert_eq!(stack_trace_push_bytes(u64::MAX, 1, 1), None);
+        assert_eq!(stack_trace_replace_bytes(2, 10, 1), None);
     }
 }

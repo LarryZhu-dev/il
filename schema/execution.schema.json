@@ -13,7 +13,10 @@
     "steps",
     "peak_heap_bytes",
     "live_allocations",
-    "lifecycle"
+    "lifecycle",
+    "live_handles",
+    "handle_events",
+    "stack_trace"
   ],
   "properties": {
     "status": {
@@ -91,6 +94,85 @@
               "minimum": 0,
               "maximum": 18446744073709551615
             }
+          }
+        }
+      }
+    },
+    "live_handles": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "handle_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "entity_id",
+          "slot",
+          "generation",
+          "error"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "opened",
+              "closed",
+              "dropped"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          },
+          "error": {
+            "enum": [
+              null,
+              "Read",
+              "Write",
+              "Closed",
+              "Timeout",
+              "PermissionDenied",
+              "InvalidData",
+              "Other"
+            ]
+          }
+        }
+      }
+    },
+    "stack_trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "function_id",
+          "call_site",
+          "entity_id"
+        ],
+        "properties": {
+          "function_id": {
+            "type": "string"
+          },
+          "call_site": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_id": {
+            "type": "string"
           }
         }
       }
@@ -254,6 +336,43 @@
                       "items": {
                         "$ref": "#/$defs/value"
                       }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "resource"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "slot",
+                    "generation"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "file"
+                    },
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 18446744073709551615
+                    },
+                    "generation": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 18446744073709551615
                     }
                   }
                 }

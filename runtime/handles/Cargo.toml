@@ -1,0 +1,18 @@
+[package]
+name = "il-runtime-handles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+il-runtime-startup.workspace = true
+il-runtime-allocator.workspace = true
+il-graph.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[test]]
+name = "host_resource_contracts"
+path = "../../tests/runtime_host/handles.rs"

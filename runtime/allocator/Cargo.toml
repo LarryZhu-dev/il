@@ -1,0 +1,12 @@
+[package]
+name = "il-runtime-allocator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+il-runtime-startup.workspace = true
+
+[[test]]
+name = "allocator_contracts"
+path = "../../tests/runtime_host/allocator.rs"

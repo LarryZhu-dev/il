@@ -1,0 +1,18 @@
+[package]
+name = "il-runtime-startup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+il-graph.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[test]]
+name = "startup_contracts"
+path = "../../tests/runtime_host/startup.rs"
