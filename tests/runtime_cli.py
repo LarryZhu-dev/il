@@ -631,7 +631,7 @@ class RuntimeCliAcceptance(unittest.TestCase):
 
     def test_long_recursive_call_ids_keep_a_bounded_stack_report(self):
         call_id = "recursive_" + "x" * 20000
-        source = f'module app {{@id("main") fn main()->Unit {{@id("{call_id}") main();}}}}'
+        source = f'module app {{@id("main") fn main()->I64 {{@id("{call_id}") let n:I64=main();return n;}}}}'
         with self.scenario("long_recursive_stack_budget") as row:
             self.publish(source)
             row["executions"] = {}
