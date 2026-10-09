@@ -263,5 +263,34 @@ class HttpContractReaderTests(unittest.TestCase):
         self.assertEqual(self.read("a: {b: ['中,文', \"escaped\\\"quote\"], c: 'it''s'}"),
                          {"a": {"b": ["中,文", 'escaped"quote'], "c": "it's"}})
 
+class AiProtocolGateReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("ci_gate_runner", ROOT / "tools/ci/run.py")
+        cls.gates = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.gates)
+
+    def report(self):
+        return {"suite": "ai_protocol_cli", "scope": "worker_and_real_cli", "state": "PASSED",
+                "passed": True, "count": 12, "failures": [], "errors": [], "cases": [
+                    {"id": "test_historical_budget_diagnostics_and_receipt_tamper", "passed": True},
+                    {"id": "test_bounded_route_diagnosis_repair_restore_and_receipts", "passed": True}]}
+
+    def test_complete_real_acceptance_is_counted(self):
+        self.assertEqual(self.gates.protocol_report_count(self.report()), 12)
+
+    def test_worker_only_missing_failed_or_repeated_cases_cannot_pass_p08(self):
+        variants = [None, [], {}]
+        for field, value in [("scope", "worker_boundaries_only"), ("passed", False), ("state", "FAILED"),
+                             ("count", 10), ("count", True), ("errors", [{"error": "timeout"}]), ("cases", [])]:
+            report = self.report(); report[field] = value; variants.append(report)
+        report = self.report(); report["cases"][0]["passed"] = False; variants.append(report)
+        report = self.report(); report["cases"][1] = report["cases"][0].copy(); variants.append(report)
+        report = self.report(); report["cases"][0]["id"] = []; variants.append(report)
+        for report in variants:
+            with self.subTest(report=report), self.assertRaises(ValueError):
+                self.gates.protocol_report_count(report)
+
+
 if __name__ == "__main__":
     unittest.main()

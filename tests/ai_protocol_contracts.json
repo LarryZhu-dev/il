@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "context_phases": ["contract", "target_entities", "direct_dependencies", "callers", "related_types", "related_tests", "current_diagnostics", "relevant_rfc_fragments"],
+  "whole_program_scope": "forbidden",
+  "environment_retries": 0,
+  "graph_nodes": 4096,
+  "scenario": {
+    "baseline_revision": 1,
+    "added_revision": 2,
+    "restored_revision": 3,
+    "request": "/hello/Rebuild",
+    "added_status": 200,
+    "restored_status": 404,
+    "body_json": {"message": "Hello, Rebuild"},
+    "successful_resource_owners": 0
+  },
+  "reconstruction": {
+    "input_roles": ["graph", "policy", "toolchain_lock", "compiler", "runtime"],
+    "identical_artifacts": ["native_ir", "llvm_ir", "object", "executable"],
+    "original_store": "unavailable_during_rebuild"
+  },
+  "acceptance_scope": "P08 deterministic protocol evaluation; not an LLM benchmark or G4 comparison"
+}

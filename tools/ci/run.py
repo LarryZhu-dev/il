@@ -17,6 +17,26 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "build" / "ci"
 
 
+def protocol_report_count(report: dict) -> int:
+    """Require actual compiler acceptance, not just the launcher worker fixture."""
+    if not isinstance(report, dict):
+        raise ValueError("P08 acceptance report must be an object")
+    expected = {
+        "test_historical_budget_diagnostics_and_receipt_tamper",
+        "test_bounded_route_diagnosis_repair_restore_and_receipts",
+    }
+    cases = report.get("cases")
+    if (report.get("suite") != "ai_protocol_cli" or report.get("scope") != "worker_and_real_cli"
+            or report.get("state") != "PASSED" or report.get("passed") is not True
+            or type(report.get("count")) is not int or report["count"] < 12
+            or report.get("failures") != [] or report.get("errors") != []
+            or not isinstance(cases, list) or len(cases) != len(expected)
+            or any(not isinstance(case, dict) or not isinstance(case.get("id"), str) or case.get("passed") is not True for case in cases)
+            or {case.get("id") for case in cases} != expected):
+        raise ValueError("P08 gate requires the complete worker and real CLI acceptance report")
+    return report["count"]
+
+
 def main() -> int:
     if len(sys.argv) != 1:
         print("ci runner accepts no arguments", file=sys.stderr)
@@ -43,6 +63,8 @@ def main() -> int:
     def run(name: str, arguments: list[str]) -> None:
         result["active_gate"] = {"name": name, "command": arguments}
         publish_report()
+        if name == "ai-protocol-cli":
+            (ROOT / "build/ai_protocol_cli_report.json").unlink(missing_ok=True)
         started = time.monotonic()
         process = subprocess.run(
             arguments, cwd=ROOT, text=True, stdout=subprocess.PIPE,
@@ -54,8 +76,10 @@ def main() -> int:
             print(f"Recorded installed package versions in {log.relative_to(ROOT).as_posix()}", flush=True)
         else:
             print(process.stdout, end="", flush=True)
-        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli"}
+        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli", "ai-protocol-cli"}
         test_count = 0
+        gate_error = None
+        report_artifact = {}
         if name in {"bootstrap-pre-commit", "bootstrap-strict", "native-probe"}:
             test_count = 1
             try:
@@ -84,21 +108,38 @@ def main() -> int:
                 test_count = json.loads(process.stdout)["count"]
             except (ValueError, KeyError):
                 pass
+        elif name == "ai-protocol-cli":
+            report_path = ROOT / "build/ai_protocol_cli_report.json"
+            try:
+                data = report_path.read_bytes()
+                report_artifact = {"report": report_path.relative_to(ROOT).as_posix(),
+                                   "report_sha256": hashlib.sha256(data).hexdigest()}
+                report = json.loads(data)
+                count = report.get("count")
+                test_count = count if type(count) is int and count >= 0 else 0
+                if process.returncode == 0:
+                    test_count = protocol_report_count(report)
+            except (OSError, ValueError, AttributeError) as error:
+                gate_error = str(error)
         result["gates"].append({
             "name": name,
             "command": arguments,
-            "status": "PASSED" if process.returncode == 0 else "FAILED",
+            "status": "PASSED" if process.returncode == 0 and gate_error is None else "FAILED",
             "exit_code": process.returncode,
             "is_test": is_test,
             "test_count": test_count,
             "elapsed_seconds": round(time.monotonic() - started, 6),
             "log": log.relative_to(ROOT).as_posix(),
             "log_sha256": hashlib.sha256(log.read_bytes()).hexdigest(),
+            **report_artifact,
+            **({"error": gate_error} if gate_error else {}),
         })
         result.pop("active_gate", None)
         publish_report()
         if process.returncode:
             raise RuntimeError(f"gate {name} failed with exit code {process.returncode}")
+        if gate_error:
+            raise RuntimeError(f"gate {name} report validation failed: {gate_error}")
 
     try:
         if platform.system() != "Linux" or platform.machine() not in ("x86_64", "AMD64"):
@@ -149,6 +190,8 @@ def main() -> int:
                     run(f"{suite}-cli", [sys.executable, f"tests/{suite}_cli.py", "--binary", "target/release/il", "--report", f"build/{suite}_cli_report.json"])
             if (ROOT / "tests/http_blackbox/cli.py").is_file():
                 run("http-cli", [sys.executable, "tests/http_blackbox/cli.py", "--binary", "target/release/il", "--report", "build/http_cli_report.json"])
+            if (ROOT / "tests/ai_protocol_cli.py").is_file():
+                run("ai-protocol-cli", [sys.executable, "tests/ai_protocol_cli.py", "--binary", "target/release/il", "--report", "build/ai_protocol_cli_report.json"])
             if (ROOT / "tests/execution_cli.py").is_file():
                 run("interpreter-profile-parity", [sys.executable, "tools/ci/compare_execution.py"])
         else:

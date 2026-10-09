@@ -44,17 +44,20 @@ def main():
     parser.add_argument('--compiler')
     parser.add_argument('--runtime')
     parser.add_argument('--artifact', action='append', default=[])
+    parser.add_argument('--known-limit', action='append', default=[])
     args = parser.parse_args()
     if subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip():
         raise SystemExit('E_EVIDENCE_INCOMPLETE: evidence requires a clean source checkout')
-    report = json.loads(Path(args.report).read_text())
+    if any(not limit.strip() for limit in args.known_limit):
+        raise SystemExit('E_EVIDENCE_INCOMPLETE: known limits cannot be empty')
+    report = json.loads(Path(args.report).read_text(encoding='utf-8'))
     source_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     try:
         checks = validate_report(report, source_commit)
     except ValueError as error:
         raise SystemExit(str(error))
-    state = json.loads(Path('repository_state.json').read_text())
-    lock = json.loads(Path('toolchain.lock').read_text())
+    state = json.loads(Path('repository_state.json').read_text(encoding='utf-8'))
+    lock = json.loads(Path('toolchain.lock').read_text(encoding='utf-8'))
     unavailable = [name for name in ['compiler', 'runtime'] if getattr(args, name) is None]
     evidence = {
         'evidence_id': f'ev_{args.task}_{state["head_revision"]}',
@@ -71,7 +74,7 @@ def main():
         'artifacts': [archive_artifact(p) for p in args.artifact],
         'tests': [{'suite': g['name'], 'passed': True, 'count': g.get('test_count', 1)} for g in checks if g.get('is_test', False)],
         'effects_delta': [], 'capabilities_delta': [],
-        'known_limits': ['Only the recorded task and gates are verified; later tasks are not verified.'],
+        'known_limits': ['Only the recorded task and gates are verified; later tasks are not verified.', *args.known_limit],
     }
     if not evidence['tests']:
         raise SystemExit('E_EVIDENCE_INCOMPLETE: report has no designated test suites')
@@ -79,7 +82,7 @@ def main():
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         raise SystemExit('Evidence is immutable: ' + str(path))
-    path.write_text(json.dumps(evidence, indent=2) + '\n', newline='\n')
+    path.write_text(json.dumps(evidence, indent=2) + '\n', encoding='utf-8', newline='\n')
     print(json.dumps({'ok': True, 'evidence': str(path)}))
 
 
