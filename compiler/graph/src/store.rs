@@ -251,6 +251,8 @@ impl Store {
 
     fn publish(&self, graph: &Graph, parent: Option<&Head>, provenance: Provenance, reason: String, fault: Option<FaultPoint>) -> StoreResult<Head> {
         if fault == Some(FaultPoint::BeforeSnapshot) { return Err(StoreError::new("E_TOOLCHAIN_FAILURE", "injected interruption before snapshot")); }
+        #[cfg(feature = "process-test-barriers")]
+        process_barrier("transaction_before_snapshot");
         let directory = self.snapshot(graph.revision);
         if parent.is_none() { fs::create_dir_all(&directory)?; }
         else { fs::create_dir(&directory)?; }
@@ -268,6 +270,8 @@ impl Store {
         sync_directory(&directory)?;
         sync_directory(&self.metadata().join("revisions"))?;
         if fault == Some(FaultPoint::AfterSnapshot) { return Err(StoreError::new("E_TOOLCHAIN_FAILURE", "injected interruption after snapshot")); }
+        #[cfg(feature = "process-test-barriers")]
+        process_barrier("transaction_after_snapshot");
         let head = Head { revision: graph.revision, graph_hash, manifest_hash: hash_bytes(&manifest_bytes) };
         let temporary = self.metadata().join("HEAD.next");
         // A prior interrupted publication may leave only this uncommitted pointer.
