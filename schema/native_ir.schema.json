@@ -1,0 +1,1053 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/native_ir.schema.json",
+  "title": "Intelligent language fixed-width native IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "compiler_version",
+    "input_hash",
+    "source_revision",
+    "target",
+    "mode",
+    "layouts",
+    "globals",
+    "externs",
+    "functions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "compiler_version": {
+      "type": "string"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "target": {
+      "const": "x86_64-unknown-linux-gnu"
+    },
+    "mode": {
+      "$ref": "#/$defs/mode"
+    },
+    "layouts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/layout"
+      }
+    },
+    "globals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "bytes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        }
+      }
+    },
+    "externs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "signature",
+          "noreturn"
+        ],
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "signature": {
+            "$ref": "#/$defs/signature"
+          },
+          "noreturn": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/function"
+      }
+    }
+  },
+  "$defs": {
+    "type": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "void"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ptr"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "bits"
+          ],
+          "properties": {
+            "kind": {
+              "const": "int"
+            },
+            "bits": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          }
+        }
+      ]
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "register"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "bits",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "bits": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "global"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "null"
+            }
+          }
+        }
+      ]
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "parameters"
+      ],
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/type"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/type"
+          }
+        }
+      }
+    },
+    "mode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entry"
+          ],
+          "properties": {
+            "kind": {
+              "const": "application"
+            },
+            "entry": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entry",
+            "arguments",
+            "limits"
+          ],
+          "properties": {
+            "kind": {
+              "const": "captured"
+            },
+            "entry": {
+              "type": "string"
+            },
+            "arguments": {
+              "type": "array",
+              "items": {
+                "$ref": "execution.schema.json#/$defs/value"
+              }
+            },
+            "limits": {
+              "$ref": "execution.schema.json#/$defs/limits"
+            }
+          }
+        }
+      ]
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "fields",
+        "offsets"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offsets": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 18446744073709551615
+          }
+        }
+      }
+    },
+    "shape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unit"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "never"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bool"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "signed",
+            "bits"
+          ],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "signed": {
+              "type": "boolean"
+            },
+            "bits": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "utf8"
+          ],
+          "properties": {
+            "kind": {
+              "const": "buffer"
+            },
+            "utf8": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "names",
+            "fields",
+            "offsets"
+          ],
+          "properties": {
+            "kind": {
+              "const": "record"
+            },
+            "names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "offsets": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fields",
+            "offsets"
+          ],
+          "properties": {
+            "kind": {
+              "const": "tuple"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "offsets": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "payload",
+            "variants"
+          ],
+          "properties": {
+            "kind": {
+              "const": "sum"
+            },
+            "payload": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            },
+            "variants": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/variant"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "size",
+        "align",
+        "owned",
+        "shape"
+      ],
+      "properties": {
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "align": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "owned": {
+          "type": "boolean"
+        },
+        "shape": {
+          "$ref": "#/$defs/shape"
+        }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "bytes",
+            "align"
+          ],
+          "properties": {
+            "kind": {
+              "const": "alloca"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            },
+            "align": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pointer",
+            "bytes"
+          ],
+          "properties": {
+            "kind": {
+              "const": "offset"
+            },
+            "pointer": {
+              "$ref": "#/$defs/operand"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pointer",
+            "ty",
+            "align"
+          ],
+          "properties": {
+            "kind": {
+              "const": "load"
+            },
+            "pointer": {
+              "$ref": "#/$defs/operand"
+            },
+            "ty": {
+              "$ref": "#/$defs/type"
+            },
+            "align": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pointer",
+            "value",
+            "align"
+          ],
+          "properties": {
+            "kind": {
+              "const": "store"
+            },
+            "pointer": {
+              "$ref": "#/$defs/operand"
+            },
+            "value": {
+              "$ref": "#/$defs/operand"
+            },
+            "align": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "destination",
+            "source",
+            "bytes"
+          ],
+          "properties": {
+            "kind": {
+              "const": "copy"
+            },
+            "destination": {
+              "$ref": "#/$defs/operand"
+            },
+            "source": {
+              "$ref": "#/$defs/operand"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pointer",
+            "bytes"
+          ],
+          "properties": {
+            "kind": {
+              "const": "zero"
+            },
+            "pointer": {
+              "$ref": "#/$defs/operand"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "kind": {
+              "const": "binary"
+            },
+            "operation": {
+              "enum": [
+                "add",
+                "sub",
+                "mul",
+                "and",
+                "or",
+                "xor"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/operand"
+            },
+            "right": {
+              "$ref": "#/$defs/operand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "predicate",
+            "left",
+            "right"
+          ],
+          "properties": {
+            "kind": {
+              "const": "compare"
+            },
+            "predicate": {
+              "enum": [
+                "eq",
+                "ne",
+                "ult",
+                "ule",
+                "ugt",
+                "uge",
+                "slt",
+                "sle",
+                "sgt",
+                "sge"
+              ]
+            },
+            "left": {
+              "$ref": "#/$defs/operand"
+            },
+            "right": {
+              "$ref": "#/$defs/operand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation",
+            "value",
+            "bits"
+          ],
+          "properties": {
+            "kind": {
+              "const": "convert"
+            },
+            "operation": {
+              "enum": [
+                "truncate",
+                "sign_extend",
+                "zero_extend"
+              ]
+            },
+            "value": {
+              "$ref": "#/$defs/operand"
+            },
+            "bits": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation",
+            "signed",
+            "left",
+            "right",
+            "context"
+          ],
+          "properties": {
+            "kind": {
+              "const": "checked"
+            },
+            "operation": {
+              "enum": [
+                "add",
+                "sub",
+                "mul",
+                "div",
+                "rem",
+                "shl",
+                "shr"
+              ]
+            },
+            "signed": {
+              "type": "boolean"
+            },
+            "left": {
+              "$ref": "#/$defs/operand"
+            },
+            "right": {
+              "$ref": "#/$defs/operand"
+            },
+            "context": {
+              "$ref": "#/$defs/operand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "signed_source",
+            "signed_target",
+            "bits",
+            "value",
+            "context"
+          ],
+          "properties": {
+            "kind": {
+              "const": "checked_cast"
+            },
+            "signed_source": {
+              "type": "boolean"
+            },
+            "signed_target": {
+              "type": "boolean"
+            },
+            "bits": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "value": {
+              "$ref": "#/$defs/operand"
+            },
+            "context": {
+              "$ref": "#/$defs/operand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "symbol",
+            "arguments"
+          ],
+          "properties": {
+            "kind": {
+              "const": "call"
+            },
+            "symbol": {
+              "type": "string"
+            },
+            "arguments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/operand"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "instruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "entity_id",
+        "operation"
+      ],
+      "properties": {
+        "result": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entity_id": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        }
+      }
+    },
+    "terminator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "return"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/operand"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target"
+          ],
+          "properties": {
+            "kind": {
+              "const": "branch"
+            },
+            "target": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "condition",
+            "yes",
+            "no"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cond_branch"
+            },
+            "condition": {
+              "$ref": "#/$defs/operand"
+            },
+            "yes": {
+              "type": "string"
+            },
+            "no": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value",
+            "cases",
+            "default"
+          ],
+          "properties": {
+            "kind": {
+              "const": "switch"
+            },
+            "value": {
+              "$ref": "#/$defs/operand"
+            },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 18446744073709551615
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "items": false,
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "default": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unreachable"
+            }
+          }
+        }
+      ]
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "instructions",
+        "terminator"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "instructions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/instruction"
+          }
+        },
+        "terminator": {
+          "$ref": "#/$defs/terminator"
+        }
+      }
+    },
+    "function": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "entity_id",
+        "signature",
+        "parameters",
+        "blocks"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string"
+        },
+        "entity_id": {
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/signature"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        }
+      }
+    }
+  }
+}
