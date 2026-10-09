@@ -13,7 +13,25 @@ il-graph.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 libc.workspace = true
+il-runtime-startup.workspace = true
+il-runtime-allocator.workspace = true
+il-runtime-handles.workspace = true
 
 [[test]]
 name = "native_runtime_contracts"
 path = "../../tests/native_runtime/contracts.rs"
+
+[dev-dependencies]
+il-frontend.workspace = true
+il-hir.workspace = true
+il-mir.workspace = true
+il-interpreter.workspace = true
+il-native-ir.workspace = true
+il-codegen-x86-64.workspace = true
+il-link-driver.workspace = true
+il-object-emitter.workspace = true
+tempfile.workspace = true
+
+[[test]]
+name = "package_sources"
+path = "../../tests/runtime_host/package_sources.rs"

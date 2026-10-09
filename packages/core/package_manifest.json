@@ -1,0 +1,39 @@
+{
+  "package_manifest": {
+    "name": "core",
+    "version": "0.1.0",
+    "stage": "P06",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": []
+  },
+  "public_types": [
+    "core.File",
+    "core.Deadline",
+    "core.IoError",
+    "core.AllocError"
+  ],
+  "public_functions": [
+    "core.infinite",
+    "core.deadline_at",
+    "core.max_i64"
+  ],
+  "error_types": [
+    "core.IoError",
+    "core.AllocError"
+  ],
+  "effects": [],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/package_sources.rs::package_sources_parse_check_and_execute",
+    "tests/runtime_host/package_sources.rs::package_manifest_exports_are_actual_checked_entities"
+  ],
+  "blackbox_tests": [
+    "tests/runtime_host/package_sources.rs::hello_package_sources_execute_as_debug_and_release_native"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

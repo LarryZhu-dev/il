@@ -1,0 +1,41 @@
+{
+  "package_manifest": {
+    "name": "alloc",
+    "version": "0.1.0",
+    "stage": "P06",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core"
+    ]
+  },
+  "public_types": [
+    "alloc.StringResult"
+  ],
+  "public_functions": [
+    "alloc.concat",
+    "alloc.clone_string",
+    "alloc.clone_bytes",
+    "alloc.string_size",
+    "alloc.bytes_size"
+  ],
+  "error_types": [
+    "core.AllocError"
+  ],
+  "effects": [
+    "alloc"
+  ],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/package_sources.rs::package_sources_parse_check_and_execute",
+    "tests/runtime_host/package_sources.rs::package_manifest_exports_are_actual_checked_entities"
+  ],
+  "blackbox_tests": [
+    "tests/runtime_host/package_sources.rs::hello_package_sources_execute_as_debug_and_release_native"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}
