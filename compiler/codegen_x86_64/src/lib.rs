@@ -11,7 +11,7 @@ pub struct LlvmArtifact{pub ir:String,pub entity_map:Vec<SourceLocation>,pub sta
 fn ty(t:&Type)->String{match t{Type::Void=>"void".into(),Type::Ptr=>"i8*".into(),Type::Int{bits}=>format!("i{bits}")}}
 pub fn emit(program:&Program)->Result<LlvmArtifact,Vec<Diagnostic>>{
     let errors=verify(program);if !errors.is_empty(){return Err(errors);}
-    let mut e=Emitter{ir:String::new(),map:vec![],types:BTreeMap::new(),globals:program.globals.iter().map(|g|(g.name.clone(),g.bytes.len().max(1))).collect(),signatures:program.externs.iter().map(|f|(f.symbol.clone(),f.signature.clone())).chain(program.functions.iter().map(|f|(f.symbol.clone(),f.signature.clone()))).collect(),next:0,metadata:vec![],debug:0,function:String::new(),trap_data:BTreeMap::new(),profile:program.runtime_profile,exports:match &program.mode{BuildMode::Exports{entries}=>entries.iter().map(|e|symbol(e)).collect(),_=>BTreeSet::new()}};
+    let mut e=Emitter{ir:String::new(),line_offset:0,line_count:0,map:vec![],types:BTreeMap::new(),globals:program.globals.iter().map(|g|(g.name.clone(),g.bytes.len().max(1))).collect(),signatures:program.externs.iter().map(|f|(f.symbol.clone(),f.signature.clone())).chain(program.functions.iter().map(|f|(f.symbol.clone(),f.signature.clone()))).collect(),next:0,metadata:vec![],debug:0,function:String::new(),trap_data:BTreeMap::new(),profile:program.runtime_profile,exports:match &program.mode{BuildMode::Exports{entries}=>entries.iter().map(|e|symbol(e)).collect(),_=>BTreeSet::new()}};
     e.ir.push_str("; Intelligent language direct LLVM backend\nsource_filename = \"program.ll\"\ntarget datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"\ntarget triple = \"x86_64-unknown-linux-gnu\"\n");
     for global in &program.globals{writeln!(e.ir,"@{} = private unnamed_addr constant [{} x i8] c\"{}\", align 1",global.name,global.bytes.len().max(1),escaped(if global.bytes.is_empty(){&[0]}else{&global.bytes})).unwrap();}
     // Checked arithmetic traps use immutable strings, never host source generation.
@@ -28,8 +28,16 @@ pub fn emit(program:&Program)->Result<LlvmArtifact,Vec<Diagnostic>>{
     let stage=il_hir::StageRecord{stage:"codegen_x86_64".into(),input_hash,output_hash:il_graph::hash_bytes(e.ir.as_bytes()),compiler_version:program.compiler_version.clone(),diagnostics:vec![]};Ok(LlvmArtifact{ir:e.ir,entity_map:e.map,stage})
 }
 fn escaped(bytes:&[u8])->String{bytes.iter().map(|b|format!("\\{b:02X}")).collect()}
-struct Emitter{ir:String,map:Vec<SourceLocation>,types:BTreeMap<String,Type>,globals:BTreeMap<String,usize>,signatures:BTreeMap<String,Signature>,next:usize,metadata:Vec<String>,debug:usize,function:String,trap_data:BTreeMap<String,(String,usize)>,profile:RuntimeProfile,exports:BTreeSet<String>}
+struct Emitter{ir:String,line_offset:usize,line_count:usize,map:Vec<SourceLocation>,types:BTreeMap<String,Type>,globals:BTreeMap<String,usize>,signatures:BTreeMap<String,Signature>,next:usize,metadata:Vec<String>,debug:usize,function:String,trap_data:BTreeMap<String,(String,usize)>,profile:RuntimeProfile,exports:BTreeSet<String>}
 impl Emitter{
+    fn source_line(&mut self)->usize{
+        // Every append ends at a line boundary. Count only newly emitted bytes,
+        // including labels and expansions that produce several LLVM instructions.
+        debug_assert!(self.ir.ends_with('\n'));
+        self.line_count+=self.ir.as_bytes()[self.line_offset..].iter().filter(|byte|**byte==b'\n').count();
+        self.line_offset=self.ir.len();
+        self.line_count+1
+    }
     fn memory_loop(&mut self,destination:&Operand,source:Option<&Operand>,bytes:u64){
         if bytes==0{return;}
         let forward=self.label();let backward=self.label();let done=self.label();
@@ -49,7 +57,7 @@ impl Emitter{
         self.next=0;self.types.clear();self.function=f.symbol.clone();for(p,t)in f.parameters.iter().zip(&f.signature.parameters){self.types.insert(p.clone(),t.clone());}
         let scope=self.metadata.len();self.metadata.push(format!("!{scope} = distinct !DISubprogram(name: \"{}\", linkageName: \"{}\", scope: !1, file: !1, line: 1, type: !4, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !0)",escaped(f.entity_id.as_bytes()),f.symbol));
         writeln!(self.ir,"\ndefine {}{} @{}({}) !dbg !{scope} {{",if self.profile==RuntimeProfile::None&&!self.exports.contains(&f.symbol){"internal "}else{""},ty(&f.signature.result),f.symbol,f.parameters.iter().zip(&f.signature.parameters).map(|(p,t)|format!("{} %{p}",ty(t))).collect::<Vec<_>>().join(", ")).unwrap();
-        for block in &f.blocks{writeln!(self.ir,"{}:",block.name).unwrap();for instruction in &block.instructions{let line=self.ir.lines().count()+1;self.debug=self.metadata.len();self.metadata.push(format!("!{} = !DILocation(line: {}, column: 1, scope: !{scope})",self.debug,line));self.map.push(SourceLocation{function:f.symbol.clone(),entity_id:instruction.entity_id.clone(),llvm_line:line});self.instruction(instruction);}
+        for block in &f.blocks{writeln!(self.ir,"{}:",block.name).unwrap();for instruction in &block.instructions{let line=self.source_line();self.debug=self.metadata.len();self.metadata.push(format!("!{} = !DILocation(line: {}, column: 1, scope: !{scope})",self.debug,line));self.map.push(SourceLocation{function:f.symbol.clone(),entity_id:instruction.entity_id.clone(),llvm_line:line});self.instruction(instruction);}
             if block.instructions.is_empty(){self.debug=self.metadata.len();self.metadata.push(format!("!{} = !DILocation(line: 1, column: 1, scope: !{scope})",self.debug));}
             match &block.terminator{Terminator::Return{value}=>self.line(value.as_ref().map(|v|format!("ret {}",self.typed(v))).unwrap_or_else(||"ret void".into())),Terminator::Branch{target}=>self.line(format!("br label %{target}")),Terminator::CondBranch{condition,yes,no}=>self.line(format!("br {}, label %{yes}, label %{no}",self.typed(condition))),Terminator::Switch{value,cases,default}=>self.line(format!("switch {}, label %{default} [ {} ]",self.typed(value),cases.iter().map(|(n,l)|format!("{} {n}, label %{l}",ty(&self.operand_type(value)))).collect::<Vec<_>>().join(" "))),Terminator::Unreachable=>self.line("unreachable")};
         }self.ir.push_str("}\n");

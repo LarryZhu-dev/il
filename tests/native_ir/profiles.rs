@@ -48,3 +48,33 @@ fn minimal_is_separate_static_no_std_and_preserves_stdout_and_trap_contracts(){
     let p=source("@id(\"app\") module app { @id(\"app.main\") fn main()->I32 { return 2147483647+1; } }",RuntimeProfile::Minimal,BuildMode::Application{entry:"app.main".into()}).unwrap();let dir=root.join("trap");fs::create_dir(&dir).unwrap();let built=compile(&il_codegen_x86_64::emit(&p).unwrap().ir,&dir,&LinkPlan::Minimal{archive},il_object_emitter_profile(false)).unwrap();let output=Command::new(&built.executable.unwrap().path).output().unwrap();assert_eq!(output.status.code(),Some(101));assert!(String::from_utf8_lossy(&output.stderr).contains("E_INTEGER_OVERFLOW"));fs::remove_dir_all(root).unwrap();
 }
 fn il_object_emitter_profile(release:bool)->il_object_emitter::Profile{if release{il_object_emitter::Profile::Release}else{il_object_emitter::Profile::Debug}}
+
+#[test]
+fn entity_map_preserves_physical_lines_across_profiles_and_multiline_operations(){
+    let text=r#"@id("app") module app visibility public {
+      type Maybe=Option<I64>;
+      @id("identity") fn identity(value:Maybe)->Maybe{return value;}
+      @id("answer") fn answer(x:I64)->I64{
+        let some:Maybe=Some(x);let value:Maybe=identity(some);
+        match value{Some(number)=>{let narrow:I16=cast<I16>(number);return cast<I64>(narrow)+1;}None=>{return 0;}}
+      }
+      @id("main") fn main()->I32{return cast<I32>(answer(41));}
+    }"#;
+    for profile in [RuntimeProfile::None,RuntimeProfile::Minimal,RuntimeProfile::Full]{
+        let mode=if profile==RuntimeProfile::None{BuildMode::Exports{entries:vec!["answer".into()]}}else{BuildMode::Application{entry:"main".into()}};
+        let program=source(text,profile,mode).unwrap();
+        let artifact=il_codegen_x86_64::emit(&program).unwrap();
+        let lines:Vec<_>=artifact.ir.lines().collect();
+        let instructions:Vec<_>=program.functions.iter().flat_map(|f|f.blocks.iter().flat_map(move|b|b.instructions.iter().map(move|i|(f,i)))).collect();
+        assert_eq!(artifact.entity_map.len(),instructions.len());
+        assert!(artifact.entity_map.windows(2).all(|entries|entries[0].llvm_line<=entries[1].llvm_line));
+        for (location,(function,instruction)) in artifact.entity_map.iter().zip(instructions){
+            assert_eq!(location.function,function.symbol);
+            assert_eq!(location.entity_id,instruction.entity_id);
+            let line=lines[location.llvm_line-1];
+            let debug=line.rsplit_once("!dbg !").unwrap_or_else(||panic!("mapped line is not an LLVM instruction: {line}" )).1;
+            let expected=format!("!{debug} = !DILocation(line: {}, column: 1,",location.llvm_line);
+            assert!(lines.iter().any(|line|line.starts_with(&expected)),"wrong physical line for {}: {}",location.entity_id,location.llvm_line);
+        }
+    }
+}
