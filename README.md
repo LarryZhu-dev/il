@@ -4,12 +4,12 @@ il is an AI-oriented, ahead-of-time compiled programming language. Text files us
 the `.il` extension; the canonical program representation is a structured graph.
 The bootstrap compiler is written in Rust and the native backend is LLVM.
 
-P00–P06 are verified, including a successful
-[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37876306998).
+P00–P07 are verified, including a successful
+[GitHub Actions run](https://github.com/LarryZhu-dev/il/actions/runs/37881790179).
 The verified implementation includes the shared static checker, structured text
 frontend, semantic graph transactions, HIR/MIR, bounded interpreter and LLVM native
-compiler and operating-system runtime. HTTP packages, extensions and self-hosting
-are not yet verified. `repository_state.json`, task
+compiler, operating-system runtime and compiled HTTP packages. P08–P10,
+extensions and self-hosting are not yet verified. `repository_state.json`, task
 records and successful machine-readable evidence determine milestone status.
 No release is available until all of its gates pass.
 
@@ -91,7 +91,7 @@ hashes; workflow configuration is not evidence that these gates passed.
 
 ## Normative inputs
 
-P07 is in progress. RFCs [0020](rfc/0020-network-resources-and-byte-primitives.md)
+P07 is verified in `eval/evidence/ev_P07_0.json`. RFCs [0020](rfc/0020-network-resources-and-byte-primitives.md)
 and [0021](rfc/0021-http-library-and-declarative-routing.md) define scoped TCP
 resources, byte operations and declarative routing. The `net`, `time`, `json`,
 `http`, `test` and `tracing` packages contain actual `.il` sources. HTTP parsing,
@@ -102,8 +102,10 @@ HTTP contracts expand into ordinary canonical graph functions. The dispatcher
 has an explicit effect/capability declaration and may use a declaration ending
 in `;` when its implementation is supplied by the server contract. Canonical
 formatting shows the complete generated operations, and graph transactions
-enforce scope for the generated changes. P07 remains unverified until the
-independent TCP suite and complete stage gates finish.
+enforce scope for the generated changes. Clean local and hosted acceptance passed
+23 gates, including 213 Rust tests and 84 external TCP wire cases. The recorded
+scope is Linux x86-64; dedicated real connect-timeout and socket-EINTR tests are
+not claimed. P08 AI protocol integration is now the active task.
 
 - The development document is
   [il_execution_spec_v1.md](il_execution_spec_v1.md). Its product spelling was

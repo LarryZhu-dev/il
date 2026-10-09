@@ -1,0 +1,89 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 113663081042,
+      "run_id": 37881790179,
+      "workflow_name": "il bootstrap gates",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/LarryZhu-dev/il/actions/runs/37881790179",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVAxl3M8AAAAadtj6Ug",
+      "head_sha": "3a48914994d8c4eb47b62971dfa743885e91cf92",
+      "url": "https://api.github.com/repos/LarryZhu-dev/il/actions/jobs/113663081042",
+      "html_url": "https://github.com/LarryZhu-dev/il/actions/runs/37881790179/job/113663081042",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-09T04:00:22Z",
+      "started_at": "2026-10-09T04:00:23Z",
+      "completed_at": "2026-10-09T04:16:01Z",
+      "name": "bootstrap-linux-x86_64",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-09T04:00:24Z",
+          "completed_at": "2026-10-09T04:00:25Z"
+        },
+        {
+          "name": "Check out exact source revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-09T04:00:25Z",
+          "completed_at": "2026-10-09T04:00:26Z"
+        },
+        {
+          "name": "Build pinned bootstrap environment",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-09T04:00:26Z",
+          "completed_at": "2026-10-09T04:00:51Z"
+        },
+        {
+          "name": "Run gates and reconstruct external Git binding",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-09T04:00:51Z",
+          "completed_at": "2026-10-09T04:15:59Z"
+        },
+        {
+          "name": "Preserve machine-readable gate results",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-09T04:15:59Z",
+          "completed_at": "2026-10-09T04:15:59Z"
+        },
+        {
+          "name": "Post Check out exact source revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-09T04:15:59Z",
+          "completed_at": "2026-10-09T04:16:00Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-09T04:16:00Z",
+          "completed_at": "2026-10-09T04:16:00Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/LarryZhu-dev/il/check-runs/113663081042",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000000268,
+      "runner_name": "GitHub Actions 1000000268",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}
