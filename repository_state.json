@@ -6,7 +6,9 @@
   "compiler_version": "0.1.0",
   "runtime_version": "0.1.0",
   "target": "x86_64-unknown-linux-gnu",
-  "open_tasks": [],
+  "open_tasks": [
+    "P09"
+  ],
   "blocked_tasks": [
     "P10",
     "E01",
