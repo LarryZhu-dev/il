@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/application_evidence.schema.json",
+  "title": "Immutable il application evidence manifest",
+  "description": "Application build/execution evidence addressed by ev_<SHA256>; it is distinct from development-stage evidence and cannot change stage state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "task_id",
+    "revision",
+    "graph_hash",
+    "source_git_commit",
+    "source_tree_hash",
+    "compiler_hash",
+    "runtime_hash",
+    "target",
+    "toolchain_lock_hash",
+    "policy_hash",
+    "runs",
+    "selected_artifacts",
+    "tests",
+    "blobs",
+    "known_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "application_evidence"
+    },
+    "task_id": {
+      "$ref": "tool.schema.json#/$defs/id"
+    },
+    "revision": {
+      "$ref": "tool.schema.json#/$defs/revision"
+    },
+    "graph_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_tree_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "compiler_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime_hash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "target": {
+      "const": "x86_64-unknown-linux-gnu"
+    },
+    "toolchain_lock_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^run_[0-9a-f]{64}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "selected_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "role",
+          "sha256"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "pattern": "^run_[0-9a-f]{64}$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "test"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "pattern": "^run_[0-9a-f]{64}$"
+          },
+          "test": {
+            "$ref": "tool_run.schema.json#/$defs/test"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "blobs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "known_limits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}

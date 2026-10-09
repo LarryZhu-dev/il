@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/tool_run.schema.json",
+  "title": "Immutable il tool-run receipt payload",
+  "description": "Canonical payload addressed by run_<SHA256>. Its complete semantic response excludes the delivered run_id. Receipt IDs are external to the hashed payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool",
+    "request",
+    "request_hash",
+    "source_git_commit",
+    "source_tree_hash",
+    "binding",
+    "compiler_hash",
+    "runtime_hash",
+    "toolchain_lock_hash",
+    "policy_hash",
+    "response",
+    "commands",
+    "artifacts",
+    "tests",
+    "delivery"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "tool": {
+      "enum": [
+        "state",
+        "schema-check",
+        "inspect",
+        "callers",
+        "dependencies",
+        "slice",
+        "validate",
+        "transact",
+        "diff",
+        "restore",
+        "build",
+        "test",
+        "blackbox",
+        "explain",
+        "evidence"
+      ]
+    },
+    "request": true,
+    "request_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_tree_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "binding": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base_revision",
+            "result_revision",
+            "observed_head_revision",
+            "graph_hash",
+            "candidate_hash",
+            "comparison_graph_hash"
+          ],
+          "properties": {
+            "base_revision": {
+              "$ref": "tool.schema.json#/$defs/revision"
+            },
+            "result_revision": {
+              "$ref": "tool.schema.json#/$defs/revision"
+            },
+            "observed_head_revision": {
+              "$ref": "tool.schema.json#/$defs/revision"
+            },
+            "graph_hash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "candidate_hash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "comparison_graph_hash": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "compiler_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime_hash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "toolchain_lock_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policy_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "response": {
+      "$ref": "tool.schema.json"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/command"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/test"
+      }
+    },
+    "delivery": {
+      "$ref": "tool.schema.json"
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "program",
+        "arguments",
+        "exit_code",
+        "stdout",
+        "stderr"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string"
+        },
+        "program": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^blobs/[0-9a-f]{64}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite",
+        "passed",
+        "count",
+        "contract_hash"
+      ],
+      "properties": {
+        "suite": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contract_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

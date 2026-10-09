@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+#[derive(Debug)]
 pub struct Failure { pub code: String, pub message: String, pub committed_revision: Option<u64>, pub diagnostics: Vec<il_graph::Diagnostic> }
 
 impl Failure {

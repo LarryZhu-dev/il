@@ -57,7 +57,7 @@ class TextCliAcceptance(unittest.TestCase):
 
     def preview(self, source=SOURCE):
         response = self.invoke("schema-check", {"source": source})
-        self.assertEqual(set(response["result"]), {"graph", "source"})
+        self.assertEqual(set(response["result"]), {"graph", "source", "run_id"})
         self.assertIsInstance(response["result"]["source"], str)
         return response["result"]
 

@@ -107,6 +107,16 @@ enforce scope for the generated changes. Clean local and hosted acceptance passe
 scope is Linux x86-64; dedicated real connect-timeout and socket-EINTR tests are
 not claimed. P08 AI protocol integration is now the active task.
 
+The P08 implementation adds exact-scoped `add_route` transactions, immutable
+tool receipts, `explain`, `blackbox` and `evidence`. Each admitted call returns a
+`result.run_id`; diagnostic lookup requires that run ID and the original
+diagnostic ID. Evidence accepts registered run/role selectors and executed test
+runs, and preserves the compiler, runtime, graph and policy for reconstruction.
+The bounded Linux task launcher and acceptance procedure are documented in
+[eval/runner](eval/runner/README.md) and [RFC 0022](rfc/0022-ai-tool-protocol.md).
+Its implementation remains under acceptance until P08 has immutable verified
+evidence and a matching hosted run.
+
 - The development document is
   [il_execution_spec_v1.md](il_execution_spec_v1.md). Its product spelling was
   normalized by accepted RFC 0001; former spellings are not compatibility aliases.

@@ -3,6 +3,10 @@ mod source;
 mod strict_json;
 mod execution;
 mod native;
+mod journal;
+mod evidence;
+mod blackbox;
+mod diagnostic_rules;
 
 use il_graph::*;
 use protocol::*;
@@ -26,6 +30,14 @@ fn optional<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(deserializer:
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SourceText { source: String }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Explain { run_id: String, diagnostic_id: String, context_budget: usize }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Blackbox { revision: u64, contract: String }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -159,6 +171,7 @@ fn options() -> Result<(Options, Option<PathBuf>), Failure> {
         }
     }
     let command = command.ok_or_else(|| Failure::input("expected an il command"))?;
+    if !journal::COMMANDS.contains(&command.as_str()) { return Err(Failure::new("E_UNSUPPORTED_FEATURE", "command is not in the tool registry")); }
     let store = store.unwrap_or_else(|| repository.join(".il/project"));
     Ok((Options { repository, store, command, host_policy: il_runtime_startup::HostPolicy::empty() }, policy_path))
 }
@@ -184,9 +197,6 @@ fn request<T: serde::de::DeserializeOwned>(input: &str) -> Result<T, Failure> {
 fn bounded(value: Value, budget: Option<usize>) -> Result<Value, Failure> {
     let budget = budget.unwrap_or(16_384);
     if budget == 0 || budget > 65_536 { return Err(Failure::input("budget must be between 1 and 65536")); }
-    if serde_json::to_vec(&value).map_err(Failure::json)?.len() > budget {
-        return Err(Failure::new("E_CONTEXT_INSUFFICIENT", "result exceeds conservative UTF-8 byte budget"));
-    }
     Ok(value)
 }
 
@@ -270,18 +280,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let args: Inspect = request(input)?;
             let revision = args.revision.unwrap_or(current);
             let graph = load(store.as_ref(), context, revision)?;
-            let mut entity = if args.entity_id == "program" { json!(graph) } else {
-                entity_index(&graph)?.remove(&args.entity_id)
-                    .ok_or_else(|| Failure::new("E_NAME_NOT_FOUND", "entity not found at revision"))?
-            };
-            if let Some(fields) = args.fields {
-                let object = entity.as_object().unwrap();
-                let mut selected = serde_json::Map::new();
-                for field in fields {
-                    selected.insert(field.clone(), object.get(&field).ok_or_else(|| Failure::input("unknown entity field"))?.clone());
-                }
-                entity = Value::Object(selected);
-            }
+            let entity = entity_view(&graph,&args.entity_id,args.fields.as_deref())?;
             Ok(envelope(tool, current, revision, bounded(json!({"entity": entity}), args.budget)?))
         }
         "validate" => {
@@ -303,9 +302,11 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let args: SourceText = request(input)?;
             let graph = il_frontend::parse(&args.source, current).map_err(Failure::diagnostics)?;
             let diagnostics = check(&graph);
-            if !diagnostics.is_empty() { return Err(Failure::diagnostics(diagnostics)); }
-            let source = il_frontend::format(&graph).map_err(Failure::diagnostics)?;
-            Ok(envelope(tool, current, current, json!({"graph": graph, "source": source})))
+            let source = if diagnostics.is_empty() { Some(il_frontend::format(&graph).map_err(Failure::diagnostics)?) } else { None };
+            let mut response = envelope(tool, current, current, json!({"graph": graph, "source": source}));
+            response["ok"] = json!(diagnostics.is_empty());
+            response["diagnostics"] = json!(diagnostics);
+            Ok(response)
         }
         "test" => {
             let args: Test = request(input)?;
@@ -324,6 +325,30 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let graph = load(store.as_ref(), context, args.revision)?;
             let result = native::build(&graph, args.profile, args.runtime_profile, args.exports, &options.store, context, &options.host_policy)?;
             Ok(envelope(tool, current, args.revision, result))
+        }
+        "blackbox" => {
+            let args: Blackbox = request(input)?;
+            let graph = load(store.as_ref(), context, args.revision)?;
+            let result = blackbox::run(&graph, &args.contract, &options.store, context, &options.host_policy)?;
+            let mut response = envelope(tool, current, args.revision, result);
+            response["ok"] = response["result"]["passed"].clone();
+            response["diagnostics"] = response["result"]["diagnostics"].clone();
+            Ok(response)
+        }
+        "explain" => {
+            let args: Explain = request(input)?;
+            if args.context_budget == 0 || args.context_budget > 65_536 { return Err(Failure::input("context_budget must be in 1..65536")); }
+            let (revision,result) = journal::explain(&options.store, &args.run_id, &args.diagnostic_id)?;
+            Ok(envelope(tool,current,revision,result))
+        }
+        "evidence" => {
+            let args: evidence::Request = request(input)?;
+            let graph = load(store.as_ref(), context, args.revision)?;
+            let result = evidence::emit(&options.store, context, &options.host_policy, &graph, &args)?;
+            let mut response = envelope(tool,current,args.revision,result);
+            response["evidence_id"] = response["result"]["evidence_id"].clone();
+            response["artifacts"] = response["result"]["artifacts"].clone();
+            Ok(response)
         }
         "diff" => {
             let args: Diff = request(input)?;
@@ -349,7 +374,11 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let revision = args.revision.unwrap_or(current);
             let entities = if let Some(store) = &store {
                 let result = store.slice(&args.root_entities, revision, args.max_nodes, args.max_tokens)?;
-                if result.truncated { return Err(Failure::new("E_CONTEXT_INSUFFICIENT", "slice exceeds requested context budget")); }
+                if result.truncated {
+                    let mut response = failed(tool,revision,&Failure::new("E_CONTEXT_INSUFFICIENT", "slice exceeds requested context budget"));
+                    response["result"] = json!({"status":"BLOCKED","missing":result.missing,"budget":args.max_tokens,"required":args.max_tokens.saturating_add(1)});
+                    return Ok(response);
+                }
                 if !result.missing.is_empty() { return Err(Failure::new("E_NAME_NOT_FOUND", "slice roots include unavailable entities")); }
                 result.entities
             } else {
@@ -366,7 +395,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             if !["forward", "reverse"].contains(&direction) { return Err(Failure::input("direction must be forward or reverse")); }
             let revision = args.revision.unwrap_or(current);
             let graph = load(store.as_ref(), context, revision)?;
-            let index = entity_index(&graph)?;
+            let index = entity_reference_index(&graph);
             if !index.contains_key(&args.entity_id) { return Err(Failure::new("E_NAME_NOT_FOUND", "entity not found")); }
             let mut ids = if tool == "callers" {
                 graph.functions.iter().filter(|function| function.blocks.iter().any(|block|
@@ -374,8 +403,8 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                         matches!(&op.attributes, Attributes::Call { callee } if *callee == args.entity_id))))
                     .map(|function| function.entity_id.clone()).collect()
             }
-                else if direction == "forward" { entity_references(&graph, &args.entity_id) }
-                else { index.keys().filter(|id| entity_references(&graph, id).contains(&args.entity_id)).cloned().collect() };
+                else if direction == "forward" { index[&args.entity_id].clone() }
+                else { index.iter().filter(|(_,references)| references.contains(&args.entity_id)).map(|(id,_)|id.clone()).collect() };
             ids.sort(); ids.dedup();
             Ok(envelope(tool, current, revision, bounded(json!({"entity_ids": ids, "revision": revision}), args.budget)?))
         }
@@ -398,7 +427,21 @@ fn main() {
         let mut input = String::new();
         io::stdin().take((INPUT_LIMIT + 1) as u64).read_to_string(&mut input).map_err(Failure::io)?;
         if input.len() > INPUT_LIMIT { return Err(Failure::input("JSON request exceeds 262144 bytes")); }
-        dispatch(&options, &context, &input, &mut base_revision)
+        let parsed: Value = request(&input)?;
+        let result = dispatch(&options, &context, &input, &mut base_revision);
+        let mut response = match result { Ok(value) => value, Err(error) => failed(&tool,journal::subject(&tool,&parsed).unwrap_or(base_revision),&error) };
+        journal::bind_response(&tool, &parsed, &mut response,base_revision);
+        let delivery = journal::delivery(&tool,&parsed,&response);
+        match journal::record(&options.store,&context,&options.host_policy,&tool,&parsed,&response,&delivery,base_revision) {
+            Ok(id) => Ok(journal::deliver(delivery,&id)),
+            Err(mut error) => {
+                if response["ok"] == true && matches!(tool.as_str(),"transact"|"restore") { error.committed_revision = response["result_revision"].as_u64(); }
+                let mut failure=failed(&tool,journal::subject(&tool,&parsed).unwrap_or(base_revision),&error);
+                failure["base_revision"]=response["base_revision"].clone();
+                failure["result_revision"]=response["result_revision"].clone();
+                Ok(failure)
+            }
+        }
     })();
     let mut response = match result {
         Ok(value) => value,

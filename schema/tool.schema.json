@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://il-lang.dev/schema/tool.schema.json",
   "title": "Intelligent language structured tool response",
-  "description": "CLI command arguments are JSON stdin values validated by the named request definition. Paths are trusted CLI options, never JSON request fields. JSON input and output are bounded to 262144 UTF-8 bytes. Context budgets use a conservative byte count as a token upper bound.",
+  "description": "CLI requests are closed JSON stdin objects. Trusted launcher options select repository, store and policy. Input/output are bounded to 262144 UTF-8 bytes; query budgets count the complete delivered envelope including run_id. A fixed bounded error may exceed an impossibly small requested budget and its actual size is charged.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -129,7 +129,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "uniqueItems": true
         },
         "budget": {
           "$ref": "#/$defs/budget"
@@ -387,6 +388,97 @@
           }
         }
       ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[0-9a-f]{64}$"
+    },
+    "explain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "diagnostic_id",
+        "context_budget"
+      ],
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "diagnostic_id": {
+          "type": "string",
+          "pattern": "^diag_[0-9a-f]+$"
+        },
+        "context_budget": {
+          "$ref": "#/$defs/budget"
+        }
+      }
+    },
+    "blackbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "contract"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "contract": {
+          "const": "http_mvp"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "task_id",
+        "artifacts",
+        "tests"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run_id",
+              "role"
+            ],
+            "properties": {
+              "run_id": {
+                "$ref": "#/$defs/run_id"
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run_id"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      }
     }
   }
 }

@@ -135,6 +135,8 @@ class GraphCliAcceptance(unittest.TestCase):
         self.assertEqual(completed.returncode == 0, expect_ok, response)
         self.assertIsInstance(response["tool_version"], str)
         self.assertIsInstance(response["diagnostics"], list)
+        if expect_ok:
+            self.assertRegex(response["result"]["run_id"], r"^run_[0-9a-f]{64}$")
         for diagnostic in response["diagnostics"]:
             self.assertEqual(set(diagnostic), DIAGNOSTIC)
         if not expect_ok:
@@ -161,6 +163,7 @@ class GraphCliAcceptance(unittest.TestCase):
         self.assertEqual(delta["result"], {
             "added": ["app"], "removed": [], "modified": [],
             "base_revision": 0, "target_revision": 1,
+            "run_id": delta["result"]["run_id"],
         })
         restored = self.invoke("restore", {"revision": 0, "reason": "Independent restore acceptance"})
         self.assertEqual(restored["result_revision"], 2)
@@ -187,6 +190,7 @@ class GraphCliAcceptance(unittest.TestCase):
         })
         self.assertEqual(selected["result"], {
             "entities": [module()], "revision": 1, "node_count": 1,
+            "run_id": selected["result"]["run_id"],
         })
 
     def test_context_budget_failure_is_explicit(self):
