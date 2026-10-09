@@ -73,6 +73,7 @@ impl Lower{
         let mut b=Builder::new("main".into(),"native.harness".into(),Signature{result:Type::int(32),parameters:vec![]},vec![]);
         let(captured,arguments,limits)=match mode{BuildMode::Application{..}=>(false,vec![],Limits::default()),BuildMode::Captured{arguments,limits,..}=>(true,arguments.clone(),*limits)};
         let ctx=b.rt("context_new",vec![Operand::int(32,captured as u32),Operand::int(64,limits.max_steps),Operand::int(32,limits.max_call_depth),Operand::int(64,limits.max_heap_bytes),Operand::int(64,limits.max_output_bytes),Operand::int(64,self.program.source_revision),Operand::int(32,if captured{3}else{-1})],true);
+        self.entity_call(&mut b,"location",ctx.clone(),&function.entity_id);
         let result_layout=self.program.layouts[&function.result].clone();let output=b.alloca(&result_layout);let mut args=vec![ctx.clone()];if result_layout.scalar().is_none()&&result_layout.size>0{args.push(output.clone());}
         for(arg,param)in arguments.iter().zip(&function.parameters){let layout=self.program.layouts[&param.type_ref].clone();let slot=b.alloca(&layout);self.initialize(&mut b,ctx.clone(),slot.clone(),arg,&param.entity_id)?;if let Some(ty)=layout.scalar(){args.push(b.load(slot,ty,layout.align));}else if layout.size>0{args.push(slot);}}
         let result=b.call(symbol(&function.entity_id),args,result_layout.scalar().is_some());if result_layout.scalar().is_some(){b.store(output.clone(),result.clone(),result_layout.align);}

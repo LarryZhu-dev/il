@@ -35,3 +35,20 @@ fn program(source:&str)->Program{
     if let InstructionKind::Call{arguments,..}=&mut json.operation{arguments[1]=Operand::Global{name:global};arguments[2]=Operand::int(64,24);}
     assert!(verify(&p).is_empty());
 }
+#[test]fn captured_argument_import_uses_entry_diagnostic_location(){
+    let graph=il_frontend::parse("@id(\"app\") module app { @id(\"app.identity\") fn identity(@id(\"app.input\") value:String)->String { return value; } }",0).unwrap();
+    let mir=il_mir::lower(&il_hir::lower(&graph).unwrap()).unwrap();
+    let p=lower(&mir,&BuildMode::Captured{entry:"app.identity".into(),arguments:vec![Value::string("owned")],limits:Limits{max_output_bytes:1,..Limits::default()}}).unwrap();
+    let harness=p.functions.iter().find(|f|f.symbol=="main").unwrap();
+    let calls:Vec<_>=harness.blocks.iter().flat_map(|b|&b.instructions).filter_map(|i|if let InstructionKind::Call{symbol,arguments}=&i.operation{Some((symbol.as_str(),arguments))}else{None}).collect();
+    let create=calls.iter().position(|(s,_)|*s=="il_rt_context_new").unwrap();
+    let location=calls.iter().position(|(s,_)|*s=="il_rt_location").unwrap();
+    let import=calls.iter().position(|(s,_)|*s=="il_rt_buffer_new").unwrap();
+    let entry=calls.iter().position(|(s,_)|*s==symbol("app.identity")).unwrap();
+    assert!(create<location&&location<import&&import<entry);
+    let Operand::Global{name}=&calls[location].1[1] else{panic!("entry location requires stable global")};
+    assert_eq!(p.globals.iter().find(|g|g.name==*name).unwrap().bytes,b"app.identity");
+    let Operand::Global{name}=&calls[import].1[4] else{panic!("allocation requires its parameter entity")};
+    assert_eq!(p.globals.iter().find(|g|g.name==*name).unwrap().bytes,b"app.input");
+    assert!(!calls[create+1..entry].iter().any(|(s,_)|matches!(*s,"il_rt_tick"|"il_rt_enter")));
+}
