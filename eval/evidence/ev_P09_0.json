@@ -1,0 +1,287 @@
+{
+  "evidence_id": "ev_P09_0",
+  "task_id": "P09",
+  "phase": "application",
+  "revision": 0,
+  "git_commit": "833fc4072a039dae27b81a6a8eafbf0ee64c4a6f",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:2c5dae642707bc9c3b4528410694e5d3121e3df7c2ab088e3641f6f7084fb038",
+  "runtime_hash": "sha256:5b7f107b91304d8e5e68c8a05d3ccfa3cd5b70689afe18749cad89bb6f146f95",
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "toolchain-rust",
+      "argv_hash": "sha256:8486d9561e12a51de5ec438f1458ef70581e599bfa1409d96d0a6e46734a12f5",
+      "exit_code": 0
+    },
+    {
+      "id": "toolchain-llvm",
+      "argv_hash": "sha256:5c218374ff9812343ea5a0c7f52fde7e40fd198706ab2ba639d194f20f90decb",
+      "exit_code": 0
+    },
+    {
+      "id": "environment-packages",
+      "argv_hash": "sha256:367e60807afe55c0de8163e719f8ce2de648917e9122196e7cf7b53c3fddea98",
+      "exit_code": 0
+    },
+    {
+      "id": "git-revision-binding",
+      "argv_hash": "sha256:0572ba01cc3a0f14ccdeca92c0225c15d09e5f0e19139f6bf36b9f3c7bf6c39b",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-tests",
+      "argv_hash": "sha256:b8758b5fda73b97335daeec6e51944a6f7f6bc67183fbeaca92bd893cbd2a69f",
+      "exit_code": 0
+    },
+    {
+      "id": "p09-fault-build",
+      "argv_hash": "sha256:59efdf086fe21dcd21bcd72a62bb660e8618b93fb1f4549c5f616f890852f961",
+      "exit_code": 0
+    },
+    {
+      "id": "p09-transaction-process",
+      "argv_hash": "sha256:ffb3275bed6b44809367a460db8a219244dc7ecb7403b7aa9bac98fa2cc3c10d",
+      "exit_code": 0
+    },
+    {
+      "id": "p09-build-process",
+      "argv_hash": "sha256:5adbb7225962616365f678d0f8372d8afa65f798a1c03f8fd513e89f6d5779c8",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-debug",
+      "argv_hash": "sha256:8372ed38fa4fbd2e29ed3626a55fc80e06e31527c3dc66b79b57d1c94d6dfb5f",
+      "exit_code": 0
+    },
+    {
+      "id": "full-runtime-debug",
+      "argv_hash": "sha256:17edfe1870962d825cc27b8000c3247f3b38c75402ac708620eeb37277d3074c",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli-debug",
+      "argv_hash": "sha256:e5bba993afc90822cf23b9c0c99833ef6b4f0e2af0a10d2b1680f138b7c77154",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-release",
+      "argv_hash": "sha256:1edcee5273bd09129a7227d8d31c5757bb447627d32b0698bb3a1cd1725c3f91",
+      "exit_code": 0
+    },
+    {
+      "id": "full-runtime-release",
+      "argv_hash": "sha256:ff1d123ec2c49e9144ee7cd8ddac76036e32225a1f8f8db06bbf54e6c842da01",
+      "exit_code": 0
+    },
+    {
+      "id": "minimal-runtime",
+      "argv_hash": "sha256:5d152054617289fe7cbcd0e7f1916abc1522111cc80c0ec8369995a46c4bc34e",
+      "exit_code": 0
+    },
+    {
+      "id": "native-probe",
+      "argv_hash": "sha256:8d2207034ad03cc8fa03c75a571f9b31e9f3ace19383ac879cf63b376876590f",
+      "exit_code": 0
+    },
+    {
+      "id": "graph-cli",
+      "argv_hash": "sha256:016e9cbd04eec4d2ec9c0bae13568826fef7d4b6cb39d7c2fb289ffc9bcd6c16",
+      "exit_code": 0
+    },
+    {
+      "id": "semantic-cli",
+      "argv_hash": "sha256:e65b17c3e5364dcd1ecfdf8d7c6d9c57269a7df687939c642e52d5ab4e9d80be",
+      "exit_code": 0
+    },
+    {
+      "id": "text-cli",
+      "argv_hash": "sha256:7c6678f69c8c4ca741e587a0227bcbdfe00eef88af45b056a8c6310076bc9818",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli",
+      "argv_hash": "sha256:cbd9c7fefdf5ec7c75a8f67e8f148ed9c8b3b11dcdea010058d3106c5ae4193d",
+      "exit_code": 0
+    },
+    {
+      "id": "native-cli",
+      "argv_hash": "sha256:b742f39d46fc82d5401685a6cb3d9548d91324dfd6f1b8b1c5bfec16072ef44f",
+      "exit_code": 0
+    },
+    {
+      "id": "runtime-cli",
+      "argv_hash": "sha256:3de374d619d47694b844287146faf85d690134488c9a7eb01716cf6af6f532a8",
+      "exit_code": 0
+    },
+    {
+      "id": "network-cli",
+      "argv_hash": "sha256:d460448137262a1687c68c4f87bb4208ece1a85354bba63197574dad387df4a0",
+      "exit_code": 0
+    },
+    {
+      "id": "bytes-cli",
+      "argv_hash": "sha256:e5473c634f2fad536d06c83a2e792e749bba146794d511399f33f5b01c78286b",
+      "exit_code": 0
+    },
+    {
+      "id": "http-cli",
+      "argv_hash": "sha256:c2e3b35c3de13a754e87c5593a42d5fcd5be62bc0df8079fd37ce6647fb533c1",
+      "exit_code": 0
+    },
+    {
+      "id": "ai-protocol-cli",
+      "argv_hash": "sha256:8f7b796a3aa06be180ae972c67ee1e47c85670996fc20f406426fe0029d36cff",
+      "exit_code": 0
+    },
+    {
+      "id": "interpreter-profile-parity",
+      "argv_hash": "sha256:ac3bba6d57e03ae222b7fcf18ff96a359249371a04d95022abbaee5ce2a8368e",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-pre-commit",
+      "argv_hash": "sha256:b8fa89c8ce791cba94a1e342d101c0c2bb3a72f73d8e9aeea929ae106d28c28c",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-unit-tests",
+      "argv_hash": "sha256:5964df816921afcf874dbc56a1b0206891d331a603e281c3177b1778d8a97f8a",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-strict",
+      "argv_hash": "sha256:ca7d1f05b24d34fac70f2f54ab737f8ad82f2ec0c5cb6c354c32b4ca73b60fb0",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "build/ci/result.json",
+      "sha256": "sha256:eea993e44ae470e470ac1f511c780c270b58483437f0207c7eefa039d7f8de6b"
+    },
+    {
+      "path": "build/ci/p09-transaction-process_report.json",
+      "sha256": "sha256:e9357fa41b812cb2518d36458276f5299500aa8d4ed2c8273c69651e50b0f152"
+    },
+    {
+      "path": "build/ci/p09-build-process_report.json",
+      "sha256": "sha256:e5850091570f7ace0d62cba9af4bf6190f0b7bc193a79e6703c1c2d913c69311"
+    },
+    {
+      "path": "build/http_cli_report.json",
+      "sha256": "sha256:eab0e851e099c6342e53fbbf93200f0cc09eda68b40852a07a5764b03420d08a"
+    },
+    {
+      "path": "build/ai_protocol_cli_report.json",
+      "sha256": "sha256:8d14802f78e79a1bf34b85b6b6a9dbac986e32ad00e26f85afc26ff911b81a27"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "rust-tests",
+      "passed": true,
+      "count": 231
+    },
+    {
+      "suite": "p09-transaction-process",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "p09-build-process",
+      "passed": true,
+      "count": 2
+    },
+    {
+      "suite": "execution-cli-debug",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-probe",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "graph-cli",
+      "passed": true,
+      "count": 28
+    },
+    {
+      "suite": "semantic-cli",
+      "passed": true,
+      "count": 231
+    },
+    {
+      "suite": "text-cli",
+      "passed": true,
+      "count": 14
+    },
+    {
+      "suite": "execution-cli",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-cli",
+      "passed": true,
+      "count": 9
+    },
+    {
+      "suite": "runtime-cli",
+      "passed": true,
+      "count": 19
+    },
+    {
+      "suite": "network-cli",
+      "passed": true,
+      "count": 2
+    },
+    {
+      "suite": "bytes-cli",
+      "passed": true,
+      "count": 1
+    },
+    {
+      "suite": "http-cli",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "ai-protocol-cli",
+      "passed": true,
+      "count": 15
+    },
+    {
+      "suite": "interpreter-profile-parity",
+      "passed": true,
+      "count": 180
+    },
+    {
+      "suite": "bootstrap-pre-commit",
+      "passed": true,
+      "count": 7
+    },
+    {
+      "suite": "bootstrap-unit-tests",
+      "passed": true,
+      "count": 32
+    },
+    {
+      "suite": "bootstrap-strict",
+      "passed": true,
+      "count": 9
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified.",
+    "Verified on Linux x86-64 only; cross-platform targets remain unverified.",
+    "P10 and E01-E05 remain blocked until their declared prerequisites are completed."
+  ]
+}
