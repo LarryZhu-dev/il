@@ -15,7 +15,7 @@ concurrency:
 jobs:
   bootstrap-linux-x86_64:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out exact source revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -40,5 +40,6 @@ jobs:
             build/*_report.json
             build/*-failed-artifacts/
             build/failures/
+            build/http-artifacts/
           if-no-files-found: warn
           retention-days: 30

@@ -92,6 +92,35 @@ class BootstrapSchemaTests(unittest.TestCase):
             with self.assertRaises(CHECK.ValidationError):
                 CHECK.validate_instance(mutation, build, schema_path, root_schema=schema)
 
+    def test_http_declaration_schema_is_closed_and_parameters_are_bounded(self):
+        path = ROOT / "schema/program_graph.schema.json"
+        schema = CHECK.read_json(path)
+        contract = {"entity_id": "server_api", "subject": "app.dispatch", "predicates": [{
+            "kind": "http_server", "entry": "app.serve", "bind": "127.0.0.1:8080", "capability": "listen",
+            "routes": [{"entity_id": "hello", "method": "GET", "path": "/hello/{name}", "handler": "app.hello",
+                        "parameters": [{"name": "name", "type_ref": "String", "source": "path", "max_utf8_bytes": 128}]}]}]}
+        def validate(value):
+            CHECK.validate_instance(value, schema["$defs"]["contract"], path, root_schema=schema)
+        validate(contract)
+        mutations = []
+        value = copy.deepcopy(contract); value["predicates"][0]["shell"] = "execute"; mutations.append(value)
+        value = copy.deepcopy(contract); value["predicates"][0]["routes"][0]["parameters"][0]["max_utf8_bytes"] = 129; mutations.append(value)
+        value = copy.deepcopy(contract); value["predicates"][0]["routes"][0]["method"] = "POST"; mutations.append(value)
+        for value in mutations:
+            with self.assertRaises(CHECK.ValidationError):
+                validate(value)
+
+    def test_native_resource_layout_requires_an_explicit_closed_kind(self):
+        path = ROOT / "schema/native_ir.schema.json"
+        schema = CHECK.read_json(path)
+        def validate(value):
+            CHECK.validate_instance(value, schema["$defs"]["shape"], path, root_schema=schema)
+        for resource in ("file", "listener", "stream"):
+            validate({"kind": "resource", "resource": resource})
+        for value in ({"kind": "resource"}, {"kind": "file"}, {"kind": "resource", "resource": "socket"}):
+            with self.assertRaises(CHECK.ValidationError):
+                validate(value)
+
     def test_duplicate_keys_and_non_json_numbers_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "input.json"
@@ -203,6 +232,36 @@ class EvidenceReportTests(unittest.TestCase):
         for report in variants:
             with self.subTest(report=report), self.assertRaises(ValueError):
                 self.recorder.validate_report(report, "a" * 40)
+
+class HttpContractReaderTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("http_contract", ROOT / "tests/http_blackbox/contract.py")
+        cls.reader = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.reader)
+
+    def read(self, text):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contract.yaml"
+            path.write_text(text, encoding="utf-8")
+            return self.reader.read_contract(path)
+
+    def test_locked_wire_contract_is_read_without_external_yaml_dependency(self):
+        contract = self.reader.read_contract(ROOT / "spec/http.yaml")
+        self.assertEqual(contract["limits"]["request_line_max_bytes"], 4096)
+        self.assertEqual(contract["responses"]["hello"]["body_json"], {"message": "Hello, Larry"})
+        self.assertEqual(contract["responses"]["mandatory_headers"], ["Content-Length", "Connection"])
+        self.assertEqual(contract["responses"]["method_not_allowed_header"], "Allow: GET")
+
+    def test_rejects_ambiguous_or_unsupported_contract_values(self):
+        for text in ["a: 1\na: 2", "a: {b: 1, b: 2}", "a: &alias 1", "a: *alias", "a: |\n  text",
+                     "a:\n    b: 1", " a: 1", "a:\n\tb: 1", "a: [1,]", "a: [1", "a: !!str 1", "a: " + "x"*65536]:
+            with self.subTest(text=text[:40]), self.assertRaises(ValueError):
+                self.read(text)
+
+    def test_flow_values_preserve_quotes_unicode_and_nested_structure(self):
+        self.assertEqual(self.read("a: {b: ['中,文', \"escaped\\\"quote\"], c: 'it''s'}"),
+                         {"a": {"b": ["中,文", 'escaped"quote'], "c": "it's"}})
 
 if __name__ == "__main__":
     unittest.main()

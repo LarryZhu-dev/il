@@ -20,7 +20,10 @@
     "fragmentation_cases_pass",
     "timeout_cases_pass",
     "body_and_header_limits_pass",
-    "route_collision_is_rejected"
+    "route_collision_is_rejected",
+    "scoped_network_io_and_deadlines_pass",
+    "standard_packages_execute_in_all_engines",
+    "declarative_routes_roundtrip_and_restore"
   ],
   "resource_budget": {
     "context_tokens": 65536,
@@ -32,7 +35,11 @@
     "packages/net",
     "packages/http",
     "examples/http_demo",
-    "tests/http_blackbox"
+    "tests/http_blackbox",
+    "packages/time",
+    "packages/json",
+    "packages/test",
+    "packages/tracing"
   ],
   "rollback_revision": 0,
   "status": "RUNNING"

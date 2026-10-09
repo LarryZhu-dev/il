@@ -1,0 +1,16 @@
+{
+  "contract_version": "1.0.0",
+  "modes": ["captured", "native_debug", "native_release"],
+  "cases": [
+    {"id":"get_out_of_bounds","input_type":"Bytes","input":[1],"result_type":"U8","expression":"runtime.bytes_get(data,1)","expected":{"status":"trapped","code":"E_INDEX_OUT_OF_BOUNDS","live_allocations":1}},
+    {"id":"slice_overflow_before_oom","input_type":"Bytes","input":[1],"result_type":"Bytes","expression":"runtime.bytes_slice(data,18446744073709551615,2)","fail_after":1,"expected":{"status":"returned","error":"InvalidData","live_allocations":0}},
+    {"id":"invalid_utf8_before_oom","input_type":"Bytes","input":[255],"result_type":"String","expression":"runtime.string_from_utf8(data)","fail_after":1,"expected":{"status":"returned","error":"InvalidData","live_allocations":0}},
+    {"id":"invalid_utf8_before_quota","input_type":"Bytes","input":[255],"result_type":"String","expression":"runtime.string_from_utf8(data)","limits":{"max_heap_bytes":1},"expected":{"status":"returned","error":"InvalidData","live_allocations":0}},
+    {"id":"valid_utf8_oom","input_type":"Bytes","input":[105,108],"result_type":"String","expression":"runtime.string_from_utf8(data)","fail_after":1,"expected":{"status":"returned","error":"Other","live_allocations":0}},
+    {"id":"string_to_bytes_oom","input_type":"String","input":"il","result_type":"Bytes","expression":"runtime.string_to_bytes(data)","fail_after":1,"expected":{"status":"returned","error":"Other","live_allocations":0}},
+    {"id":"concat_heap_quota","input_type":"Bytes","input":[1,2],"result_type":"Bytes","expression":"runtime.bytes_concat(data,data)","limits":{"max_heap_bytes":2},"expected":{"status":"trapped","code":"E_RESOURCE_LIMIT","live_allocations":1}},
+    {"id":"utf8_heap_quota","input_type":"Bytes","input":[105,108],"result_type":"String","expression":"runtime.string_from_utf8(data)","limits":{"max_heap_bytes":2},"expected":{"status":"trapped","code":"E_RESOURCE_LIMIT","live_allocations":1}},
+    {"id":"empty_slice_copy","input_type":"Bytes","input":[1,2],"result_type":"Bytes","expression":"runtime.bytes_slice(data,2,0)","expected":{"status":"returned","bytes":[],"live_allocations":1}},
+    {"id":"strict_utf8_success","input_type":"Bytes","input":[228,184,173],"result_type":"String","expression":"runtime.string_from_utf8(data)","expected":{"status":"returned","string":"中","live_allocations":1}}
+  ]
+}

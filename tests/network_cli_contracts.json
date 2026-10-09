@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "modes": [
+    "captured",
+    "native_debug",
+    "native_release"
+  ],
+  "client_request": [
+    97,
+    98,
+    99,
+    100,
+    101
+  ],
+  "server_response": [
+    104,
+    101,
+    108,
+    108,
+    111
+  ],
+  "io_max_chunk": 2,
+  "accept_read_deadline_ms": 80,
+  "deadline_elapsed_min_ms": 65,
+  "deadline_elapsed_max_ms": 3000,
+  "startup_error": "E_CAPABILITY_MISSING",
+  "scenarios": {
+    "connect_roundtrip": {
+      "tag": "Ok",
+      "bytes": [
+        104,
+        101,
+        108,
+        108,
+        111
+      ],
+      "live_handles": 0,
+      "live_allocations": 1
+    },
+    "accept_timeout": {
+      "tag": "Err",
+      "error": "Timeout",
+      "live_handles": 0,
+      "live_allocations": 0
+    },
+    "nested_cleanup": {
+      "tag": "Ok",
+      "integer": "42",
+      "live_handles": 0,
+      "live_allocations": 0
+    }
+  }
+}

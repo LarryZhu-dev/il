@@ -54,7 +54,7 @@ def main() -> int:
             print(f"Recorded installed package versions in {log.relative_to(ROOT).as_posix()}", flush=True)
         else:
             print(process.stdout, end="", flush=True)
-        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli"}
+        is_test = name in {"bootstrap-pre-commit", "bootstrap-strict", "bootstrap-unit-tests", "rust-tests", "native-probe", "graph-cli", "semantic-cli", "text-cli", "execution-cli", "execution-cli-debug", "interpreter-profile-parity", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli"}
         test_count = 0
         if name in {"bootstrap-pre-commit", "bootstrap-strict", "native-probe"}:
             test_count = 1
@@ -72,7 +72,7 @@ def main() -> int:
                     r"test result: \w+\. (\d+) passed; (\d+) failed;", process.stdout
                 )
             )
-        elif name in {"bootstrap-unit-tests", "graph-cli", "text-cli", "execution-cli", "execution-cli-debug", "native-cli", "runtime-cli"}:
+        elif name in {"bootstrap-unit-tests", "graph-cli", "text-cli", "execution-cli", "execution-cli-debug", "native-cli", "runtime-cli", "network-cli", "bytes-cli", "http-cli"}:
             counts = re.findall(r"Ran (\d+) tests? in", process.stdout)
             test_count = int(counts[-1]) if counts else 0
         elif name == "semantic-cli":
@@ -144,9 +144,11 @@ def main() -> int:
                 run("native-probe", [sys.executable, "tools/test_native_probe.py"])
             if (ROOT / "tests/graph_cli.py").is_file():
                 run("graph-cli", [sys.executable, "tests/graph_cli.py", "--binary", "target/release/il", "--report", "build/graph_cli_report.json"])
-            for suite in ("semantic", "text", "execution", "native", "runtime"):
+            for suite in ("semantic", "text", "execution", "native", "runtime", "network", "bytes"):
                 if (ROOT / f"tests/{suite}_cli.py").is_file():
                     run(f"{suite}-cli", [sys.executable, f"tests/{suite}_cli.py", "--binary", "target/release/il", "--report", f"build/{suite}_cli_report.json"])
+            if (ROOT / "tests/http_blackbox/cli.py").is_file():
+                run("http-cli", [sys.executable, "tests/http_blackbox/cli.py", "--binary", "target/release/il", "--report", "build/http_cli_report.json"])
             if (ROOT / "tests/execution_cli.py").is_file():
                 run("interpreter-profile-parity", [sys.executable, "tools/ci/compare_execution.py"])
         else:

@@ -91,6 +91,20 @@ hashes; workflow configuration is not evidence that these gates passed.
 
 ## Normative inputs
 
+P07 is in progress. RFCs [0020](rfc/0020-network-resources-and-byte-primitives.md)
+and [0021](rfc/0021-http-library-and-declarative-routing.md) define scoped TCP
+resources, byte operations and declarative routing. The `net`, `time`, `json`,
+`http`, `test` and `tracing` packages contain actual `.il` sources. HTTP parsing,
+routing, response encoding and the demo's serving loop execute as compiled il;
+the host runtime supplies general socket and buffer operations.
+
+HTTP contracts expand into ordinary canonical graph functions. The dispatcher
+has an explicit effect/capability declaration and may use a declaration ending
+in `;` when its implementation is supplied by the server contract. Canonical
+formatting shows the complete generated operations, and graph transactions
+enforce scope for the generated changes. P07 remains unverified until the
+independent TCP suite and complete stage gates finish.
+
 - The development document is
   [il_execution_spec_v1.md](il_execution_spec_v1.md). Its product spelling was
   normalized by accepted RFC 0001; former spellings are not compatibility aliases.
