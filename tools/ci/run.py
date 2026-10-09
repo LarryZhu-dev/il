@@ -179,9 +179,9 @@ def main() -> int:
             run("p09-transaction-process", [sys.executable, "tests/fault_injection/transaction_process.py", "--binary", "target/debug/il"])
             run("p09-build-process", [sys.executable, "tests/fault_injection/build_process.py", "--binary", "target/debug/il"])
             if (ROOT / "tests/execution_cli.py").is_file():
-            run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
-            run("full-runtime-debug", ["cargo", "build", "--locked", "-p", "il-native-runtime"])
-            run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
+                run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
+                run("full-runtime-debug", ["cargo", "build", "--locked", "-p", "il-native-runtime"])
+                run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
             run("rust-release", ["cargo", "build", "--workspace", "--release", "--locked"])
             run("full-runtime-release", ["cargo", "build", "--locked", "-p", "il-native-runtime", "--release"])
             if (ROOT / "runtime/minimal/build.py").is_file():
