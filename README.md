@@ -31,7 +31,12 @@ with captured output and explicit step, call-depth, heap and output budgets.
 Its JSON interface is defined by `schema/tool.schema.json` and RFC 0013. A passing
 interpreter result does not claim native-code or operating-system runtime support.
 
-The P05 native tool path is under acceptance. Build the CLI and native runtime
+P05 native compilation is verified on Linux x86-64, including interpreter/native
+parity, real debug/release ELF execution, output failures and reproducible native
+artifacts. Immutable evidence is in `eval/evidence/ev_P05_0.json`; the matching
+[hosted acceptance run](https://github.com/LarryZhu-dev/il/actions/runs/37871320400)
+passed. P06 operating-system resources and runtime modes remain under development.
+Build the CLI and native runtime
 archive together with `./tools/dev.ps1 build`. To publish and compile
 an application into a real Linux ELF in Docker:
 

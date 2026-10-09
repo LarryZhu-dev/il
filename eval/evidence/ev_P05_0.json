@@ -1,0 +1,579 @@
+{
+  "evidence_id": "ev_P05_0",
+  "task_id": "P05",
+  "phase": "compiler",
+  "revision": 0,
+  "git_commit": "1592b4ab56fbbf751e597cf0f0c2e5ef94bf95e2",
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "compiler_hash": "sha256:725e228a4e2990d8162daa936f61f19f530bf9ed4455ea4c54b45534845cec76",
+  "runtime_hash": "sha256:e823b6a714c25a336ccfdc43dae1815f8cf9a31c089d551de728f501e7ed2faf",
+  "host_compiler_hash": "sha256:e6abf55ab1859e7c990be77fd593f51661ea99fb2fde626ae9f4108aaa34e7fa",
+  "unavailable_components": [],
+  "target": "x86_64-unknown-linux-gnu",
+  "toolchain_lock_hash": "sha256:e93471187b5d77aa4745b5d5a373c533dfcd11f1811faa698348682762f09a67",
+  "commands": [
+    {
+      "id": "toolchain-rust",
+      "argv_hash": "sha256:8486d9561e12a51de5ec438f1458ef70581e599bfa1409d96d0a6e46734a12f5",
+      "exit_code": 0
+    },
+    {
+      "id": "toolchain-llvm",
+      "argv_hash": "sha256:5c218374ff9812343ea5a0c7f52fde7e40fd198706ab2ba639d194f20f90decb",
+      "exit_code": 0
+    },
+    {
+      "id": "environment-packages",
+      "argv_hash": "sha256:367e60807afe55c0de8163e719f8ce2de648917e9122196e7cf7b53c3fddea98",
+      "exit_code": 0
+    },
+    {
+      "id": "git-revision-binding",
+      "argv_hash": "sha256:0572ba01cc3a0f14ccdeca92c0225c15d09e5f0e19139f6bf36b9f3c7bf6c39b",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-tests",
+      "argv_hash": "sha256:795eb7c61d91ef39f1031a69bbf5c569b355ab8bec69bb77b577068b52e94c47",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-debug",
+      "argv_hash": "sha256:8372ed38fa4fbd2e29ed3626a55fc80e06e31527c3dc66b79b57d1c94d6dfb5f",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli-debug",
+      "argv_hash": "sha256:e5bba993afc90822cf23b9c0c99833ef6b4f0e2af0a10d2b1680f138b7c77154",
+      "exit_code": 0
+    },
+    {
+      "id": "rust-release",
+      "argv_hash": "sha256:1edcee5273bd09129a7227d8d31c5757bb447627d32b0698bb3a1cd1725c3f91",
+      "exit_code": 0
+    },
+    {
+      "id": "native-probe",
+      "argv_hash": "sha256:8d2207034ad03cc8fa03c75a571f9b31e9f3ace19383ac879cf63b376876590f",
+      "exit_code": 0
+    },
+    {
+      "id": "graph-cli",
+      "argv_hash": "sha256:016e9cbd04eec4d2ec9c0bae13568826fef7d4b6cb39d7c2fb289ffc9bcd6c16",
+      "exit_code": 0
+    },
+    {
+      "id": "semantic-cli",
+      "argv_hash": "sha256:e65b17c3e5364dcd1ecfdf8d7c6d9c57269a7df687939c642e52d5ab4e9d80be",
+      "exit_code": 0
+    },
+    {
+      "id": "text-cli",
+      "argv_hash": "sha256:7c6678f69c8c4ca741e587a0227bcbdfe00eef88af45b056a8c6310076bc9818",
+      "exit_code": 0
+    },
+    {
+      "id": "execution-cli",
+      "argv_hash": "sha256:cbd9c7fefdf5ec7c75a8f67e8f148ed9c8b3b11dcdea010058d3106c5ae4193d",
+      "exit_code": 0
+    },
+    {
+      "id": "native-cli",
+      "argv_hash": "sha256:b742f39d46fc82d5401685a6cb3d9548d91324dfd6f1b8b1c5bfec16072ef44f",
+      "exit_code": 0
+    },
+    {
+      "id": "interpreter-profile-parity",
+      "argv_hash": "sha256:ac3bba6d57e03ae222b7fcf18ff96a359249371a04d95022abbaee5ce2a8368e",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-pre-commit",
+      "argv_hash": "sha256:b8fa89c8ce791cba94a1e342d101c0c2bb3a72f73d8e9aeea929ae106d28c28c",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-unit-tests",
+      "argv_hash": "sha256:5964df816921afcf874dbc56a1b0206891d331a603e281c3177b1778d8a97f8a",
+      "exit_code": 0
+    },
+    {
+      "id": "bootstrap-strict",
+      "argv_hash": "sha256:ca7d1f05b24d34fac70f2f54ab737f8ad82f2ec0c5cb6c354c32b4ca73b60fb0",
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "build/ci/bootstrap-pre-commit.log",
+      "sha256": "sha256:eaa25290a18c70b7c8bc5a838044ba66189fddc04ac0cb5c9a2a1533298d887a"
+    },
+    {
+      "path": "build/ci/bootstrap-strict.log",
+      "sha256": "sha256:3c8d942e90b1a03f8b00e981aa20799dfd8652b3f88b3d2799425474a0746b72"
+    },
+    {
+      "path": "build/ci/bootstrap-unit-tests.log",
+      "sha256": "sha256:49afdc9aeb031859c414ee61c8e5216d38a62fbb11ed13c8e70970ffe9ba4a1f"
+    },
+    {
+      "path": "build/ci/environment-packages.log",
+      "sha256": "sha256:51b7d23f8153cf840b9de5ca67ca3f5fe8fec3c0b108c3282707034a60d87e37"
+    },
+    {
+      "path": "build/ci/execution-cli-debug.log",
+      "sha256": "sha256:5d2343fa8cdeb6e363d1c361a899d49447594f22d27b06bf6db0d2a90426f20d"
+    },
+    {
+      "path": "build/ci/execution-cli.log",
+      "sha256": "sha256:cb057a2f7a3385e0c6d23799786049b6a319da70a4cbb1db97eaeb207501d5a5"
+    },
+    {
+      "path": "build/ci/git-revision-binding.log",
+      "sha256": "sha256:0048346e48a0577912051fbe582dc1b95e329fbabf57f74c61160541bc777eba"
+    },
+    {
+      "path": "build/ci/graph-cli.log",
+      "sha256": "sha256:742948e29fba747247b027d879bd726627ef832417e45ef46ab9e504e3f0ab91"
+    },
+    {
+      "path": "build/ci/interpreter-profile-parity.log",
+      "sha256": "sha256:9fd1cbcbfa3349c485407c5cd99733b441eb7ca5049c1bd1028141b9c692bfba"
+    },
+    {
+      "path": "build/ci/native-cli.log",
+      "sha256": "sha256:5c274d84b643cd08ade2f01a643c37ae19dc58b227c10501f6898a9b3581dcbb"
+    },
+    {
+      "path": "build/ci/native-probe.log",
+      "sha256": "sha256:6302522a4a5be2d11746eac49c3354dc4421d7e0fa133fd325f80a672f7236c3"
+    },
+    {
+      "path": "build/ci/result.json",
+      "sha256": "sha256:69612154f3dfd81f93fd5a747b069e56961e26c8b88984ed4c50508dd60f3dff"
+    },
+    {
+      "path": "build/ci/rust-debug.log",
+      "sha256": "sha256:a13905646e2aed93ec6ea9ed6ac91490a4e01f91af0215c3965279a910612149"
+    },
+    {
+      "path": "build/ci/rust-release.log",
+      "sha256": "sha256:9576f1f7e73fc2bb1ec2336aae60cb485c591eadc60a1b998573411c34057e08"
+    },
+    {
+      "path": "build/ci/rust-tests.log",
+      "sha256": "sha256:e9e8c22b04c345bf456e057aded3b034974b898f4c7e65a2034c0e1ffb53a713"
+    },
+    {
+      "path": "build/ci/semantic-cli.log",
+      "sha256": "sha256:734fe77d1ff2936cc8ef534ffa84f6036c63bf6df2113a80a8fb71aa9f91e54f"
+    },
+    {
+      "path": "build/ci/text-cli.log",
+      "sha256": "sha256:ca7ed096f82c36190fe1153509d80d1981e5e49326958577a8c297e16277eabf"
+    },
+    {
+      "path": "build/ci/toolchain-llvm.log",
+      "sha256": "sha256:ac8e51b307c8a1ebea55f839ee57b5e0327716084e9c5b37d7e8ea9434b3a82a"
+    },
+    {
+      "path": "build/ci/toolchain-rust.log",
+      "sha256": "sha256:938db28b83089ab88301ca425f99fa1d8b61ee66e0371babe1db6373ae9810a3"
+    },
+    {
+      "path": "build/execution_cli_debug_report.json",
+      "sha256": "sha256:c833e3368ae5a246c5994ed039b2ef1e46a06a4dbc0a5c0dc2d58d5e04b18d5a"
+    },
+    {
+      "path": "build/execution_cli_report.json",
+      "sha256": "sha256:c833e3368ae5a246c5994ed039b2ef1e46a06a4dbc0a5c0dc2d58d5e04b18d5a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/report.json",
+      "sha256": "sha256:0e14c72b665467a4f13bf37b2bebc7111995c1e696bbf71d95a71f74e27adf68"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/build-report.json",
+      "sha256": "sha256:30a5c1a1fc92e01d46ad715e37980ce6558d9c7be1450126702965b610a4ddbf"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/commands.json",
+      "sha256": "sha256:1dcdde4895cb876dcc05e6e20e4ea2b7bc2a33148b6bea88f30362012736d98c"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/compiler-input.json",
+      "sha256": "sha256:02c0ee8454337325b685f4d2cf6ab18c4d185d05ce4d04dcc5f0e6578c3d6a8d"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/entities.json",
+      "sha256": "sha256:cfcf1c55c9c8ec81cdfc4beaba8b49b634f729ac28082df31f3f87dc245fef67"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/execution.json",
+      "sha256": "sha256:b11bf6b277a7d009abfa7bf1512a26b4c6b1fc4c2b5259abad3ec3fa254980ca"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/graph.json",
+      "sha256": "sha256:4027fdd5d81ec07d3ca32c95d8e7babdf9ae4ab6bebe3d35f1de1de0df46050a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/input.json",
+      "sha256": "sha256:3c9d5c2bd648c68295cb7f4716fbea91baf05a9e44c2a578882c6081b8387510"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/native.json",
+      "sha256": "sha256:8e37adc3dffb1f197d1e81b71567d779e951729db0997f79e76ca5bc680b270a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/optimized.ll",
+      "sha256": "sha256:3abf886def3cf64dd8410c9af70de8f370c6688184b4cc07bcebabd0c7c4dc8b"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/program.elf",
+      "sha256": "sha256:f944806a45159b23dcb085c05afcc46e71428fbec0f70d95abeabc43a552af33"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/program.ll",
+      "sha256": "sha256:f79bb295324b535957f5499b503f51f288a441f76e9ae87f5f91c765d939584e"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/program.o",
+      "sha256": "sha256:c50b9f2ec44319cf7f8f93b036fe2e35f8525c784acf6b01311a028c06d04aed"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/request.json",
+      "sha256": "sha256:43639dde02cca3b7ecb69049a55e8678a912937eeb73e720a34d16ad0b7e34ea"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/test-result.json",
+      "sha256": "sha256:c4694eb683cce501be2db7f244db1fa74834d14122ed961b97b5de0e1f6e839b"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-cBaqZg/verified.json",
+      "sha256": "sha256:e8a682763805f931b98090134d9f0521f0da5a22e6320ef1b92ee2be224e1476"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/build-report.json",
+      "sha256": "sha256:56a3993412c76164b88f92371838f1fa01a59d22ff31812f9ec22b70c722ebcd"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/commands.json",
+      "sha256": "sha256:a889a45806ecefa2d9d417067dc093a0a6dad79c2cc2bfcc1b7f95fe3d16a719"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/compiler-input.json",
+      "sha256": "sha256:71686b1b41f092ca0ce46481c811cc96cea1b5913cbc46c0b167ac9d5ee8e971"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/entities.json",
+      "sha256": "sha256:cfcf1c55c9c8ec81cdfc4beaba8b49b634f729ac28082df31f3f87dc245fef67"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/execution.json",
+      "sha256": "sha256:b11bf6b277a7d009abfa7bf1512a26b4c6b1fc4c2b5259abad3ec3fa254980ca"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/graph.json",
+      "sha256": "sha256:4027fdd5d81ec07d3ca32c95d8e7babdf9ae4ab6bebe3d35f1de1de0df46050a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/input.json",
+      "sha256": "sha256:d68a5befe4d01f45afa22f9002a5c5d2bf42524c4415e8f3dbca7c56bc65b6f2"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/native.json",
+      "sha256": "sha256:8e37adc3dffb1f197d1e81b71567d779e951729db0997f79e76ca5bc680b270a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/optimized.ll",
+      "sha256": "sha256:2a75081384d202b39a78defb8a5db9b0e6d0eeaaef994d278b87912a49496cc7"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/program.elf",
+      "sha256": "sha256:06ea2d77de5baf32168564208bc6a836466f767681418d1edb1941acc14ef0ba"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/program.ll",
+      "sha256": "sha256:f79bb295324b535957f5499b503f51f288a441f76e9ae87f5f91c765d939584e"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/program.o",
+      "sha256": "sha256:4580a42907581fc40cb5d21e030b22884fde13c886cdd667fc01932050351fcb"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/request.json",
+      "sha256": "sha256:06b096f4afcb506edd80ee1b78cc63011f1372cd8f172df196fc27313acc6504"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/test-result.json",
+      "sha256": "sha256:fbbd3845fcd3d51b509b97669f9d01ff2af4013e31a22f764a0715dfff4c8ef2"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/builds/candidates/native-M2PWFt/verified.json",
+      "sha256": "sha256:662e371c430ace04a53b6880769a96b4ca3ea8520a002149967f7b061caa59eb"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/HEAD",
+      "sha256": "sha256:a1a4fd2ce4fff7a72b37d09336a9bac2b1b0ab11ba125d79bb18c1fa9456fdaf"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/lock",
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/revisions/00000000000000000000/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/revisions/00000000000000000000/manifest.json",
+      "sha256": "sha256:5657d8de744eeb12e28e40f1bce56325b7b1d04299b3b77289fcce7cd5d40a71"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/revisions/00000000000000000001/graph.json",
+      "sha256": "sha256:4027fdd5d81ec07d3ca32c95d8e7babdf9ae4ab6bebe3d35f1de1de0df46050a"
+    },
+    {
+      "path": "build/failures/P05-argument-location/retained-store/.il/revisions/00000000000000000001/manifest.json",
+      "sha256": "sha256:86cad98e0d1576f7a317a8f41aa8a37e0af93cac92c0f8c58b23bf41d52c3e80"
+    },
+    {
+      "path": "build/failures/P05-broken-pipe/report.json",
+      "sha256": "sha256:f2cebf8d86d665f26eeef36c85063316b6f8db7910afaffad7c788bb6d8cd3c2"
+    },
+    {
+      "path": "build/failures/P05-full-76d6c99/native-cli.log",
+      "sha256": "sha256:23ab753f60b927321d49b3a42b284b932c48050c1be5ad3cf5cb85a5e54603a0"
+    },
+    {
+      "path": "build/failures/P05-full-76d6c99/native_cli_report.json",
+      "sha256": "sha256:da76ee90657fdcc7182849081c14fbe7f93da146383f8e5cb41502d716bfdef4"
+    },
+    {
+      "path": "build/failures/P05-full-76d6c99/result.json",
+      "sha256": "sha256:f02bee570ae1bce9ae4b26405b87b0656b0ac537ddcf342787986ff678ee6ef9"
+    },
+    {
+      "path": "build/failures/P05-helper-placement-1592b4a/bootstrap-pre-commit.log",
+      "sha256": "sha256:156b238203b84ad31b12d1af2594eba11c505b1f4a5174ea72d608b24d4a7336"
+    },
+    {
+      "path": "build/failures/P05-helper-placement-1592b4a/result.json",
+      "sha256": "sha256:c2c46a7df6665ca88cb9fac78bc6225f8ca0857c95d1ba19dd6b128c09653d64"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/annotations.json",
+      "sha256": "sha256:14533c1305a111a98b5517db1f0f201d4ca2f063e1e2281823b65b9bea1a1c2b"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/approval-rejection.txt",
+      "sha256": "sha256:a2bccdb80e125c2100e0cd0ce518ab8c7936ff8a5433a5c6ff287f562dc8cdc0"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/artifacts.json",
+      "sha256": "sha256:36a1d7c36b243c42751883c466121862b1ae75f710543d473775a6e9e96d1eee"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/check-run.json",
+      "sha256": "sha256:3d20ad2f6b5c43a242a6968f06e09d428b75d0316e3e7b3182087c2c027d2761"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/jobs.json",
+      "sha256": "sha256:a10a7763ac69989701011a513b196e27ddf1561dbee0d49a5371469803a2f962"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/local-native-snapshot.json",
+      "sha256": "sha256:ab9853e21e88d4fb22763715c6af96edb4938d2e00656c8896119543536aa806"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/log-access-error.json",
+      "sha256": "sha256:5f3ab7977d7670812aa6782b576dac4112c13ade66b5e70e09d441df954380f3"
+    },
+    {
+      "path": "build/failures/P05-hosted-76d6c99/run.json",
+      "sha256": "sha256:c826a8c457e720b770fb1bc8dc994f683fa8b629cda4a8957539bb24542d2dc4"
+    },
+    {
+      "path": "build/failures/P05-interrupted-alignment/interruption.json",
+      "sha256": "sha256:77420c2f217b1f010a36f49c8dcdadb35c4d642df3f58f903e8c0299c8439f2e"
+    },
+    {
+      "path": "build/failures/P05-interrupted-alignment/native_cli_report.json",
+      "sha256": "sha256:d57624340f4a350a9447bef518260f9d2df09c858532c02af3ad1d276458a579"
+    },
+    {
+      "path": "build/failures/P05-interrupted-alignment/result.json",
+      "sha256": "sha256:de63b1d51beb1e507094f6c8335c9c8705456f8d722e99c8b73145037c2d502d"
+    },
+    {
+      "path": "build/graph_cli_report.json",
+      "sha256": "sha256:f6f4fee287e0ffcf6e2843ccae74c9f2d5be0cc29137ea73be4cd2a8da0dd649"
+    },
+    {
+      "path": "build/native_cli_report.json",
+      "sha256": "sha256:51e2051b6dc45ee475ff30bd96f345e3bca959057fe63666f0bb30c6dc34fe1c"
+    },
+    {
+      "path": "build/P05-github-jobs.json",
+      "sha256": "sha256:6c97831c2117b5688a394b9247644c1d245ba0bba36606705faa53cc89f1ba63"
+    },
+    {
+      "path": "build/P05-github-success.json",
+      "sha256": "sha256:8706813a48dd38a4fe47db67cab88df398d5adc8c22ac594d0784b788a8256bd"
+    },
+    {
+      "path": "build/p05-native-example/result.json",
+      "sha256": "sha256:a9571ea48691b5f396892d2f0c7c811a26213d5bfda83675eb46863cdc80c214"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/build-report.json",
+      "sha256": "sha256:3a8e4129d4d13a61a0cb39a5efa9cc7939d55e4b8a6a2bba3d01594211eb0aa7"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/commands.json",
+      "sha256": "sha256:1dcdde4895cb876dcc05e6e20e4ea2b7bc2a33148b6bea88f30362012736d98c"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/compiler-input.json",
+      "sha256": "sha256:999557df3133255b927edf7370016858a83ece6dc3a4fb45d2a4f4c722f73673"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/entities.json",
+      "sha256": "sha256:5866d460b08f40393254750e407d8829ec74df4b149af8b955f4d4999e1ad21d"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/graph.json",
+      "sha256": "sha256:c8ebe6d10199ccbea98a8b8db2a2615cdee35d7bc3415dc497ad787986e4d499"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/input.json",
+      "sha256": "sha256:a4d6c9641ae5320c2a35979de8d217e1484ca33e5461505f389e8c822fb73b85"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/native.json",
+      "sha256": "sha256:6e030c3e1a7a2c44bde5dd1a6e90e224c80f470f1c2bf942f4beda61ef92582c"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/optimized.ll",
+      "sha256": "sha256:f05a7bd8d260aff045d4549767a5a18f2d7495e15e12cb0244aedb4bfe755191"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/program.elf",
+      "sha256": "sha256:93733116e13fac8826071b4c7f6e9800bd690e51c43f0960bdc35c66a5b72e5b"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/program.ll",
+      "sha256": "sha256:492272f3e6ce03739ea43ccd1c7fe15816b55a5652a0d14799c6c936f0bd6375"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/program.o",
+      "sha256": "sha256:9c38a2ed3f3f86d734047d2caacd2244ac26808df28b0f0eb9a4ba0d211b84e2"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/request.json",
+      "sha256": "sha256:eb278ad4d437baeac267330bea43597a419cfa1babb6aeb1f8b86c16f55b2730"
+    },
+    {
+      "path": "build/p05-native-example/store/.il/builds/candidates/native-8Or3hg/verified.json",
+      "sha256": "sha256:49c88be432f114536b4c267f400add4a8a15f400b5c13b1a43e991ad60a2a501"
+    },
+    {
+      "path": "build/p05-regressions-report.json",
+      "sha256": "sha256:1f2ffbdb2d106d06979eb84025681cf9359c603ae5027a5b519218c2e999259b"
+    },
+    {
+      "path": "build/probe_gate_report.json",
+      "sha256": "sha256:7ea2ee254df9f1f51d051e3e7cb317fec015e12adfc0e6df17aafc4d2377f024"
+    },
+    {
+      "path": "build/semantic_cli_report.json",
+      "sha256": "sha256:b75c640d0699b79a9647142a21a4928675eee8186bfc264e34b4bf02278e8d6d"
+    },
+    {
+      "path": "build/text_cli_report.json",
+      "sha256": "sha256:407ae59936315ed7990454570c5104747b221b2bc6d9f035fde97e17b36973e3"
+    },
+    {
+      "path": "examples/bootstrap/graph.json",
+      "sha256": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05"
+    },
+    {
+      "path": "examples/core/native_hello.il",
+      "sha256": "sha256:6a5660726ed3342cf34e12a3902dd5c0c3388d6660d47cc652eba31ccf94b69c"
+    },
+    {
+      "path": "target/release/il",
+      "sha256": "sha256:725e228a4e2990d8162daa936f61f19f530bf9ed4455ea4c54b45534845cec76"
+    },
+    {
+      "path": "target/release/libil_native_runtime.a",
+      "sha256": "sha256:e823b6a714c25a336ccfdc43dae1815f8cf9a31c089d551de728f501e7ed2faf"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "rust-tests",
+      "passed": true,
+      "count": 138
+    },
+    {
+      "suite": "execution-cli-debug",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-probe",
+      "passed": true,
+      "count": 4
+    },
+    {
+      "suite": "graph-cli",
+      "passed": true,
+      "count": 28
+    },
+    {
+      "suite": "semantic-cli",
+      "passed": true,
+      "count": 231
+    },
+    {
+      "suite": "text-cli",
+      "passed": true,
+      "count": 14
+    },
+    {
+      "suite": "execution-cli",
+      "passed": true,
+      "count": 8
+    },
+    {
+      "suite": "native-cli",
+      "passed": true,
+      "count": 9
+    },
+    {
+      "suite": "interpreter-profile-parity",
+      "passed": true,
+      "count": 180
+    },
+    {
+      "suite": "bootstrap-pre-commit",
+      "passed": true,
+      "count": 7
+    },
+    {
+      "suite": "bootstrap-unit-tests",
+      "passed": true,
+      "count": 19
+    },
+    {
+      "suite": "bootstrap-strict",
+      "passed": true,
+      "count": 9
+    }
+  ],
+  "effects_delta": [],
+  "capabilities_delta": [],
+  "known_limits": [
+    "Only the recorded task and gates are verified; later tasks are not verified."
+  ]
+}

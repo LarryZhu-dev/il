@@ -35,5 +35,5 @@
     "examples/hello"
   ],
   "rollback_revision": 0,
-  "status": "BLOCKED"
+  "status": "RUNNING"
 }

@@ -3,14 +3,13 @@
   "schema_version": "1.0.0",
   "head_revision": 0,
   "last_verified_revision": 0,
-  "compiler_version": null,
-  "runtime_version": null,
+  "compiler_version": "0.1.0",
+  "runtime_version": "0.1.0",
   "target": "x86_64-unknown-linux-gnu",
   "open_tasks": [
-    "P05"
+    "P06"
   ],
   "blocked_tasks": [
-    "P06",
     "P07",
     "P08",
     "P09",
