@@ -66,7 +66,11 @@ responses:
     connect: 405
     unsupported_http_version: 505
     handler_error: 500
+    # Service-level failure status; an accept syscall has no stream, so no
+    # HTTP response is emitted when this failure happens before acceptance.
     accept_failure: 500
+  diagnostics:
+    accept_failure: E_HTTP_ACCEPT_FAILED
   error_body: empty
   method_not_allowed_header: 'Allow: GET'
 io:

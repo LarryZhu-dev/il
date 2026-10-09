@@ -28,6 +28,17 @@ bytes come from a committed test contract, never from the implementation under
 test. External HTTP tests must not import package HTTP parsing, routing, or
 response implementation.
 
+The zero threshold case is an immediate pre-`accept4` failure: the captured
+service must terminate without waiting for a client, retain the listener cleanup
+events, and emit the structured `E_HTTP_ACCEPT_FAILED` diagnostic. It has no
+accepted stream and therefore cannot emit an HTTP 500 response on the wire;
+`responses.errors.accept_failure: 500` remains the service-level contract for
+the failure class. A positive threshold is exercised with `demo.serve(2)`:
+an independent TCP client completes the first `/health` request, then the next
+accept is injected and the service exits with the same diagnostic. Both native
+debug and native release captured executables are required to satisfy these
+cases.
+
 ## Process interruption and recovery
 
 Process recovery tests use a trusted test supervisor and private synchronization

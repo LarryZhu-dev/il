@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tests'))
 import graph_cli, runtime_cli
+import execution_cli
 REPORT=None
 RECORDS=[]
 MODULES=('core','alloc','io','time','net','json','http','test','tracing')
@@ -230,27 +231,86 @@ class HttpAcceptance(unittest.TestCase):
                 if process.poll() is None:process.kill();process.wait(timeout=5)
 
     def test_captured_accept_failure_is_external_diagnostic_and_cleans_up(self):
-        rules=locked()['responses']['errors']
-        faults={'allocation_fail_after':None,'io_max_chunk':None,'io_fail_after':None,'accept_fail_after':0}
-        fixture,directory=self.fixture('accept-failure',package_source()+'\n'+(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8'),faults=faults)
-        request_data=fixture.execute_request(isolation='captured');request_data['suite']['entry']='demo.serve_once';request_data['suite']['limits']['max_steps']=1_000_000;request_data['suite']['limits']['max_output_bytes']=1_048_576
-        command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
-        completed=subprocess.run(command,input=json.dumps(request_data),capture_output=True,text=True,timeout=180)
-        reply=json.loads(completed.stdout)
-        if reply['ok']:
-            self.assertEqual(completed.returncode,0);retained=reply['result']
-        else:
-            self.assertEqual(completed.returncode,1)
-            self.assertTrue(reply['diagnostics'])
-            retained_path=max(fixture.store.glob('.il/builds/candidates/native-*/test-result.json'),key=lambda path:path.stat().st_mtime_ns)
-            retained=json.loads(retained_path.read_text(encoding='utf-8'))
-        execution=retained['execution']
-        self.assertEqual(execution['status'],'trapped')
-        self.assertEqual(execution['live_handles'],0)
-        self.assertEqual(execution['live_allocations'],0)
-        self.assertTrue(execution['diagnostics'])
-        self.assertEqual(execution['diagnostics'][0]['code'],'E_IO_READ')
-        write_json(directory/'accept-failure.json',{'expected_code':rules.get('accept_failure','E_IO_READ'),'actual_code':execution['diagnostics'][0]['code'],'execution':execution})
+        """Exercise accept faults through the compiled captured service boundary.
+
+        A zero threshold must return without waiting for a client.  A threshold
+        of one accepts a real external `/health` request and then fails on the
+        next accept.  Both cases run the native captured executable, so the
+        report is independent of the interpreter and retains process evidence.
+        """
+        rules=locked()['responses'];diagnostic_code=rules['diagnostics']['accept_failure']
+        source=package_source()+'\n'+(ROOT/'examples/http_demo/main.il').read_text(encoding='utf-8')
+        for profile in ('debug','release'):
+            for threshold,maximum in ((0,1),(1,2)):
+                identity=f'accept-failure-{profile}-{threshold}'
+                faults={'allocation_fail_after':None,'io_max_chunk':None,'io_fail_after':None,'accept_fail_after':threshold}
+                fixture,directory=self.fixture(identity,source,faults=faults)
+                request_data=fixture.execute_request(isolation='native_'+profile)
+                request_data['suite']['entry']='demo.serve'
+                request_data['suite']['arguments']=[{'type':'Usize','data':{'kind':'integer','value':str(maximum)}}]
+                request_data['suite']['limits']['max_steps']=1_000_000
+                request_data['suite']['limits']['max_output_bytes']=1_048_576
+                command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
+                process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                started=time.monotonic_ns()
+                try:
+                    process.stdin.write(json.dumps(request_data));process.stdin.close();process.stdin=None
+                    wire=None;elapsed=None
+                    if threshold==1:
+                        # The first accepted stream is driven by an independent
+                        # TCP client; after it closes the second accept fails.
+                        deadline=time.monotonic()+30
+                        while True:
+                            self.assertIsNone(process.poll(),'native service exited before external accept')
+                            try:
+                                wire,elapsed=exchange(request('/health'),timeout=2)
+                                break
+                            except (ConnectionRefusedError,ConnectionResetError,socket.timeout,TimeoutError):
+                                self.assertLess(time.monotonic(),deadline,'native service did not open a TCP listener')
+                                time.sleep(.02)
+                        self.record(identity+':health',wire,elapsed,rules['health']['status'])
+                    stdout,stderr=process.communicate(timeout=30)
+                    reply=json.loads(stdout)
+                    self.assertEqual(process.returncode,0,stderr)
+                    self.assertTrue(reply['ok'],reply)
+                    retained=reply['result'];execution=retained['execution']
+                    execution_cli.SCHEMA_CHECK.validate_file(ROOT,execution,'execution')
+                    self.assertEqual(execution['status'],'returned')
+                    self.assertEqual(execution['value']['data'],{'kind':'integer','value':'1'})
+                    self.assertEqual(execution['live_handles'],0)
+                    self.assertEqual(execution['live_allocations'],0)
+                    self.assertEqual(execution['diagnostics'],[])
+                    diagnostic=json.loads(bytes(execution['stderr']))
+                    self.assertEqual(diagnostic,{'code':diagnostic_code})
+                    events=execution['handle_events']
+                    # The injected syscall is performed before allocating a
+                    # stream, so only the first real TCP connection produces
+                    # an opened/dropped pair.
+                    self.assertEqual(sum(event['kind']=='opened' for event in events),1)
+                    self.assertEqual(sum(event['kind']=='dropped' for event in events),1)
+                    native=retained['native'];executable=Path(native['argv'][0])
+                    self.assertTrue(executable.is_file())
+                    executable_sha=sha(executable);policy_sha=sha(fixture.policy_path)
+                    policy_value=json.loads(fixture.policy_path.read_text(encoding='utf-8'))
+                    self.assertEqual(retained['execution_input']['policy_hash'],runtime_cli.policy_hash(policy_value))
+                    evidence=directory/'accept-failure.json'
+                    write_json(evidence,{'schema_version':'1.0.0','case':identity,'threshold':threshold,'maximum':maximum,
+                        'command':command,'pid':process.pid,'exit_code':process.returncode,'elapsed_ns':time.monotonic_ns()-started,
+                        'executable':{'path':str(executable),'sha256':executable_sha},'policy':{'path':str(fixture.policy_path),'sha256':policy_sha},
+                        'report_path':str(evidence),'expected_code':diagnostic_code,'actual_code':diagnostic['code'],
+                        'execution':execution})
+                    RECORDS.append({'id':identity+':fault','threshold':threshold,'status':'returned','diagnostic':diagnostic_code,
+                                    'execution_schema':'execution.schema.json','executable_sha256':executable_sha,'policy_sha256':policy_sha,
+                                    'report_sha256':sha(evidence),'process_pid':process.pid,'exit_code':process.returncode})
+                    write_json(REPORT,{'suite':'http_external_blackbox','state':'RUNNING','passed':False,'cases':RECORDS})
+                finally:
+                    if process.poll() is None:
+                        process.kill();process.wait(timeout=5)
+                # A returned accept failure must release its listener.  This
+                # also ensures threshold zero never leaves a hidden blocker.
+                with socket.socket() as probe:
+                    probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+                    probe.bind(('127.0.0.1',8080))
 
 def main():
     global REPORT
