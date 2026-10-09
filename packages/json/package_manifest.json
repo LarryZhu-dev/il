@@ -1,0 +1,38 @@
+{
+  "package_manifest": {
+    "name": "json",
+    "version": "0.1.0",
+    "stage": "P07",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core"
+    ]
+  },
+  "public_types": [
+    "json.BytesResult"
+  ],
+  "public_functions": [
+    "json.hex_digit",
+    "json.quote",
+    "json.message"
+  ],
+  "error_types": [
+    "core.IoError"
+  ],
+  "effects": [
+    "alloc"
+  ],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/http_packages.rs"
+  ],
+  "blackbox_tests": [
+    "tests/http_blackbox/cli.py"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

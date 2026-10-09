@@ -12,7 +12,7 @@ pub fn verify(program:&Program)->Vec<Diagnostic>{
     for(ty,layout)in &program.layouts{if layout.size>67_108_864||layout.align>8||!layout.align.is_power_of_two(){error(ty,"invalid bounded native layout");}}
     if !errors.is_empty(){return errors;}
     let mut error=|entity:&str,message:&str|{if errors.len()<100{let mut d=Diagnostic::error("E_NATIVE_IR_INVALID",Some(entity),message,program.source_revision);d.stage="verify_native_ir".into();errors.push(d);}};
-    for(ty,layout)in &program.layouts{if (ty=="core.File")!=matches!(layout.shape,Shape::File){error(ty,"File must retain its exact opaque nominal resource layout");}if layout::compute(layout.shape.clone(),&program.layouts).as_ref()!=Some(layout){error(ty,"invalid computed type layout");}}
+    for(ty,layout)in &program.layouts{if il_graph::ResourceKind::from_nominal(ty)!=match layout.shape{Shape::Resource{resource}=>Some(resource),_=>None}{error(ty,"resource must retain its exact opaque nominal layout");}if layout::compute(layout.shape.clone(),&program.layouts).as_ref()!=Some(layout){error(ty,"invalid computed type layout");}}
     let mut globals=BTreeSet::new();for global in &program.globals{if !name(&global.name)||!globals.insert(global.name.clone())||global.bytes.len()>1_048_576{error(&global.name,"invalid or duplicate native global");}}
     let mut signatures:BTreeMap<String,Signature>=expected.into_iter().map(|e|(e.symbol,e.signature)).collect();for function in &program.functions{if !name(&function.symbol)||globals.contains(&function.symbol)||signatures.insert(function.symbol.clone(),function.signature.clone()).is_some(){error(&function.entity_id,"invalid or duplicate function symbol");}}
     match (&program.mode,program.runtime_profile) {
@@ -63,7 +63,7 @@ fn verify_authority(program:&Program,error:&mut impl FnMut(&str,&str)){
                 let valid=args.len()==4&&function.symbol=="main"&&matches!(&args[1],Operand::Global{name} if program.globals.iter().any(|g|g.name==*name&&g.bytes==bytes))&&args[2]==Operand::int(64,bytes.len())&&args[3]==Operand::int(32,4);
                 if !valid{error(&function.entity_id,"authorization requires exact embedded requirements and inherited policy descriptor 4");}
             }
-            let requirement=match symbol{"il_rt_file_open_read"|"il_rt_file_read"=>Some((2,il_graph::CapabilityKind::FileRead)),"il_rt_file_open_write"|"il_rt_file_write"=>Some((2,il_graph::CapabilityKind::FileWrite)),"il_rt_clock_now"=>Some((1,il_graph::CapabilityKind::ClockRead)),_=>None};
+            let requirement=symbol.strip_prefix("il_rt_").and_then(il_checker::runtime_signature).and_then(|signature|signature.capability.map(|kind|(if matches!(signature.result,il_checker::RuntimeResult::Result{..}){2}else{1},kind)));
             if let Some((index,kind))=requirement{let selected=args.get(index).and_then(|arg|if let Operand::Integer{bits:64,value}=arg{value.parse::<usize>().ok()}else{None}).and_then(|index|program.requirements.get(index));if selected.is_none_or(|r|r.kind!=kind){error(&function.entity_id,"privileged runtime operation requires a constant matching requirement index");}}
         }
     }
@@ -111,7 +111,18 @@ fn call_safety(program:&Program)->Vec<Diagnostic>{
                                 "il_rt_file_write"=>{add(1,8,8,true);add(3,24,8,false);add(4,24,8,false);},
                                 "il_rt_file_read_some"=>{add(1,24,8,true);add(2,16,8,false);add(4,16,8,false);},
                                 "il_rt_file_write_some"=>{add(1,8,8,true);add(2,16,8,false);add(3,24,8,false);add(5,16,8,false);},
-                                "il_rt_file_close"|"il_rt_file_drop"|"il_rt_trace_file"|"il_rt_json_file"=>add(1,16,8,matches!(symbol.as_str(),"il_rt_file_close"|"il_rt_file_drop")),
+                                "il_rt_file_close"|"il_rt_file_drop"|"il_rt_trace_file"|"il_rt_json_file"|"il_rt_net_close_listener"|"il_rt_listener_drop"|"il_rt_trace_listener"|"il_rt_json_listener"|"il_rt_net_close_stream"|"il_rt_stream_drop"|"il_rt_trace_stream"|"il_rt_json_stream"=>add(1,16,8,false),
+                                "il_rt_net_opened_at"=>add(1,16,8,false),
+                                "il_rt_net_listen"=>add(1,16,8,true),
+                                "il_rt_net_connect"=>{add(1,16,8,true);add(3,16,8,false);},
+                                "il_rt_net_accept"=>{add(1,16,8,true);add(2,16,8,false);add(3,16,8,false);},
+                                "il_rt_net_read"=>{add(1,24,8,true);add(2,16,8,false);add(4,16,8,false);},
+                                "il_rt_net_write"=>{add(1,8,8,true);add(2,16,8,false);add(3,24,8,false);add(5,16,8,false);},
+                                "il_rt_bytes_get"=>add(1,24,8,false),
+                                "il_rt_bytes_equal"|"il_rt_string_equal"=>{add(1,24,8,false);add(2,24,8,false);},
+                                "il_rt_bytes_slice"|"il_rt_string_to_bytes"|"il_rt_string_from_utf8"=>{add(1,24,8,true);add(2,24,8,false);},
+                                "il_rt_bytes_concat"=>{add(1,24,8,true);add(2,24,8,false);add(3,24,8,false);},
+                                "il_rt_bytes_from_u8"=>add(1,24,8,true),
                                 "il_rt_stdin_read"=>{add(1,24,8,true);add(3,16,8,false);},
                                 "il_rt_stdout_write"|"il_rt_stderr_write"=>{add(1,8,8,true);add(2,24,8,false);add(4,16,8,false);},
                                 "il_rt_buffer_new"=>{add(1,24,8,true);let bytes=arguments.get(3).and_then(constant);if let Some(bytes)=bytes{add(2,bytes,1,false);}else{report(&i.entity_id,"buffer construction requires a constant source extent");}},

@@ -362,7 +362,11 @@
                   ],
                   "properties": {
                     "kind": {
-                      "const": "file"
+                      "enum": [
+                        "file",
+                        "listener",
+                        "stream"
+                      ]
                     },
                     "slot": {
                       "type": "integer",

@@ -15,11 +15,12 @@ struct ArmExit { draft: Draft, env: Environment }
 #[derive(Clone)]
 struct Loop { header: Target, exit: Target }
 
-pub(super) fn lower(graph: &mut Graph, names: &BTreeMap<String, String>, scope: &str, function: &Function, body: Body) -> Result<Vec<Block>> {
+pub(super) fn lower(graph: &mut Graph, names: &BTreeMap<String, String>, scope: &str, function: &Function, body: Body, nodes: &mut usize) -> Result<Vec<Block>> {
     let block_names = body.blocks.iter().map(|block| (block.name.clone(), block.id.clone())).collect();
     let mut lower = Lower { graph, declarations: names, scope, function, blocks: vec![], current: None,
-        env: BTreeMap::new(), locals: BTreeMap::new(), sequence: 0, loops: vec![], block_names };
+        env: BTreeMap::new(), locals: BTreeMap::new(), sequence: 0, loops: vec![], block_names, nodes };
     for (index, block) in body.blocks.into_iter().enumerate() {
+        lower.reserve(1 + block.args.len())?;
         lower.env.clear(); lower.locals.clear();
         for parameter in &function.parameters {
             lower.insert(parameter.entity_id.clone(), ValueDef { entity_id: parameter.entity_id.clone(), type_ref: parameter.type_ref.clone() }, false);
@@ -47,6 +48,7 @@ struct Lower<'a> {
     graph: &'a mut Graph, declarations: &'a BTreeMap<String, String>, scope: &'a str, function: &'a Function,
     blocks: Vec<Block>, current: Option<Draft>, env: Environment, locals: Locals,
     sequence: u64, loops: Vec<Loop>, block_names: BTreeMap<String, String>,
+    nodes: &'a mut usize,
 }
 
 impl Lower<'_> {
@@ -55,6 +57,12 @@ impl Lower<'_> {
         error.stage = "text_parse".into(); error
     }
     fn fresh(&mut self, owner: &str) -> String { let id = format!("{owner}.expr.{}", self.sequence); self.sequence += 1; id }
+    fn reserve(&mut self, count: usize) -> Result<()> {
+        let next = self.nodes.saturating_add(count);
+        if next > 100_000 { return Err(self.error("E_RESOURCE_LIMIT", "surface lowering graph node budget exceeded")); }
+        *self.nodes = next;
+        Ok(())
+    }
     fn owns(&self, ty: &str) -> bool { is_owned_type(self.graph, ty) }
     fn insert(&mut self, key: String, value: ValueDef, loan: bool) {
         let order = self.sequence; self.sequence += 1;
@@ -69,8 +77,11 @@ impl Lower<'_> {
         let key = self.locals.get(name).map(|local| local.key.clone()).unwrap_or_else(|| name.into());
         self.value(&key)?; Ok(key)
     }
-    fn target(&self, id: String, source: &Environment, selected: Option<&[String]>) -> Result<Target> {
+    fn target(&mut self, id: String, source: &Environment, selected: Option<&[String]>) -> Result<Target> {
         let mut bindings: Vec<_> = source.iter().filter(|(key, value)| value.alive && selected.is_none_or(|keys| keys.contains(key))).collect();
+        // Charge before copying live values into branch environments. A short
+        // sequence of branches can otherwise expand quadratically in memory.
+        self.reserve(1 + bindings.len())?;
         bindings.sort_by_key(|(_, value)| value.order);
         let mut env = Environment::new(); let mut keys = vec![]; let mut args = vec![];
         for (index, (key, binding)) in bindings.into_iter().enumerate() {
@@ -117,13 +128,14 @@ impl Lower<'_> {
             _ => {}
         }
         if opcode == Opcode::Const && operation.outputs.iter().any(|value| self.owns(&value.type_ref)) { operation.effects = vec![Effect::Alloc]; }
-        if opcode == Opcode::Drop && operation.inputs.first().and_then(|id| type_of(id)).is_some_and(|ty| il_checker::contains_file_type(self.graph, ty)) { operation.effects = vec![Effect::Fs]; }
+        if opcode == Opcode::Drop { if let Some(ty) = operation.inputs.first().and_then(|id| type_of(id)) { operation.effects = il_checker::resource_cleanup_effects(self.graph, ty).into_iter().collect(); } }
         if opcode == Opcode::Clone && operation.inputs.first().and_then(|id| type_of(id)).is_some_and(|ty| self.owns(ty)) { operation.effects = vec![Effect::Alloc]; }
         operation.consumes = moved.into_iter().collect();
         if !matches!(opcode, Opcode::Borrow | Opcode::BorrowMut) { operation.produces = operation.outputs.iter().filter(|value| self.owns(&value.type_ref)).cloned().collect(); }
         Ok(operation)
     }
     fn emit(&mut self, operation: Operation) -> Result<()> {
+        self.reserve(1 + operation.outputs.len())?;
         if self.blocks.len() > 10_000 || self.sequence > 100_000 { return Err(self.error("E_RESOURCE_LIMIT", "surface lowering budget exceeded")); }
         for consumed in &operation.consumes {
             for binding in self.env.values_mut().filter(|binding| binding.value.entity_id == *consumed) { binding.alive = false; }
@@ -341,9 +353,12 @@ impl Lower<'_> {
                 module.entity_id.clone()
             } else {
                 if self.graph.modules.iter().any(|module| module.entity_id == "core") { return Err(self.error("E_DUPLICATE_NAME", "reserved core module ID already belongs to another module")); }
+                self.reserve(1)?;
                 self.graph.modules.push(Module { entity_id: "core".into(), path: "core".into(), imports: vec![], declarations: vec![], visibility: Visibility::Public });
                 "core".into()
             };
+            self.reserve(1 + variants.len())?;
+            if self.graph.types.len() >= 256 { return Err(self.error("E_RESOURCE_LIMIT", "type declaration budget exceeded")); }
             self.graph.types.push(TypeDef { entity_id: error.into(), kind: TypeKind::Sum, parameters: vec![], layout: Layout::Inferred, integer: None, fields: vec![], variants: variants.iter().map(|name| Variant { name: (*name).into(), fields: vec![] }).collect() });
             self.graph.modules.iter_mut().find(|module| module.entity_id == core).unwrap().declarations.push(error.into());
         }
@@ -361,6 +376,8 @@ impl Lower<'_> {
             return Ok(ty.entity_id.clone());
         }
         let id = self.fresh(&format!("{}.result", self.function.entity_id));
+        self.reserve(3)?;
+        if self.graph.types.len() >= 256 { return Err(self.error("E_RESOURCE_LIMIT", "type declaration budget exceeded")); }
         self.graph.types.push(TypeDef { entity_id: id.clone(), kind: TypeKind::Result, parameters: vec![success.into(), error.into()], layout: Layout::Inferred, integer: None, fields: vec![], variants: vec![] });
         let module = self.graph.modules.iter_mut().find(|module| module.entity_id == self.scope).ok_or_else(|| Diagnostic::error("E_NAME_NOT_FOUND", None, "generated type requires an owning module", self.graph.revision))?;
         module.declarations.push(id.clone()); Ok(id)

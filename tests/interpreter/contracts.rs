@@ -279,3 +279,35 @@ fn repeated_long_ids_have_a_bounded_complete_stack_report(){
     assert!(e.stack_trace[..e.stack_trace.len()-1].iter().all(|frame|frame.call_site.as_deref()==Some(&large_id)));
     assert_eq!(e.diagnostics[0].entity_id.as_deref(),Some(e.stack_trace[0].entity_id.as_str()));
 }
+
+fn byte_program(symbol:&str)->Program{
+    let signature=il_checker::runtime_signature(symbol).unwrap();let params:Vec<_>=signature.parameters.iter().enumerate().map(|(i,p)|(format!("input{i}"),p.type_ref)).collect();let inputs:Vec<_>=params.iter().map(|(id,_)|id.as_str()).collect();
+    let result=match signature.result{il_checker::RuntimeResult::Exact(ty)=>ty,il_checker::RuntimeResult::Result{..}=>"ByteResult"};let mut operation=op("runtime",Opcode::RuntimeCall,&inputs,&[("answer",result)],Attributes::RuntimeCall{symbol:symbol.into(),capability:None});operation.effects=signature.effects.to_vec();
+    let borrowed:Vec<_>=params.iter().map(|(id,ty)|(id.as_str(),*ty)).collect();let mut p=program(result,&borrowed,vec![operation],Some("answer"));p.functions[0].effects=signature.effects.to_vec();p.types=io_types();
+    if let il_checker::RuntimeResult::Result{success,error}=signature.result{p.types.push(typedef(result,TypeKind::Result,vec![success.into(),error.into()]));p.functions[0].blocks[0].operations[0].produces=p.functions[0].blocks[0].operations[0].outputs.clone();}
+    if let Terminator::Return{cleanup,..}=&mut p.functions[0].blocks[0].terminator{for(id,ty)in params.iter().rev(){if matches!(*ty,"Bytes"|"String"){cleanup.push(DropAction{value_id:id.clone(),type_ref:(*ty).into()});}}}p
+}
+fn byte_value(bytes:&[u8])->Value{Value{type_ref:"Bytes".into(),data:ValueData::Bytes(bytes.to_vec())}}
+fn byte_ok(value:Value)->Value{Value{type_ref:"ByteResult".into(),data:ValueData::Variant(il_execution_model::VariantValue{tag:"Ok".into(),fields:vec![value]})}}
+#[test]
+fn byte_operations_follow_explicit_conversion_and_range_contracts(){
+    let cases=vec![
+        ("bytes_get",vec![byte_value(&[0,255]),Value::integer("Usize",1)],Value::integer("U8",255)),
+        ("bytes_slice",vec![byte_value(&[1,2,3]),Value::integer("Usize",1),Value::integer("Usize",2)],byte_ok(byte_value(&[2,3]))),
+        ("bytes_slice",vec![byte_value(&[1,2]),Value::integer("Usize",2),Value::integer("Usize",0)],byte_ok(byte_value(&[]))),
+        ("bytes_concat",vec![byte_value(&[1,2]),byte_value(&[3])],byte_ok(byte_value(&[1,2,3]))),
+        ("bytes_from_u8",vec![Value::integer("U8",255)],byte_ok(byte_value(&[255]))),
+        ("string_to_bytes",vec![Value::string("il语言")],byte_ok(byte_value("il语言".as_bytes()))),
+        ("string_from_utf8",vec![byte_value("il语言".as_bytes())],byte_ok(Value::string("il语言"))),
+        ("bytes_equal",vec![byte_value(&[0,255]),byte_value(&[0,255])],Value::boolean(true)),
+        ("bytes_equal",vec![byte_value(&[0]),byte_value(&[1])],Value::boolean(false)),
+        ("string_equal",vec![Value::string("il"),Value::string("IL")],Value::boolean(false)),
+    ];for(symbol,args,expected)in cases{let p=byte_program(symbol);let e=execute(&p,"main",&args,Limits::default());success(&e,expected);assert_eq!(e.live_allocations,u64::from(matches!(p.functions[0].result.as_str(),"ByteResult")));}
+    trapped(&execute(&byte_program("bytes_get"),"main",&[byte_value(&[]),Value::integer("Usize",0)],Limits::default()),"E_INDEX_OUT_OF_BOUNDS");
+}
+#[test]
+fn invalid_byte_inputs_precede_fault_injection_and_heap_limits_are_traps(){
+    for(symbol,args)in [("bytes_slice",vec![byte_value(&[1]),Value::integer("Usize",u64::MAX as i128),Value::integer("Usize",2)]),("string_from_utf8",vec![byte_value(&[0xff])])]{let e=il_interpreter::execute_with_policy(&byte_program(symbol),"main",&args,Limits::default(),&faults(Some(1),None,None));assert_eq!(e.status,ExecutionStatus::Returned,"{:?}",e.diagnostics);let v=serde_json::to_value(e.value).unwrap();assert_eq!(v["data"]["value"]["fields"][0]["data"]["value"]["tag"],"InvalidData");assert_eq!(e.live_allocations,0);}
+    let p=byte_program("bytes_from_u8");let args=[Value::integer("U8",1)];let e=il_interpreter::execute_with_policy(&p,"main",&args,Limits::default(),&faults(Some(0),None,None));let v=serde_json::to_value(e.value).unwrap();assert_eq!(v["data"]["value"]["fields"][0]["data"]["value"]["tag"],"Other");
+    let p=byte_program("bytes_concat");trapped(&execute(&p,"main",&[byte_value(&[1,2]),byte_value(&[3])],Limits{max_heap_bytes:3,..Limits::default()}),"E_RESOURCE_LIMIT");
+}

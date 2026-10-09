@@ -35,3 +35,7 @@ tempfile.workspace = true
 [[test]]
 name = "package_sources"
 path = "../../tests/runtime_host/package_sources.rs"
+
+[[test]]
+name = "http_packages"
+path = "../../tests/runtime_host/http_packages.rs"

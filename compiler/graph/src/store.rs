@@ -349,7 +349,14 @@ pub fn entity_index(graph: &Graph) -> StoreResult<BTreeMap<String, serde_json::V
     for value in &graph.types { add(&mut index, &value.entity_id, value)?; }
     for value in &graph.capabilities { add(&mut index, &value.entity_id, value)?; }
     for value in &graph.packages { add(&mut index, &value.entity_id, value)?; }
-    for value in &graph.contracts { add(&mut index, &value.entity_id, value)?; }
+    for value in &graph.contracts {
+        add(&mut index, &value.entity_id, value)?;
+        for predicate in &value.predicates {
+            if let ContractPredicate::HttpServer { routes, .. } = predicate {
+                for route in routes { add(&mut index, &route.entity_id, route)?; }
+            }
+        }
+    }
     for function in &graph.functions {
         add(&mut index, &function.entity_id, function)?;
         for parameter in &function.parameters { add(&mut index, &parameter.entity_id, parameter)?; }
@@ -366,6 +373,22 @@ pub fn entity_index(graph: &Graph) -> StoreResult<BTreeMap<String, serde_json::V
 }
 
 pub fn entity_references(graph: &Graph, id: &str) -> Vec<String> {
+    for contract in &graph.contracts {
+        let mut references = vec![contract.subject.clone()];
+        for predicate in &contract.predicates {
+            match predicate {
+                ContractPredicate::HttpServer { entry, capability, routes, .. } => {
+                    references.extend([entry.clone(), capability.clone()]);
+                    references.extend(routes.iter().map(|r| r.entity_id.clone()));
+                    if let Some(route) = routes.iter().find(|r| r.entity_id == id) { return vec![route.handler.clone()]; }
+                }
+                ContractPredicate::RequiresCapability { capability } => references.push(capability.clone()),
+                ContractPredicate::Returns { type_ref } if !is_builtin_type(type_ref) => references.push(type_ref.clone()),
+                _ => {}
+            }
+        }
+        if contract.entity_id == id { references.sort(); references.dedup(); return references; }
+    }
     if let Some(module) = graph.modules.iter().find(|module| module.entity_id == id) { return module.imports.iter().chain(&module.declarations).cloned().collect(); }
     if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == id) { return ty.parameters.iter().chain(ty.fields.iter().map(|f| &f.type_ref)).chain(ty.variants.iter().flat_map(|v| &v.fields)).filter(|name| !is_builtin_type(name)).cloned().collect(); }
     if let Some(function) = graph.functions.iter().find(|function| function.entity_id == id) {

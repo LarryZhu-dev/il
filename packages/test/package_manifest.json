@@ -1,0 +1,37 @@
+{
+  "package_manifest": {
+    "name": "test",
+    "version": "0.1.0",
+    "stage": "P07",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core"
+    ]
+  },
+  "public_types": [
+    "test.TestError",
+    "test.Result"
+  ],
+  "public_functions": [
+    "test.assert_true",
+    "test.assert_i64",
+    "test.assert_bytes"
+  ],
+  "error_types": [
+    "test.TestError"
+  ],
+  "effects": [],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/http_packages.rs"
+  ],
+  "blackbox_tests": [
+    "tests/http_blackbox/cli.py"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

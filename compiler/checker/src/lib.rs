@@ -2,9 +2,10 @@
 pub mod runtime;
 mod types;
 mod ownership;
+mod http;
 
 pub use runtime::*;
-pub use types::{is_owned_type, contains_file_type};
+pub use types::{is_owned_type, resource_cleanup_effects};
 
 use il_graph::*;
 use std::cell::RefCell;
@@ -23,6 +24,7 @@ pub fn check_with_capabilities(graph: &Graph, injected: &[Capability]) -> Vec<Di
     let owners = graph.modules.iter().flat_map(|module| module.declarations.iter().map(move |declaration| (declaration.as_str(), module))).collect();
     let context = Context { graph, types: Types::new(graph), owners, injected, diagnostics: RefCell::new(vec![]) };
     context.declarations();
+    context.diagnostics.borrow_mut().extend(http::check(graph));
     for function in &graph.functions { context.function(function); }
     let mut diagnostics = context.diagnostics.into_inner();
     let mut seen = BTreeSet::new();
@@ -91,7 +93,7 @@ impl Context<'_> {
         }
         for ty in &self.graph.types {
             let valid = match ty.entity_id.as_str() {
-                "core.File" => ty.kind == TypeKind::Record && ty.layout == Layout::Opaque
+                name if ResourceKind::from_nominal(name).is_some() => ty.kind == TypeKind::Record && ty.layout == Layout::Opaque
                     && ty.parameters.is_empty() && ty.integer.is_none() && ty.variants.is_empty()
                     && ty.fields == [Field { name:"slot".into(), type_ref:"U64".into() }, Field { name:"generation".into(), type_ref:"U64".into() }],
                 "core.Deadline" => ty.kind == TypeKind::Sum && ty.layout == Layout::Inferred
@@ -100,7 +102,7 @@ impl Context<'_> {
                 _ => true,
             };
             if !valid { self.error("E_TYPE_MISMATCH", &ty.entity_id, "runtime nominal type differs from its locked ABI"); }
-            if ty.layout == Layout::Opaque && ty.entity_id != "core.File" {
+            if ty.layout == Layout::Opaque && ResourceKind::from_nominal(&ty.entity_id).is_none() {
                 self.error("E_UNSUPPORTED_FEATURE", &ty.entity_id, "opaque resource type has no implemented runtime ABI");
             }
         }
@@ -312,7 +314,7 @@ impl Context<'_> {
             }
             Opcode::EndBorrow | Opcode::Drop => {
                 self.signature(operation, values, &[one_in.into()], &empty);
-                if operation.opcode == Opcode::Drop { self.move_owned(&mut facts, &operation.inputs, values); if contains_file_type(self.graph, one_in) { facts.effects.insert(Effect::Fs); } }
+                if operation.opcode == Opcode::Drop { self.move_owned(&mut facts, &operation.inputs, values); facts.effects.extend(resource_cleanup_effects(self.graph, one_in)); }
             }
             Opcode::Branch => {
                 if !outputs.is_empty() { self.error("E_TYPE_MISMATCH", &operation.entity_id, "branch cannot produce values"); }

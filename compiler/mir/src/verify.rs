@@ -131,7 +131,7 @@ impl State {
 
     fn cleanup(&mut self, program: &Program, diagnostics: &mut Vec<Diagnostic>, entity: &str, actions: &[DropAction], all: bool, function: &Function, graph: &Graph) {
         let expected = self.expected_cleanup(all);
-        if !function.effects.contains(&Effect::Fs) && expected.iter().chain(actions).any(|action| il_checker::contains_file_type(graph, &action.type_ref)) { error(program, diagnostics, "E_EFFECT_UNDECLARED", entity, "implicit File cleanup requires fs effect"); }
+        for action in expected.iter().chain(actions) { for effect in il_checker::resource_cleanup_effects(graph, &action.type_ref) { if !function.effects.contains(&effect) { error(program, diagnostics, "E_EFFECT_UNDECLARED", entity, format!("implicit resource cleanup requires {effect:?} effect")); } } }
         let expected_ids: BTreeSet<_> = expected.iter().map(|action| &action.value_id).collect();
         let actual_ids: BTreeSet<_> = actions.iter().map(|action| &action.value_id).collect();
         if expected_ids.difference(&actual_ids).next().is_some() { error(program, diagnostics, "E_MIR_MISSING_DROP", entity, "MIR omits cleanup for a live owned value"); }

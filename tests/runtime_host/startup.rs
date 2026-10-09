@@ -45,3 +45,9 @@ fn closed_standard_stream_child(){
 }
 #[test]
 fn authority_and_capture_never_repurpose_closed_reserved_descriptors(){let result=std::process::Command::new(std::env::current_exe().unwrap()).args(["--exact","closed_standard_stream_child"]).env("IL_TEST_CLOSED_STDIN","1").output().unwrap();assert!(result.status.success(),"{result:?}");}
+
+#[test]
+fn network_policy_accepts_only_exact_canonical_numeric_endpoints(){
+    for endpoint in ["127.0.0.1:8080","[::1]:8080"]{let policy=HostPolicy{schema_version:"1.0.0".into(),grants:vec![grant("listen",CapabilityKind::Listen,Some(endpoint.into()))],test_faults:None};policy.validate().unwrap();let requirements=policy.grants.clone();let checked=ValidatedPolicy::new(policy,&requirements,false).unwrap();assert_eq!(checked.endpoint(GrantId(0),CapabilityKind::Listen).unwrap().to_string(),endpoint);assert!(checked.endpoint(GrantId(0),CapabilityKind::Connect).is_err());}
+    for endpoint in ["localhost:8080","127.0.0.1:0","127.0.0.1:08080","127.0.0.1:65536","http://127.0.0.1:8080","127.000.0.1:8080","[0:0:0:0:0:0:0:1]:8080","[::1]:0"]{let policy=HostPolicy{schema_version:"1.0.0".into(),grants:vec![grant("listen",CapabilityKind::Listen,Some(endpoint.into()))],test_faults:None};assert!(policy.validate().is_err(),"{endpoint}");}
+}

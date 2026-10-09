@@ -40,20 +40,21 @@ impl Lower{
                 let result=b.call(symbol(callee),arguments,layout.scalar().is_some());self.entity_call(b,"location",ctx.clone(),&op.entity_id);if layout.scalar().is_some(){Some(result)}else{None}
             }
             Opcode::RuntimeCall=>{
-                let Attributes::RuntimeCall{symbol,capability}=&op.attributes else{unreachable!()};match symbol.as_str(){
+                let Attributes::RuntimeCall{symbol,capability}=&op.attributes else{unreachable!()};
+                let signature=il_checker::runtime_signature(symbol).ok_or_else(||self.error(&op.entity_id,"E_UNSUPPORTED_FEATURE","unknown runtime signature"))?;
+                for(index,parameter)in signature.parameters.iter().enumerate(){if parameter.passing==il_checker::Passing::Owned{self.trace(b,ctx.clone(),1,&types[&op.inputs[index]],input[index].clone(),&op.entity_id);}}
+                match symbol.as_str(){
                     "string_len"|"bytes_len"=>{let pointer=b.offset(input[0].clone(),8);Some(b.load(pointer,Type::int(64),8))},
                     "print_i64"|"print_string"=>{let value=if symbol=="print_i64"{load(b,0,&self.program.layouts)}else{input[0].clone()};let status=if self.full(){b.rt(if symbol=="print_i64"{"print_i64"}else{"print_buffer"},vec![ctx.clone(),value],true)}else{b.call("il_min_print_i64",vec![value],true)};self.runtime_result(b,output.clone().unwrap(),&layout,status,None);None},
                     "string_concat"=>{let buffer=b.alloca(&self.program.layouts["String"]);let(p,n)=self.text(&op.entity_id);let status=b.rt("concat",vec![ctx.clone(),buffer.clone(),input[0].clone(),input[1].clone(),p,n],true);self.runtime_result(b,output.clone().unwrap(),&layout,status,Some(buffer));None},
-                    "clock_now"=>{let index=self.program.requirements.iter().position(|r|Some(&r.entity_id)==capability.as_ref()).ok_or_else(||self.error(&op.entity_id,"E_CAPABILITY_MISSING","runtime requirement selector missing"))?;Some(b.rt("clock_now",vec![ctx.clone(),Operand::int(64,index)],true))},
-                    "file_open_read"|"file_open_write"|"file_read"|"file_write"|"file_read_some"|"file_write_some"|"file_close"|"stdin_read"|"stdout_write"|"stderr_write"=>{
-                        let Shape::Sum{variants,..}=&layout.shape else{unreachable!()};let success_ty=variants[0].fields[0].clone();let success=if self.program.layouts[&success_ty].size>0{Some(b.alloca(&self.program.layouts[&success_ty]))}else{None};
-                        let mut arguments=vec![ctx.clone()];if let Some(pointer)=&success{arguments.push(pointer.clone());}
-                        if matches!(symbol.as_str(),"file_open_read"|"file_open_write"|"file_read"|"file_write"){let index=self.program.requirements.iter().position(|r|Some(&r.entity_id)==capability.as_ref()).ok_or_else(||self.error(&op.entity_id,"E_CAPABILITY_MISSING","runtime requirement selector missing"))?;arguments.push(Operand::int(64,index));}
-                        if symbol=="file_close"{self.trace(b,ctx.clone(),1,&types[&op.inputs[0]],input[0].clone(),&op.entity_id);}
+                    _=>{
+                        let mut arguments=vec![ctx.clone()];let mut success=None;
+                        if let il_checker::RuntimeResult::Result{success:success_ty,..}=signature.result{if self.program.layouts[success_ty].size>0{let pointer=b.alloca(&self.program.layouts[success_ty]);arguments.push(pointer.clone());success=Some(pointer);}}
+                        if signature.capability.is_some(){let index=self.program.requirements.iter().position(|r|Some(&r.entity_id)==capability.as_ref()).ok_or_else(||self.error(&op.entity_id,"E_CAPABILITY_MISSING","runtime requirement selector missing"))?;arguments.push(Operand::int(64,index));}
                         for(index,pointer)in input.iter().enumerate(){let physical=&self.program.layouts[&types[&op.inputs[index]]];arguments.push(if let Some(ty)=physical.scalar(){b.load(pointer.clone(),ty,physical.align)}else{pointer.clone()});}
-                        let status=b.rt(symbol,arguments,true);self.runtime_result(b,output.clone().unwrap(),&layout,status,success);None
+                        let result=b.rt(symbol,arguments,true);
+                        match signature.result{il_checker::RuntimeResult::Result{..}=>{self.runtime_result(b,output.clone().unwrap(),&layout,result,success);None},il_checker::RuntimeResult::Exact("Bool")=>Some(b.cast(result,1,8,false)),il_checker::RuntimeResult::Exact(_)=>Some(result)}
                     },
-                    _=>return Err(self.error(&op.entity_id,"E_UNSUPPORTED_FEATURE","runtime symbol has no native lowering")),
                 }
             }
             _=>return Err(self.error(&op.entity_id,"E_SCHEMA_INVALID","terminator cannot be a native operation")),

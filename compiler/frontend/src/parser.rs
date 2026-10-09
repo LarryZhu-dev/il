@@ -9,12 +9,20 @@ mod lowering;
 type Result<T> = std::result::Result<T, Diagnostic>;
 
 pub fn parse(source: &str, revision: u64) -> std::result::Result<Graph, Vec<Diagnostic>> {
-    let tokens = lex(source).map_err(|(offset, message)| vec![diagnostic(revision, "E_SCHEMA_INVALID", offset, &message)])?;
+    let tokens = lex(source).map_err(|error| vec![diagnostic(revision, error.code, error.offset, &error.message)])?;
     let mut parser = Parser { tokens, at: 0, revision, counter: 0, graph: Graph::empty(),
         names: BTreeMap::new(), pending: vec![], depth: 0 };
     parser.graph.revision = revision;
     parser.document().map_err(|error| vec![error])?;
     parser.finish().map_err(|error| vec![error])?;
+    for function in parser.graph.functions.iter().filter(|f| f.blocks.is_empty()) {
+        if !parser.graph.contracts.iter().any(|c| c.subject == function.entity_id && function.contracts.contains(&c.entity_id)
+            && c.predicates.iter().any(|p| matches!(p, ContractPredicate::HttpServer { .. }))) {
+            return Err(vec![Diagnostic::error("E_MISSING_RETURN", Some(&function.entity_id), "function declaration requires an implementing http_server contract", revision)]);
+        }
+    }
+    let diagnostics = il_graph::http::elaborate(&mut parser.graph);
+    if !diagnostics.is_empty() { return Err(diagnostics); }
     Ok(parser.graph)
 }
 
@@ -270,6 +278,10 @@ impl Parser {
         if self.eat("effects") { effects = self.effects()?; }
         if self.eat("capabilities") { capabilities = self.list()?; }
         if self.eat("contracts") { contracts = self.list()?; }
+        if self.eat(";") {
+            self.graph.functions.push(Function { entity_id: id.clone(), name, parameters, result, effects, capabilities, contracts, blocks: vec![] });
+            return Ok(id);
+        }
         self.expect("{")?;
         let start = self.at; let mut braces = 1;
         while braces > 0 {
@@ -299,6 +311,16 @@ impl Parser {
         resolve_name(&self.graph, &self.names, scope, name)
     }
     fn finish(&mut self) -> Result<()> {
+        let mut nodes = self.graph.modules.len() + self.graph.capabilities.len() + self.graph.packages.len()
+            + self.graph.functions.iter().map(|f| 1 + f.parameters.len()).sum::<usize>()
+            + self.graph.types.iter().map(|t| 1 + t.parameters.len() + t.fields.len()
+                + t.variants.iter().map(|v| 1 + v.fields.len()).sum::<usize>()).sum::<usize>()
+            + self.graph.contracts.iter().map(|c| 1 + c.predicates.len()
+                + c.predicates.iter().map(|p| match p { ContractPredicate::HttpServer { routes, .. } =>
+                    routes.iter().map(|r| 1 + r.parameters.len()).sum(), _ => 0 }).sum::<usize>()).sum::<usize>();
+        if nodes > 100_000 || self.graph.types.len() > 256 {
+            return Err(self.error("E_RESOURCE_LIMIT", "declaration graph budget exceeded"));
+        }
         let graph = self.graph.clone();
         for ty in &mut self.graph.types {
             for reference in ty.parameters.iter_mut().chain(ty.fields.iter_mut().map(|field| &mut field.type_ref)).chain(ty.variants.iter_mut().flat_map(|variant| variant.fields.iter_mut())) {
@@ -318,7 +340,7 @@ impl Parser {
         }
         for (pending, body) in pending.into_iter().zip(bodies) {
             let function = self.graph.functions[pending.function].clone();
-            let blocks = lowering::lower(&mut self.graph, &self.names, &pending.scope, &function, body)?;
+            let blocks = lowering::lower(&mut self.graph, &self.names, &pending.scope, &function, body, &mut nodes)?;
             self.graph.functions[pending.function].blocks = blocks;
         }
         Ok(())

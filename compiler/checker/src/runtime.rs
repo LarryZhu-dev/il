@@ -27,7 +27,29 @@ const FILE_OWNED: RuntimeParameter = RuntimeParameter { type_ref: "core.File", p
 const USIZE_COPY: RuntimeParameter = RuntimeParameter { type_ref: "Usize", passing: Passing::Copy };
 const DEADLINE_COPY: RuntimeParameter = RuntimeParameter { type_ref: "core.Deadline", passing: Passing::Copy };
 
+const LISTENER_SHARED: RuntimeParameter = RuntimeParameter { type_ref: "net.Listener", passing: Passing::Shared };
+const LISTENER_OWNED: RuntimeParameter = RuntimeParameter { type_ref: "net.Listener", passing: Passing::Owned };
+const STREAM_SHARED: RuntimeParameter = RuntimeParameter { type_ref: "net.Stream", passing: Passing::Shared };
+const STREAM_OWNED: RuntimeParameter = RuntimeParameter { type_ref: "net.Stream", passing: Passing::Owned };
+const U8_COPY: RuntimeParameter = RuntimeParameter { type_ref: "U8", passing: Passing::Copy };
+
 pub static RUNTIME_SIGNATURES: &[RuntimeSignature] = &[
+    RuntimeSignature { symbol: "net_listen", parameters: &[], result: RuntimeResult::Result { success: "net.Listener", error: "core.IoError" }, effects: &[Effect::Net], capability: Some(CapabilityKind::Listen) },
+    RuntimeSignature { symbol: "net_connect", parameters: &[DEADLINE_COPY], result: RuntimeResult::Result { success: "net.Stream", error: "core.IoError" }, effects: &[Effect::Net], capability: Some(CapabilityKind::Connect) },
+    RuntimeSignature { symbol: "net_accept", parameters: &[LISTENER_SHARED, DEADLINE_COPY], result: RuntimeResult::Result { success: "net.Stream", error: "core.IoError" }, effects: &[Effect::Net], capability: None },
+    RuntimeSignature { symbol: "net_read", parameters: &[STREAM_SHARED, USIZE_COPY, DEADLINE_COPY], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Net, Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "net_write", parameters: &[STREAM_SHARED, BYTES_SHARED, USIZE_COPY, DEADLINE_COPY], result: RuntimeResult::Result { success: "Usize", error: "core.IoError" }, effects: &[Effect::Net], capability: None },
+    RuntimeSignature { symbol: "net_close_listener", parameters: &[LISTENER_OWNED], result: RuntimeResult::Result { success: "Unit", error: "core.IoError" }, effects: &[Effect::Net], capability: None },
+    RuntimeSignature { symbol: "net_close_stream", parameters: &[STREAM_OWNED], result: RuntimeResult::Result { success: "Unit", error: "core.IoError" }, effects: &[Effect::Net], capability: None },
+    RuntimeSignature { symbol: "bytes_slice", parameters: &[BYTES_SHARED, USIZE_COPY, USIZE_COPY], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "bytes_concat", parameters: &[BYTES_SHARED, BYTES_SHARED], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "bytes_from_u8", parameters: &[U8_COPY], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "string_to_bytes", parameters: &[STRING_SHARED], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "string_from_utf8", parameters: &[BYTES_SHARED], result: RuntimeResult::Result { success: "String", error: "core.IoError" }, effects: &[Effect::Alloc], capability: None },
+    RuntimeSignature { symbol: "bytes_get", parameters: &[BYTES_SHARED, USIZE_COPY], result: RuntimeResult::Exact("U8"), effects: &[], capability: None },
+    RuntimeSignature { symbol: "bytes_equal", parameters: &[BYTES_SHARED, BYTES_SHARED], result: RuntimeResult::Exact("Bool"), effects: &[], capability: None },
+    RuntimeSignature { symbol: "string_equal", parameters: &[STRING_SHARED, STRING_SHARED], result: RuntimeResult::Exact("Bool"), effects: &[], capability: None },
+    RuntimeSignature { symbol: "net_opened_at", parameters: &[STREAM_SHARED], result: RuntimeResult::Exact("U64"), effects: &[Effect::Net], capability: None },
     RuntimeSignature { symbol: "file_open_read", parameters: &[STRING_SHARED], result: RuntimeResult::Result { success: "core.File", error: "core.IoError" }, effects: &[Effect::Fs], capability: Some(CapabilityKind::FileRead) },
     RuntimeSignature { symbol: "file_open_write", parameters: &[STRING_SHARED], result: RuntimeResult::Result { success: "core.File", error: "core.IoError" }, effects: &[Effect::Fs], capability: Some(CapabilityKind::FileWrite) },
     RuntimeSignature { symbol: "file_read_some", parameters: &[FILE_SHARED, USIZE_COPY, DEADLINE_COPY], result: RuntimeResult::Result { success: "Bytes", error: "core.IoError" }, effects: &[Effect::Fs, Effect::Alloc], capability: None },

@@ -1,0 +1,32 @@
+{
+  "package_manifest": {
+    "name": "time",
+    "version": "0.1.0",
+    "stage": "P07",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core"
+    ]
+  },
+  "public_types": [],
+  "public_functions": [
+    "time.deadline_after_ms",
+    "time.elapsed_ns",
+    "time.expired"
+  ],
+  "error_types": [],
+  "effects": [],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/http_packages.rs"
+  ],
+  "blackbox_tests": [
+    "tests/http_blackbox/cli.py"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

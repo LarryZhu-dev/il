@@ -230,7 +230,7 @@ fn template(parser: &Parser, scope: &str, content: &str) -> Result<Vec<Expr>> {
             if depth > 0 { at += 1; }
         }
         if depth != 0 { return Err(parser.error("E_SCHEMA_INVALID", "unterminated template interpolation")); }
-        let tokens = lex(&content[start + 2..at]).map_err(|(_, message)| parser.error("E_SCHEMA_INVALID", &message))?;
+        let tokens = lex(&content[start + 2..at]).map_err(|error| parser.error(error.code, &error.message))?;
         let mut nested = Parser { tokens, at: 0, revision: parser.revision, counter: parser.counter,
             graph: parser.graph.clone(), names: parser.names.clone(), pending: vec![], depth: parser.depth };
         parts.push(expression(&mut nested, scope, 0)?);

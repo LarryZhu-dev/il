@@ -64,6 +64,8 @@ fn host_graph(symbol:&str)->il_graph::Graph{
         TypeDef{entity_id:"core.IoError".into(),kind:TypeKind::Sum,layout:Layout::Inferred,parameters:vec![],integer:None,fields:vec![],variants:il_checker::runtime_error_variants("core.IoError").unwrap().iter().map(|name|Variant{name:(*name).into(),fields:vec![]}).collect()},
     ]);
     graph.capabilities=vec![Capability{entity_id:"host.write".into(),kind:CapabilityKind::FileWrite,scope:Some("/tmp".into())},Capability{entity_id:"host.read".into(),kind:CapabilityKind::FileRead,scope:Some("/tmp".into())},Capability{entity_id:"host.clock".into(),kind:CapabilityKind::ClockRead,scope:None}];
+    for kind in [ResourceKind::Listener,ResourceKind::Stream]{graph.types.push(TypeDef{entity_id:kind.nominal_type().into(),kind:TypeKind::Record,layout:Layout::Opaque,parameters:vec![],integer:None,fields:vec![Field{name:"slot".into(),type_ref:"U64".into()},Field{name:"generation".into(),type_ref:"U64".into()}],variants:vec![]});}
+    if let Some(kind)=signature.capability{if matches!(kind,CapabilityKind::Listen|CapabilityKind::Connect){graph.capabilities.push(Capability{entity_id:"host.socket".into(),kind,scope:Some("127.0.0.1:8080".into())});}}
     let selected=signature.capability.and_then(|kind|graph.capabilities.iter().find(|c|c.kind==kind).map(|c|c.entity_id.clone()));
     let result=match signature.result{il_checker::RuntimeResult::Exact(ty)=>ty.to_owned(),il_checker::RuntimeResult::Result{success,error}=>{graph.types.push(TypeDef{entity_id:"app.Result".into(),kind:TypeKind::Result,layout:Layout::Inferred,parameters:vec![success.into(),error.into()],integer:None,fields:vec![],variants:vec![]});"app.Result".into()}};
     let parameters:Vec<_>=signature.parameters.iter().enumerate().map(|(index,p)|Parameter{entity_id:format!("host.input{index}"),name:format!("input{index}"),type_ref:p.type_ref.into()}).collect();
@@ -92,9 +94,22 @@ fn native_authorization_rejects_forged_tables_selectors_and_policy_inputs(){
     let mut bad=original;let main=bad.functions.iter_mut().find(|f|f.symbol=="main").unwrap();let entry=&mut main.blocks[0].instructions;let auth=entry.iter().position(|i|matches!(&i.operation,InstructionKind::Call{symbol,..}if symbol=="il_rt_authorize")).unwrap();let call=entry.remove(auth);entry.push(call);assert!(!verify(&bad).is_empty());
 }
 #[test]
-fn captured_file_arguments_are_output_only_even_for_record_forgery(){
+fn captured_resource_arguments_are_output_only_even_for_record_forgery(){
     use il_execution_model::{ValueData,ResourceValue};
-    let mut graph=host_graph("file_close");let function=graph.functions.iter_mut().find(|f|f.entity_id=="host").unwrap();function.blocks[0].operations.clear();function.result="core.File".into();function.blocks[0].terminator.inputs=vec![function.parameters[0].entity_id.clone()];function.blocks[0].terminator.consumes=function.blocks[0].terminator.inputs.clone();
-    let mir=il_mir::lower_with_capabilities(&il_hir::lower_with_capabilities(&graph,&graph.capabilities).unwrap(),&graph.capabilities).unwrap();
-    for data in [ValueData::Resource(ResourceValue{kind:"file".into(),slot:0,generation:1}),ValueData::Record(vec![Value::integer("U64",0),Value::integer("U64",1)])]{let result=lower(&mir,&BuildOptions{runtime_profile:RuntimeProfile::Full,mode:BuildMode::Captured{entry:"host".into(),arguments:vec![Value{type_ref:"core.File".into(),data}],limits:Limits::default()}},&graph.capabilities);assert_eq!(result.unwrap_err()[0].code,"E_UNSUPPORTED_FEATURE");}
+    for (kind,close) in [(il_graph::ResourceKind::File,"file_close"),(il_graph::ResourceKind::Listener,"net_close_listener"),(il_graph::ResourceKind::Stream,"net_close_stream")]{
+        let mut graph=host_graph(close);let function=graph.functions.iter_mut().find(|f|f.entity_id=="host").unwrap();function.blocks[0].operations.clear();function.result=kind.nominal_type().into();function.blocks[0].terminator.inputs=vec![function.parameters[0].entity_id.clone()];function.blocks[0].terminator.consumes=function.blocks[0].terminator.inputs.clone();
+        let mir=il_mir::lower_with_capabilities(&il_hir::lower_with_capabilities(&graph,&graph.capabilities).unwrap(),&graph.capabilities).unwrap();
+        for data in [ValueData::Resource(ResourceValue{kind,slot:0,generation:1}),ValueData::Record(vec![Value::integer("U64",0),Value::integer("U64",1)])]{let result=lower(&mir,&BuildOptions{runtime_profile:RuntimeProfile::Full,mode:BuildMode::Captured{entry:"host".into(),arguments:vec![Value{type_ref:kind.nominal_type().into(),data}],limits:Limits::default()}},&graph.capabilities);assert_eq!(result.unwrap_err()[0].code,"E_UNSUPPORTED_FEATURE");}
+    }
+}
+
+#[test]
+fn network_and_byte_primitives_preserve_nominal_abi_and_constant_authority(){
+    for symbol_name in ["net_opened_at","net_listen","net_connect","net_accept","net_read","net_write","net_close_listener","net_close_stream","bytes_get","bytes_slice","bytes_concat","bytes_from_u8","string_to_bytes","string_from_utf8","bytes_equal","string_equal"]{
+        let p=lower_host(symbol_name);assert!(verify(&p).is_empty());
+        for kind in [il_graph::ResourceKind::File,il_graph::ResourceKind::Listener,il_graph::ResourceKind::Stream]{let layout=&p.layouts[kind.nominal_type()];assert_eq!(layout.size,16);assert_eq!(layout.align,8);assert_eq!(layout.shape,Shape::Resource{resource:kind});assert!(!p.functions.iter().any(|f|f.symbol==format!("il_clone_{}",symbol(kind.nominal_type()))));}
+        if matches!(symbol_name,"bytes_equal"|"string_equal"){let signature=&p.externs.iter().find(|e|e.symbol==format!("il_rt_{symbol_name}")).unwrap().signature;assert_eq!(signature.result,Type::int(1));assert!(p.functions[1].blocks.iter().flat_map(|b|&b.instructions).any(|i|matches!(i.operation,InstructionKind::Convert{bits:8,..})));}
+        if matches!(symbol_name,"net_listen"|"net_connect"){let mut bad=p.clone();let call=bad.functions.iter_mut().flat_map(|f|&mut f.blocks).flat_map(|b|&mut b.instructions).find(|i|matches!(&i.operation,InstructionKind::Call{symbol,..}if symbol==&format!("il_rt_{symbol_name}"))).unwrap();if let InstructionKind::Call{arguments,..}=&mut call.operation{arguments[2]=Operand::int(64,0);}assert!(!verify(&bad).is_empty());}
+        let mut bad=p;bad.layouts.get_mut("net.Listener").unwrap().shape=Shape::Resource{resource:il_graph::ResourceKind::Stream};assert!(!verify(&bad).is_empty());
+    }
 }

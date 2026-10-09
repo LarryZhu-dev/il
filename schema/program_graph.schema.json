@@ -430,6 +430,97 @@
                     "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "entry",
+                  "bind",
+                  "capability",
+                  "routes"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "http_server"
+                  },
+                  "entry": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  },
+                  "bind": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "capability": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                  },
+                  "routes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "entity_id",
+                        "method",
+                        "path",
+                        "handler",
+                        "parameters"
+                      ],
+                      "properties": {
+                        "entity_id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                        },
+                        "method": {
+                          "const": "GET"
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "handler": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                        },
+                        "parameters": {
+                          "type": "array",
+                          "maxItems": 1,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "name",
+                              "type_ref",
+                              "source",
+                              "max_utf8_bytes"
+                            ],
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+                              },
+                              "type_ref": {
+                                "const": "String"
+                              },
+                              "source": {
+                                "const": "path"
+                              },
+                              "max_utf8_bytes": {
+                                "const": 128
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             ]
           }

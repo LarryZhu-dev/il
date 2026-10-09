@@ -1,6 +1,6 @@
 use crate::numbers;
 use il_execution_model::*;
-use il_graph::{Attributes, Diagnostic, Graph, Literal, Opcode, Operation, TypeDef, TypeKind};
+use il_graph::{Attributes, Diagnostic, Graph, Literal, Opcode, Operation, TypeDef, TypeKind, ResourceKind};
 use il_mir::{DropAction, Program, Terminator};
 use il_runtime_allocator::{AllocFailure,Allocator,OwnedBuffer};
 use il_runtime_handles::{Deadline,HandleId,HostResources,IoError,IoFailure};
@@ -12,9 +12,9 @@ type Run<T> = Result<T, Fault>;
 type Frame = BTreeMap<String, RValue>;
 
 #[derive(Clone)]
-struct RValue { ty: String, data: Rc<Data>, allocations: Vec<u64>, handles: Vec<HandleId>, borrowed: bool }
+struct RValue { ty: String, data: Rc<Data>, allocations: Vec<u64>, handles: Vec<(ResourceKind,HandleId)>, borrowed: bool }
 enum Data {
-    Unit, Bool(bool), Integer(i128), String(String), Bytes(Vec<u8>), File(HandleId),
+    Unit, Bool(bool), Integer(i128), String(String), Bytes(Vec<u8>), Resource { kind:ResourceKind, handle:HandleId },
     Record(Vec<RValue>), Tuple(Vec<RValue>), Variant(String, Vec<RValue>),
 }
 impl RValue {
@@ -238,7 +238,7 @@ impl Machine<'_> {
             Data::Unit=>ValueData::Unit,Data::Bool(v)=>ValueData::Bool(*v),Data::Integer(v)=>ValueData::Integer(v.to_string()),
             Data::String(_)=>ValueData::String(String::new()),Data::Bytes(_)=>ValueData::Bytes(vec![]),
             Data::Record(_)=>ValueData::Record(vec![]),Data::Tuple(_)=>ValueData::Tuple(vec![]),
-            Data::File(h)=>ValueData::Resource(ResourceValue{kind:"file".into(),slot:h.slot,generation:h.generation}),
+            Data::Resource{kind,handle:h}=>ValueData::Resource(ResourceValue{kind:*kind,slot:h.slot,generation:h.generation}),
             Data::Variant(tag,_)=>ValueData::Variant(VariantValue{tag:tag.clone(),fields:vec![]}),
         };
         let overhead=serde_json::to_vec(&Value{type_ref:value.ty.clone(),data:skeleton}).map_err(|_|("E_STATE_INCONSISTENT","value serialization failed".into()))?.len() as u64;
@@ -252,7 +252,7 @@ impl Machine<'_> {
         let data = match &*value.data {
             Data::Unit => ValueData::Unit, Data::Bool(v) => ValueData::Bool(*v),
             Data::Integer(v) => ValueData::Integer(v.to_string()),
-            Data::File(h) => {self.host.validate_handle(*h).map_err(io_fault)?;ValueData::Resource(ResourceValue{kind:"file".into(),slot:h.slot,generation:h.generation})},
+            Data::Resource{kind,handle:h} => {self.host.validate_handle(*h,*kind).map_err(io_fault)?;ValueData::Resource(ResourceValue{kind:*kind,slot:h.slot,generation:h.generation})},
             Data::String(v) => ValueData::String(v.clone()),
             Data::Bytes(v) => ValueData::Bytes(v.clone()),
             Data::Record(v) => ValueData::Record(v.iter().map(|v| self.export(v,depth+1,nodes)).collect::<Run<_>>()?),
@@ -265,7 +265,7 @@ impl Machine<'_> {
         if depth > 64 || *nodes > 100_000 { return Err(("E_RESOURCE_LIMIT","clone shape budget exceeded".into())); }
         if !self.types.owned.contains(&value.ty) { let mut v=value.clone();v.borrowed=false;return Ok(v); }
         let fields = match &*value.data {
-            Data::File(_)=>return Err(("E_UNSUPPORTED_FEATURE","File cannot be cloned".into())),
+            Data::Resource{..}=>return Err(("E_UNSUPPORTED_FEATURE","resource cannot be cloned".into())),
             Data::String(v) => return self.allocate(&value.ty,Data::String(v.clone()),v.len() as u64,entity),
             Data::Bytes(v) => return self.allocate(&value.ty,Data::Bytes(v.clone()),v.len() as u64,entity),
             Data::Record(v) | Data::Tuple(v) | Data::Variant(_,v) => v.iter().map(|v| self.duplicate(v,entity,depth+1,nodes)).collect::<Run<Vec<_>>>()?,
@@ -291,7 +291,7 @@ impl Machine<'_> {
         for id in &v.allocations {
             self.allocations.remove(id).ok_or(("E_DOUBLE_DROP","allocation already freed".into()))?;
         }
-        for handle in &v.handles { let _ = self.host.drop_handle(*handle); self.host_events()?; }
+        for (kind,handle) in &v.handles { let _ = self.host.drop_handle(*handle,*kind); self.host_events()?; }
         frame.remove(id); Ok(())
     }
     fn cleanup(&mut self,frame:&mut Frame,actions:&[DropAction]) -> Run<()> {
@@ -403,7 +403,7 @@ impl Machine<'_> {
                 self.location(&op.entity_id)?; if op.outputs.is_empty() { vec![] } else { vec![value] }
             }
             RuntimeCall => {
-                if matches!(&op.attributes,Attributes::RuntimeCall{symbol,..} if symbol=="file_close"){self.transfer(frame,&op.inputs[0],&op.entity_id)?;}
+                if let Attributes::RuntimeCall{symbol,..}=&op.attributes{let signature=il_checker::runtime_signature(symbol).ok_or(("E_UNSUPPORTED_FEATURE","unknown runtime signature".into()))?;for (id,parameter) in op.inputs.iter().zip(signature.parameters){if parameter.passing==il_checker::Passing::Owned{self.transfer(frame,id,&op.entity_id)?;}}}
                 vec![self.runtime(op,&values,ty)?]
             },
             _ => return Err(("E_SCHEMA_INVALID","terminator cannot execute as operation".into())),
@@ -420,6 +420,11 @@ impl Machine<'_> {
         let value=match result{Ok(buffer)=>{let data=Data::Bytes(buffer.as_slice().to_vec());Ok(self.adopt("Bytes",data,buffer,entity)?)},Err(e)=>Err(e)};
         self.io_result(ty,value)
     }
+    fn copy_bytes_result(&mut self,ty:&str,source:&[u8],utf8:bool,entity:&str)->Run<RValue>{
+        self.check_allocation_event(entity)?;let result=self.allocator.copy(source).map_err(IoFailure::from);
+        if !utf8{return self.buffer_result(ty,result,entity)}
+        let value=match result{Ok(buffer)=>{let text=std::str::from_utf8(buffer.as_slice()).map_err(|_|("E_STATE_INCONSISTENT","validated UTF-8 changed".into()))?.to_owned();Ok(self.adopt("String",Data::String(text),buffer,entity)?)},Err(error)=>Err(error)};self.io_result(ty,value)
+    }
     fn write_stream(&mut self,stderr:bool,bytes:&[u8],offset:usize,deadline:Deadline)->Run<Result<usize,IoFailure>>{
         let remaining=bytes.len().saturating_sub(offset);
         if remaining as u64>self.limits.max_output_bytes.saturating_sub(self.captured){return Err(("E_RESOURCE_LIMIT","capture budget exhausted".into()))}
@@ -429,7 +434,7 @@ impl Machine<'_> {
     }
     fn runtime(&mut self,op:&Operation,values:&[RValue],ty:&str) -> Run<RValue> {
         let Attributes::RuntimeCall { symbol, capability } = &op.attributes else { return Err(("E_SCHEMA_INVALID","runtime symbol missing".into())); };
-        if matches!(symbol.as_str(),"file_read"|"file_read_some"|"stdin_read"|"string_concat"){self.check_allocation_event(&op.entity_id)?;}
+        if matches!(symbol.as_str(),"file_read"|"file_read_some"|"stdin_read"|"string_concat"|"net_read"){self.check_allocation_event(&op.entity_id)?;}
         let grant=||capability.as_deref().and_then(|id|self.host.policy().grant_id(id)).ok_or(("E_CAPABILITY_MISSING","runtime grant unavailable".into()));
         match symbol.as_str() {
             "print_i64" | "print_string" => {
@@ -451,15 +456,29 @@ impl Machine<'_> {
                 let value=self.adopt("String",Data::String(text),buffer,&op.entity_id)?;
                 Ok(self.variant(ty,"Ok",vec![value]))
             }
+            "bytes_get"=>{let source=bytes(&values[0])?;let index=usize_value(&values[1])?;let byte=source.get(index).ok_or(("E_INDEX_OUT_OF_BOUNDS","byte index out of bounds".into()))?;Ok(RValue::scalar("U8",Data::Integer(*byte as i128)))},
+            "bytes_equal"|"string_equal"=>{let equal=if symbol=="bytes_equal"{bytes(&values[0])?==bytes(&values[1])?}else{string(&values[0])?==string(&values[1])?};Ok(RValue::scalar("Bool",Data::Bool(equal)))},
+            "bytes_slice"=>{let source=bytes(&values[0])?;let start=usize_value(&values[1])?;let length=usize_value(&values[2])?;let slice=start.checked_add(length).and_then(|end|source.get(start..end));let Some(slice)=slice else{return self.io_result(ty,Err(IoError::InvalidData.into()))};self.copy_bytes_result(ty,slice,false,&op.entity_id)},
+            "bytes_concat"=>{let(a,b)=(bytes(&values[0])?,bytes(&values[1])?);let length=a.len().checked_add(b.len()).filter(|length|*length<=isize::MAX as usize).ok_or(("E_RESOURCE_LIMIT","byte concatenation capacity exceeded".into()))?;self.check_allocation_event(&op.entity_id)?;let result=self.allocator.allocate(length).map(|mut buffer|{buffer.as_mut_slice()[..a.len()].copy_from_slice(a);buffer.as_mut_slice()[a.len()..].copy_from_slice(b);buffer}).map_err(IoFailure::from);self.buffer_result(ty,result,&op.entity_id)},
+            "bytes_from_u8"=>{let byte=u8::try_from(values[0].integer()?).map_err(|_|("E_TYPE_MISMATCH","U8 required".into()))?;self.copy_bytes_result(ty,&[byte],false,&op.entity_id)},
+            "string_to_bytes"=>self.copy_bytes_result(ty,string(&values[0])?.as_bytes(),false,&op.entity_id),
+            "string_from_utf8"=>{let source=bytes(&values[0])?;if std::str::from_utf8(source).is_err(){return self.io_result(ty,Err(IoError::InvalidData.into()))}self.copy_bytes_result(ty,source,true,&op.entity_id)},
+            "net_opened_at"=>{let now=self.host.net_opened_at(resource(&values[0],ResourceKind::Stream)?).map_err(io_fault)?;Ok(RValue::scalar("U64",Data::Integer(now as i128)))},
+            "net_listen"=>{let result=self.host.net_listen(grant()?);self.host_events()?;self.io_result(ty,result.map(|handle|resource_value(ResourceKind::Listener,handle)))},
+            "net_connect"=>{let result=self.host.net_connect(grant()?,deadline(&values[0])?);self.host_events()?;self.io_result(ty,result.map(|handle|resource_value(ResourceKind::Stream,handle)))},
+            "net_accept"=>{let result=self.host.net_accept(resource(&values[0],ResourceKind::Listener)?,deadline(&values[1])?);self.host_events()?;self.io_result(ty,result.map(|handle|resource_value(ResourceKind::Stream,handle)))},
+            "net_read"=>{let result=self.host.net_read(resource(&values[0],ResourceKind::Stream)?,usize_value(&values[1])?,deadline(&values[2])?);self.buffer_result(ty,result,&op.entity_id)},
+            "net_write"=>{let result=self.host.net_write(resource(&values[0],ResourceKind::Stream)?,bytes(&values[1])?,usize_value(&values[2])?,deadline(&values[3])?);self.io_result(ty,result.map(|v|RValue::scalar("Usize",Data::Integer(v as i128))))},
+            "net_close_listener"|"net_close_stream"=>{let kind=if symbol=="net_close_listener"{ResourceKind::Listener}else{ResourceKind::Stream};let result=self.host.close(resource(&values[0],kind)?,kind);self.host_events()?;self.io_result(ty,result.map(|_|RValue::scalar("Unit",Data::Unit)))},
             "file_open_read" | "file_open_write" => {
                 let grant=grant()?;let path=string(&values[0])?;
                 let result=if symbol=="file_open_read"{self.host.open_read(grant,path)}else{self.host.open_write(grant,path)};
                 self.host_events()?;
-                self.io_result(ty,result.map(|handle|RValue{ty:"core.File".into(),data:Rc::new(Data::File(handle)),allocations:vec![],handles:vec![handle],borrowed:false}))
+                self.io_result(ty,result.map(|handle|resource_value(ResourceKind::File,handle)))
             }
-            "file_close" => {let result=self.host.close(file(&values[0])?);self.host_events()?;self.io_result(ty,result.map(|_|RValue::scalar("Unit",Data::Unit)))}
-            "file_read_some" => {let result=self.host.read_some(file(&values[0])?,usize_value(&values[1])?,deadline(&values[2])?);self.buffer_result(ty,result,&op.entity_id)}
-            "file_write_some" => {let result=self.host.write_some(file(&values[0])?,bytes(&values[1])?,usize_value(&values[2])?,deadline(&values[3])?);self.io_result(ty,result.map(|v|RValue::scalar("Usize",Data::Integer(v as i128))))}
+            "file_close" => {let result=self.host.close(resource(&values[0],ResourceKind::File)?,ResourceKind::File);self.host_events()?;self.io_result(ty,result.map(|_|RValue::scalar("Unit",Data::Unit)))}
+            "file_read_some" => {let result=self.host.read_some(resource(&values[0],ResourceKind::File)?,usize_value(&values[1])?,deadline(&values[2])?);self.buffer_result(ty,result,&op.entity_id)}
+            "file_write_some" => {let result=self.host.write_some(resource(&values[0],ResourceKind::File)?,bytes(&values[1])?,usize_value(&values[2])?,deadline(&values[3])?);self.io_result(ty,result.map(|v|RValue::scalar("Usize",Data::Integer(v as i128))))}
             "stdin_read" => {let result=self.host.stdin_read(usize_value(&values[0])?,deadline(&values[1])?);self.buffer_result(ty,result,&op.entity_id)}
             "stdout_write" | "stderr_write" => {let result=self.write_stream(symbol=="stderr_write",bytes(&values[0])?,usize_value(&values[1])?,deadline(&values[2])?)?;self.io_result(ty,result.map(|v|RValue::scalar("Usize",Data::Integer(v as i128))))}
             "clock_now" => {let result=self.host.clock_now(grant()?).map_err(io_fault)?;Ok(RValue::scalar("U64",Data::Integer(result as i128)))}
@@ -473,7 +492,8 @@ fn allocation_fault(error:AllocFailure)->Fault{match error{AllocFailure::Resourc
 fn io_fault(error:IoFailure)->Fault{match error{IoFailure::ResourceLimit=>("E_RESOURCE_LIMIT","heap budget exhausted".into()),IoFailure::Unsupported=>("E_UNSUPPORTED_FEATURE","host resource operation unavailable".into()),IoFailure::Error(e)=>("E_STATE_INCONSISTENT",format!("unexpected host error {e:?}"))}}
 fn string(value:&RValue)->Run<&str>{if let Data::String(v)=&*value.data{Ok(v)}else{Err(("E_TYPE_MISMATCH","string required".into()))}}
 fn bytes(value:&RValue)->Run<&[u8]>{if let Data::Bytes(v)=&*value.data{Ok(v)}else{Err(("E_TYPE_MISMATCH","bytes required".into()))}}
-fn file(value:&RValue)->Run<HandleId>{if let Data::File(v)=&*value.data{Ok(*v)}else{Err(("E_TYPE_MISMATCH","File required".into()))}}
+fn resource(value:&RValue,expected:ResourceKind)->Run<HandleId>{if let Data::Resource{kind,handle}=&*value.data{if *kind==expected{return Ok(*handle)}}Err(("E_TYPE_MISMATCH","resource kind mismatch".into()))}
+fn resource_value(kind:ResourceKind,handle:HandleId)->RValue{RValue{ty:kind.nominal_type().into(),data:Rc::new(Data::Resource{kind,handle}),allocations:vec![],handles:vec![(kind,handle)],borrowed:false}}
 fn usize_value(value:&RValue)->Run<usize>{usize::try_from(value.integer()?).map_err(|_|("E_TYPE_MISMATCH","Usize required".into()))}
 fn deadline(value:&RValue)->Run<Deadline>{match &*value.data{Data::Variant(tag,fields)if tag=="Infinite"&&fields.is_empty()=>Ok(Deadline::Infinite),Data::Variant(tag,fields)if tag=="At"&&fields.len()==1=>Ok(Deadline::At(u64::try_from(fields[0].integer()?).map_err(|_|("E_TYPE_MISMATCH","deadline instant must be U64".into()))?)),_=>Err(("E_TYPE_MISMATCH","Deadline required".into()))}}
 

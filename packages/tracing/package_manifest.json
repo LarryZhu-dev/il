@@ -1,0 +1,39 @@
+{
+  "package_manifest": {
+    "name": "tracing",
+    "version": "0.1.0",
+    "stage": "P07",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core",
+      "json",
+      "io"
+    ]
+  },
+  "public_types": [
+    "tracing.CountResult"
+  ],
+  "public_functions": [
+    "tracing.event"
+  ],
+  "error_types": [
+    "core.IoError"
+  ],
+  "effects": [
+    "alloc",
+    "process"
+  ],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/http_packages.rs"
+  ],
+  "blackbox_tests": [
+    "tests/http_blackbox/cli.py"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

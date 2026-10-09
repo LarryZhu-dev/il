@@ -1,6 +1,6 @@
 //! Native ABI substrate. This crate contains no language opcode dispatcher or IR reader.
 use il_execution_model::{Execution,ExecutionStatus,LifecycleEvent,LifecycleKind,Limits,Value,StackFrame,HandleEvent,HandleEventKind,STACK_TRACE_MAX_BYTES,json_string_bytes,stack_frame_json_bytes,stack_trace_push_bytes,stack_trace_replace_bytes};
-use il_graph::{Diagnostic,Capability};
+use il_graph::{Diagnostic,Capability,ResourceKind};
 use il_runtime_allocator::{Allocator,AllocFailure,OwnedBuffer};
 use il_runtime_startup::{HostPolicy,ValidatedPolicy,InheritedStdio,GrantId};
 use il_runtime_handles::{HostResources,HandleId,Deadline,IoFailure,IoError};
@@ -238,11 +238,11 @@ pub unsafe extern "C" fn il_rt_file_write_some(pointer:*mut Context,out:*mut u64
     let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};let when=unsafe{deadline(ctx,when)};let value=unsafe{*value};ctx.checked_buffer(value);let result=ctx.host.write_some(handle,unsafe{bytes(value.pointer,value.length)},offset as usize,when);return_count(ctx,out,result)
 }
 #[no_mangle]
-pub unsafe extern "C" fn il_rt_file_close(pointer:*mut Context,handle:*const HandleId)->u32{let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};let result=ctx.host.close(handle);ctx.drain_handles();ctx.io_status(result)}
+pub unsafe extern "C" fn il_rt_file_close(pointer:*mut Context,handle:*const HandleId)->u32{let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};let result=ctx.host.close(handle,ResourceKind::File);ctx.drain_handles();ctx.io_status(result)}
 #[no_mangle]
-pub unsafe extern "C" fn il_rt_file_drop(pointer:*mut Context,handle:*const HandleId){let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};let result=ctx.host.drop_handle(handle);ctx.drain_handles();let _=ctx.io_status(result);}
+pub unsafe extern "C" fn il_rt_file_drop(pointer:*mut Context,handle:*const HandleId){let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};let result=ctx.host.drop_handle(handle,ResourceKind::File);ctx.drain_handles();let _=ctx.io_status(result);}
 #[no_mangle]
-pub unsafe extern "C" fn il_rt_trace_file(pointer:*mut Context,handle:*const HandleId){let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};if ctx.host.validate_handle(handle).is_err(){ctx.fail("E_STATE_INCONSISTENT","unknown or closed native file",None)}}
+pub unsafe extern "C" fn il_rt_trace_file(pointer:*mut Context,handle:*const HandleId){let ctx=unsafe{context(pointer)};let handle=unsafe{file(ctx,handle)};if ctx.host.validate_handle(handle,ResourceKind::File).is_err(){ctx.fail("E_STATE_INCONSISTENT","unknown or closed native file",None)}}
 #[no_mangle]
 pub unsafe extern "C" fn il_rt_json_file(pointer:*mut Context,handle:*const HandleId){unsafe{il_rt_trace_file(pointer,handle);}let ctx=unsafe{context(pointer)};let handle=unsafe{*handle};let json=format!("{{\"kind\":\"file\",\"slot\":{},\"generation\":{}}}",handle.slot,handle.generation);ctx.emit(json.as_bytes());}
 #[no_mangle]
@@ -263,3 +263,45 @@ pub unsafe extern "C" fn il_rt_stdout_write(pointer:*mut Context,out:*mut u64,va
 pub unsafe extern "C" fn il_rt_stderr_write(pointer:*mut Context,out:*mut u64,value:*const Buffer,offset:u64,when:*const DeadlineValue)->u32{unsafe{stream_write(pointer,out,value,offset,when,true)}}
 #[no_mangle]
 pub unsafe extern "C" fn il_rt_clock_now(pointer:*mut Context,grant:u64)->u64{let ctx=unsafe{context(pointer)};ctx.host.clock_now(GrantId(grant)).unwrap_or_else(|_|ctx.fail("E_CAPABILITY_MISSING","clock grant is not authorized",None))}
+
+fn return_handle(ctx:&mut Context,out:*mut HandleId,result:Result<HandleId,IoFailure>)->u32{ctx.drain_handles();match result{Ok(handle)=>{unsafe{out.write(handle);}0},Err(error)=>ctx.io_status(Err(error))}}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_listen(pointer:*mut Context,out:*mut HandleId,grant:u64)->u32{let ctx=unsafe{context(pointer)};let result=ctx.host.net_listen(GrantId(grant));return_handle(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_connect(pointer:*mut Context,out:*mut HandleId,grant:u64,when:*const DeadlineValue)->u32{let ctx=unsafe{context(pointer)};let when=unsafe{deadline(ctx,when)};let result=ctx.host.net_connect(GrantId(grant),when);return_handle(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_accept(pointer:*mut Context,out:*mut HandleId,listener:*const HandleId,when:*const DeadlineValue)->u32{let ctx=unsafe{context(pointer)};let listener=unsafe{file(ctx,listener)};let when=unsafe{deadline(ctx,when)};let result=ctx.host.net_accept(listener,when);return_handle(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_read(pointer:*mut Context,out:*mut Buffer,stream:*const HandleId,maximum:u64,when:*const DeadlineValue)->u32{let ctx=unsafe{context(pointer)};let stream=unsafe{file(ctx,stream)};let when=unsafe{deadline(ctx,when)};let entity=ctx.current.clone();ctx.check_allocation_event(&entity);let result=ctx.host.net_read(stream,maximum as usize,when);return_buffer(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_write(pointer:*mut Context,out:*mut u64,stream:*const HandleId,value:*const Buffer,offset:u64,when:*const DeadlineValue)->u32{let ctx=unsafe{context(pointer)};let stream=unsafe{file(ctx,stream)};let when=unsafe{deadline(ctx,when)};let value=unsafe{*value};ctx.checked_buffer(value);let result=ctx.host.net_write(stream,unsafe{bytes(value.pointer,value.length)},offset as usize,when);return_count(ctx,out,result)}
+macro_rules! network_resource {
+    ($close:ident,$drop:ident,$trace:ident,$json:ident,$kind:ident,$label:literal)=>{
+        #[no_mangle]pub unsafe extern "C" fn $close(pointer:*mut Context,value:*const HandleId)->u32{let ctx=unsafe{context(pointer)};let value=unsafe{file(ctx,value)};let result=ctx.host.close(value,ResourceKind::$kind);ctx.drain_handles();ctx.io_status(result)}
+        #[no_mangle]pub unsafe extern "C" fn $drop(pointer:*mut Context,value:*const HandleId){let ctx=unsafe{context(pointer)};let value=unsafe{file(ctx,value)};let result=ctx.host.drop_handle(value,ResourceKind::$kind);ctx.drain_handles();let _=ctx.io_status(result);}
+        #[no_mangle]pub unsafe extern "C" fn $trace(pointer:*mut Context,value:*const HandleId){let ctx=unsafe{context(pointer)};let value=unsafe{file(ctx,value)};if ctx.host.validate_handle(value,ResourceKind::$kind).is_err(){ctx.fail("E_STATE_INCONSISTENT","unknown or wrong-kind native resource",None)}}
+        #[no_mangle]pub unsafe extern "C" fn $json(pointer:*mut Context,value:*const HandleId){unsafe{$trace(pointer,value);}let ctx=unsafe{context(pointer)};let value=unsafe{*value};let json=format!("{{\"kind\":\"{}\",\"slot\":{},\"generation\":{}}}",$label,value.slot,value.generation);ctx.emit(json.as_bytes());}
+    }
+}
+network_resource!(il_rt_net_close_listener,il_rt_listener_drop,il_rt_trace_listener,il_rt_json_listener,Listener,"listener");
+network_resource!(il_rt_net_close_stream,il_rt_stream_drop,il_rt_trace_stream,il_rt_json_stream,Stream,"stream");
+fn copy_bytes(ctx:&mut Context,out:*mut Buffer,data:&[u8])->u32{let entity=ctx.current.clone();ctx.check_allocation_event(&entity);let result=ctx.allocator.copy(data).map_err(IoFailure::from);return_buffer(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_bytes_get(pointer:*mut Context,value:*const Buffer,index:u64)->u8{let ctx=unsafe{context(pointer)};let value=unsafe{*value};ctx.checked_buffer(value);if index>=value.length{ctx.fail("E_INDEX_OUT_OF_BOUNDS","byte index is outside the buffer",None)}unsafe{*value.pointer.add(index as usize)}}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_bytes_slice(pointer:*mut Context,out:*mut Buffer,value:*const Buffer,start:u64,length:u64)->u32{let ctx=unsafe{context(pointer)};let value=unsafe{*value};ctx.checked_buffer(value);if start.checked_add(length).is_none_or(|end|end>value.length){return IoError::InvalidData as u32+1}let data=unsafe{bytes(value.pointer,value.length)};copy_bytes(ctx,out,&data[start as usize..(start+length)as usize])}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_bytes_concat(pointer:*mut Context,out:*mut Buffer,left:*const Buffer,right:*const Buffer)->u32{let ctx=unsafe{context(pointer)};let left=unsafe{*left};let right=unsafe{*right};ctx.checked_buffer(left);ctx.checked_buffer(right);let Some(length)=left.length.checked_add(right.length).filter(|length|*length<=isize::MAX as u64)else{ctx.fail("E_RESOURCE_LIMIT","byte concatenation size overflow",None)};let entity=ctx.current.clone();ctx.check_allocation_event(&entity);let result=ctx.allocator.allocate(length as usize).map(|mut value|{value.as_mut_slice()[..left.length as usize].copy_from_slice(unsafe{bytes(left.pointer,left.length)});value.as_mut_slice()[left.length as usize..].copy_from_slice(unsafe{bytes(right.pointer,right.length)});value}).map_err(IoFailure::from);return_buffer(ctx,out,result)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_bytes_from_u8(pointer:*mut Context,out:*mut Buffer,value:u8)->u32{let ctx=unsafe{context(pointer)};copy_bytes(ctx,out,&[value])}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_string_to_bytes(pointer:*mut Context,out:*mut Buffer,value:*const Buffer)->u32{let ctx=unsafe{context(pointer)};let value=unsafe{*value};ctx.checked_buffer(value);copy_bytes(ctx,out,unsafe{bytes(value.pointer,value.length)})}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_string_from_utf8(pointer:*mut Context,out:*mut Buffer,value:*const Buffer)->u32{let ctx=unsafe{context(pointer)};let value=unsafe{*value};ctx.checked_buffer(value);let data=unsafe{bytes(value.pointer,value.length)};if std::str::from_utf8(data).is_err(){return IoError::InvalidData as u32+1}copy_bytes(ctx,out,data)}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_bytes_equal(pointer:*mut Context,left:*const Buffer,right:*const Buffer)->bool{let ctx=unsafe{context(pointer)};let left=unsafe{*left};let right=unsafe{*right};ctx.checked_buffer(left);ctx.checked_buffer(right);unsafe{bytes(left.pointer,left.length)==bytes(right.pointer,right.length)}}
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_string_equal(pointer:*mut Context,left:*const Buffer,right:*const Buffer)->bool{unsafe{il_rt_bytes_equal(pointer,left,right)}}
+
+#[no_mangle]
+pub unsafe extern "C" fn il_rt_net_opened_at(pointer:*mut Context,value:*const HandleId)->u64{let ctx=unsafe{context(pointer)};let value=unsafe{file(ctx,value)};ctx.host.net_opened_at(value).unwrap_or_else(|_|ctx.fail("E_STATE_INCONSISTENT","invalid stream timestamp resource",None))}

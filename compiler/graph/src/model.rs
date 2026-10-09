@@ -89,6 +89,22 @@ pub struct Variant { pub name: String, pub fields: Vec<TypeRef> }
 #[serde(rename_all = "snake_case")]
 pub enum Effect { Alloc, Fs, Net, Clock, Process, Unsafe }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceKind { File, Listener, Stream }
+
+impl ResourceKind {
+    pub fn nominal_type(self) -> &'static str {
+        match self { Self::File => "core.File", Self::Listener => "net.Listener", Self::Stream => "net.Stream" }
+    }
+    pub fn from_nominal(name: &str) -> Option<Self> {
+        match name { "core.File" => Some(Self::File), "net.Listener" => Some(Self::Listener), "net.Stream" => Some(Self::Stream), _ => None }
+    }
+    pub fn cleanup_effect(self) -> Effect {
+        match self { Self::File => Effect::Fs, Self::Listener | Self::Stream => Effect::Net }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Function {
@@ -219,6 +235,26 @@ pub enum ContractPredicate {
     Returns { type_ref: TypeRef },
     RequiresEffect { effect: Effect },
     RequiresCapability { capability: EntityId },
+    HttpServer { entry: EntityId, bind: String, capability: EntityId, routes: Vec<HttpRoute> },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct HttpRoute {
+    pub entity_id: EntityId,
+    pub method: String,
+    pub path: String,
+    pub handler: EntityId,
+    pub parameters: Vec<HttpParameter>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct HttpParameter {
+    pub name: String,
+    pub type_ref: TypeRef,
+    pub source: String,
+    pub max_utf8_bytes: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -305,7 +341,14 @@ impl Graph {
         }
         for capability in &self.capabilities { add_id(&capability.entity_id); }
         for package in &self.packages { add_id(&package.entity_id); }
-        for contract in &self.contracts { add_id(&contract.entity_id); }
+        for contract in &self.contracts {
+            add_id(&contract.entity_id);
+            for predicate in &contract.predicates {
+                if let ContractPredicate::HttpServer { routes, .. } = predicate {
+                    for route in routes { add_id(&route.entity_id); }
+                }
+            }
+        }
         drop(add_id);
         let mut error = |code: &str, entity: &str, cause: String| diagnostics.push(Diagnostic::error(code, Some(entity), cause, self.revision));
         if self.project_id != "il" || self.graph_version != GRAPH_VERSION || self.target != TARGET {
@@ -447,6 +490,7 @@ impl Graph {
                 }
             }
         }
+        diagnostics.extend(crate::http::validate_declarations(self));
         diagnostics
     }
 }

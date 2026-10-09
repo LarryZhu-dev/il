@@ -47,7 +47,7 @@ impl<'de> Deserialize<'de> for ValueData {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct ResourceValue { pub kind: String, pub slot: u64, pub generation: u64 }
+pub struct ResourceValue { pub kind: il_graph::ResourceKind, pub slot: u64, pub generation: u64 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

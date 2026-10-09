@@ -123,12 +123,15 @@ pub(super) fn check_function(context: &Context<'_>, function: &Function, facts: 
 }
 
 fn check_cleanup_effect(context: &Context<'_>, function: &Function, operation: &Operation, state: &State, include_parameters: bool) {
-    if function.effects.contains(&Effect::Fs) { return; }
-    let closes_file = state.life.iter().any(|(id, life)| *life == Life::Live
-        && !state.loans.contains_key(id)
-        && (include_parameters || !function.parameters.iter().any(|parameter| &parameter.entity_id == id))
-        && state.types.get(id).is_some_and(|ty| super::contains_file_type(context.graph, ty)));
-    if closes_file { context.error("E_EFFECT_UNDECLARED", &operation.entity_id, "implicit File cleanup requires the fs effect"); }
+    for (id, _) in state.life.iter().filter(|(id, life)| **life == Life::Live
+        && !state.loans.contains_key(*id)
+        && (include_parameters || !function.parameters.iter().any(|parameter| &parameter.entity_id == *id))) {
+        if let Some(ty) = state.types.get(id) {
+            for effect in super::resource_cleanup_effects(context.graph, ty) {
+                if !function.effects.contains(&effect) { context.error("E_EFFECT_UNDECLARED", &operation.entity_id, format!("implicit resource cleanup requires the {effect:?} effect")); }
+            }
+        }
+    }
 }
 
 fn apply_operation(context: &Context<'_>, operation: &Operation, facts: Option<&Facts>, state: &mut State) {

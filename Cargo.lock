@@ -163,8 +163,10 @@ dependencies = [
  "il-hir",
  "il-interpreter",
  "il-mir",
+ "il-runtime-startup",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

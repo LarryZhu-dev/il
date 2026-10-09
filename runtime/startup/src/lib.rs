@@ -1,7 +1,7 @@
 //! Trusted host-policy parsing and Linux descriptor authority. No guest evaluator.
 use il_graph::{Capability,CapabilityKind};
 use serde::{Deserialize,Serialize};
-use std::{collections::BTreeSet,ffi::CString,fs::File,io::Read,os::fd::{AsFd,AsRawFd,BorrowedFd,FromRawFd,OwnedFd,RawFd},path::Path};
+use std::{collections::BTreeSet,ffi::CString,fs::File,io::Read,os::fd::{AsFd,AsRawFd,BorrowedFd,FromRawFd,OwnedFd,RawFd},path::Path,net::SocketAddr};
 
 pub const POLICY_MAX_BYTES:usize=65536;
 fn required_nullable<'de,D:serde::Deserializer<'de>,T:Deserialize<'de>>(d:D)->Result<Option<T>,D::Error>{Option::<T>::deserialize(d)}
@@ -51,6 +51,7 @@ impl HostPolicy{
                     let scope=grant.scope.as_ref().ok_or_else(||invalid("directory grant requires scope"))?;
                     if scope.contains('\0')||!Path::new(scope).is_absolute(){return Err(invalid("directory scope must be an absolute NUL-free path"))}
                 }
+                CapabilityKind::Listen|CapabilityKind::Connect=>{parse_endpoint(grant.scope.as_deref().ok_or_else(||invalid("network grant requires endpoint scope"))?)?;}
                 CapabilityKind::ClockRead=>if grant.scope.is_some(){return Err(invalid("clock grant has no scope"))},
                 _=>return Err(StartupError{code:"E_UNSUPPORTED_FEATURE",message:"host capability kind requires its implementation stage".into()}),
             }
@@ -83,7 +84,7 @@ impl ValidatedPolicy{
                     // Held authority must not become an accidentally inherited standard stream.
                     Some(if fd<5{duplicate(fd)?.ok_or_else(||denied("directory descriptor disappeared"))?}else{directory})
                 }
-                CapabilityKind::ClockRead=>None,
+                CapabilityKind::ClockRead|CapabilityKind::Listen|CapabilityKind::Connect=>None,
                 _=>return Err(invalid("unsupported grant requirement")),
             };
             grants.push(CheckedGrant{declaration,directory});
@@ -96,10 +97,13 @@ impl ValidatedPolicy{
     pub fn check(&self,id:GrantId,kind:CapabilityKind)->Result<(),StartupError>{
         self.grants.get(id.0 as usize).filter(|g|g.declaration.kind==kind).ok_or_else(||denied("invalid grant index or kind"))?;Ok(())
     }
+    pub fn endpoint(&self,id:GrantId,kind:CapabilityKind)->Result<SocketAddr,StartupError>{self.check(id,kind)?;if !matches!(kind,CapabilityKind::Listen|CapabilityKind::Connect){return Err(denied("grant is not a network endpoint"))}parse_endpoint(self.grants[id.0 as usize].declaration.scope.as_deref().ok_or_else(||invalid("missing endpoint"))?)}
     pub fn directory(&self,id:GrantId,kind:CapabilityKind)->Result<BorrowedFd<'_>,StartupError>{
         self.check(id,kind)?;self.grants[id.0 as usize].directory.as_ref().map(AsFd::as_fd).ok_or_else(||denied("grant is not a directory grant"))
     }
 }
+
+fn parse_endpoint(scope:&str)->Result<SocketAddr,StartupError>{let endpoint:SocketAddr=scope.parse().map_err(|_|invalid("network scope requires canonical numeric address:port"))?;if endpoint.port()==0||endpoint.to_string()!=scope{return Err(invalid("network scope requires nonzero canonical numeric endpoint"))}Ok(endpoint)}
 
 pub struct InheritedStdio{pub stdin:Option<OwnedFd>,pub stdout:Option<OwnedFd>,pub stderr:Option<OwnedFd>,drains:Vec<std::thread::JoinHandle<()>>}
 impl InheritedStdio{

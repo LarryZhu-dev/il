@@ -1,0 +1,74 @@
+{
+  "package_manifest": {
+    "name": "http",
+    "version": "0.1.0",
+    "stage": "P07",
+    "source": "lib.il",
+    "composition": "explicit_source_modules",
+    "dependencies": [
+      "core",
+      "net"
+    ]
+  },
+  "public_types": [
+    "http.HttpError",
+    "http.Request",
+    "http.EmptyRequest",
+    "http.PathRequest",
+    "http.ParseResult",
+    "http.Read",
+    "http.Response",
+    "http.ResponseResult",
+    "http.PathMatch",
+    "http.MatchResult",
+    "http.BytesResult",
+    "http.StringResult",
+    "http.UnitResult",
+    "http.Scan",
+    "http.StatusResult",
+    "http.ScanResult",
+    "http.PathScan",
+    "http.PathScanResult"
+  ],
+  "public_functions": [
+    "http.lower_ascii",
+    "http.token",
+    "http.hex_value",
+    "http.decode_path",
+    "http.header_kind",
+    "http.scan_headers",
+    "http.check_version",
+    "http.scan",
+    "http.parse",
+    "http.empty_bytes",
+    "http.match_path",
+    "http.decimal",
+    "http.append_text",
+    "http.content_header",
+    "http.response_headers",
+    "http.encode",
+    "http.error_response",
+    "http.write_response",
+    "http.read_request"
+  ],
+  "error_types": [
+    "http.HttpError",
+    "core.IoError"
+  ],
+  "effects": [
+    "alloc",
+    "net"
+  ],
+  "capabilities": [],
+  "unit_tests": [
+    "tests/runtime_host/http_packages.rs"
+  ],
+  "blackbox_tests": [
+    "tests/http_blackbox/cli.py"
+  ],
+  "schema_index": [
+    "schema/program_graph.schema.json",
+    "schema/mir.schema.json",
+    "schema/execution.schema.json"
+  ]
+}

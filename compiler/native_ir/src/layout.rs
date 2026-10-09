@@ -11,7 +11,7 @@ pub struct TypeLayout { pub size:u64,pub align:u32,pub owned:bool,pub shape:Shap
 pub struct VariantLayout { pub name:String,pub fields:Vec<String>,pub offsets:Vec<u64> }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
 #[serde(tag="kind",rename_all="snake_case",deny_unknown_fields)]
-pub enum Shape { Unit,Never,Bool,Integer{signed:bool,bits:u16},Buffer{utf8:bool},File,Record{names:Vec<String>,fields:Vec<String>,offsets:Vec<u64>},Tuple{fields:Vec<String>,offsets:Vec<u64>},Sum{payload:u64,variants:Vec<VariantLayout>} }
+pub enum Shape { Unit,Never,Bool,Integer{signed:bool,bits:u16},Buffer{utf8:bool},Resource{resource:il_graph::ResourceKind},Record{names:Vec<String>,fields:Vec<String>,offsets:Vec<u64>},Tuple{fields:Vec<String>,offsets:Vec<u64>},Sum{payload:u64,variants:Vec<VariantLayout>} }
 pub(crate) fn align(value:u64,alignment:u32)->u64 { (value+alignment as u64-1)&!(alignment as u64-1) }
 pub(crate) fn build(definitions:&[TypeDef])->Result<LayoutTable,String>{
     let mut table=LayoutTable::new();
@@ -26,7 +26,7 @@ pub(crate) fn build(definitions:&[TypeDef])->Result<LayoutTable,String>{
         let mut progress=false;
         pending.retain(|definition|{
             if definition.layout==Layout::Opaque{
-                if definition.entity_id=="core.File"&&definition.kind==TypeKind::Record&&definition.parameters.is_empty()&&definition.variants.is_empty()&&definition.integer.is_none()&&definition.fields.iter().map(|f|(f.name.as_str(),f.type_ref.as_str())).eq([("slot","U64"),("generation","U64")]){table.insert(definition.entity_id.clone(),TypeLayout{size:16,align:8,owned:true,shape:Shape::File});progress=true;return false;}
+                if il_graph::ResourceKind::from_nominal(&definition.entity_id).is_some()&&definition.kind==TypeKind::Record&&definition.parameters.is_empty()&&definition.variants.is_empty()&&definition.integer.is_none()&&definition.fields.iter().map(|f|(f.name.as_str(),f.type_ref.as_str())).eq([("slot","U64"),("generation","U64")]){table.insert(definition.entity_id.clone(),TypeLayout{size:16,align:8,owned:true,shape:Shape::Resource{resource:il_graph::ResourceKind::from_nominal(&definition.entity_id).unwrap()}});progress=true;return false;}
                 return true;
             }
             let shape=match definition.kind{
@@ -53,7 +53,7 @@ fn fields_layout(fields:&[String],table:&LayoutTable)->Option<(u64,u32,bool,Vec<
 pub(crate) fn compute(mut shape:Shape,table:&LayoutTable)->Option<TypeLayout>{
     let(size,alignment,owned)=match &mut shape{
         Shape::Unit|Shape::Never=>(0,1,false),Shape::Bool=>(1,1,false),Shape::Integer{bits,..} if matches!(bits,8|16|32|64)=>(*bits as u64/8,*bits as u32/8,false),Shape::Integer{..}=>return None,
-        Shape::Buffer{..}=>(24,8,true),Shape::File=>(16,8,true),
+        Shape::Buffer{..}=>(24,8,true),Shape::Resource{..}=>(16,8,true),
         Shape::Record{fields,offsets,..}|Shape::Tuple{fields,offsets}=>{let(s,a,o,f)=fields_layout(fields,table)?;*offsets=f;(s,a,o)},
         Shape::Sum{payload,variants}=>{
             let(mut max_size,mut max_align,mut owned)=(0,1,false);

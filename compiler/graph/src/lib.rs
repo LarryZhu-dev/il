@@ -4,6 +4,7 @@ pub const GRAPH_VERSION: &str = "1.0.0";
 pub const TARGET: &str = "x86_64-unknown-linux-gnu";
 
 pub mod model;
+pub mod http;
 pub mod transaction;
 pub mod store;
 

@@ -1,6 +1,8 @@
 use il_frontend::{format, parse};
 use il_graph::*;
 mod structured;
+mod network;
+mod http;
 
 const HELLO: &str = include_str!("../../examples/core/hello.il");
 
@@ -119,7 +121,30 @@ fn malformed_string_escapes_and_excessive_nesting_reject() {
     assert!(parse("module a { fn f()->String { return \"\\uD800\"; } }", 0).is_err());
     let nested = format!("module a {{ fn f()->I32 {{ return {}0{}; }} }}", "(".repeat(140), ")".repeat(140));
     assert_eq!(parse(&nested, 0).unwrap_err()[0].code, "E_RESOURCE_LIMIT");
-    assert!(parse(&" ".repeat(1_048_577), 0).is_err());
+    assert_eq!(parse(&" ".repeat(il_frontend::MAX_SOURCE_BYTES + 1), 0).unwrap_err()[0].code, "E_RESOURCE_LIMIT");
+}
+
+#[test]
+fn source_budget_is_bounded_for_both_input_and_canonical_projection() {
+    assert!(parse(&" ".repeat(il_frontend::MAX_SOURCE_BYTES), 0).is_ok());
+    assert_eq!(parse(&";".repeat(il_frontend::MAX_TOKENS + 1), 0).unwrap_err()[0].code, "E_RESOURCE_LIMIT");
+    let source="module app {fn main()->String effects[alloc]{return \"x\";}}";
+    let mut graph=parse(source,0).unwrap();
+    graph.functions[0].blocks[0].operations[0].attributes=Attributes::Constant{value:Literal::String("x".repeat(il_frontend::MAX_SOURCE_BYTES))};
+    assert_eq!(format(&graph).unwrap_err()[0].code,"E_RESOURCE_LIMIT");
+}
+
+#[test]
+fn surface_expansion_budget_rejects_before_building_oversized_control_flow() {
+    let body = "if true {} else {}".repeat(3000);
+    let errors = parse(&format!("module app {{fn main()->I32 {{{body} return 0;}}}}"), 0).unwrap_err();
+    assert_eq!(errors[0].code, "E_RESOURCE_LIMIT");
+    assert!(errors[0].cause.contains("surface lowering graph node budget"));
+    let body = "if true {} else {}".repeat(190);
+    assert!(parse(&format!("module app {{fn one()->I32 {{{body} return 0;}}}}"), 0).is_ok());
+    let errors = parse(&format!("module app {{fn one()->I32 {{{body} return 0;}} fn two()->I32 {{{body} return 0;}}}}"), 0).unwrap_err();
+    assert_eq!(errors[0].code, "E_RESOURCE_LIMIT");
+    assert!(errors[0].cause.contains("surface lowering graph node budget"));
 }
 
 #[test]

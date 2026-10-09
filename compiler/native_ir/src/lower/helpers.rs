@@ -3,7 +3,7 @@ impl Lower{
     pub(super) fn helpers(&mut self)->Result<()>{
         let types:Vec<_>=self.program.layouts.keys().cloned().collect();
         let mut resources=std::collections::BTreeSet::new();
-        loop{let before=resources.len();for (ty,layout) in &self.program.layouts{let children=match &layout.shape{Shape::File=>{resources.insert(ty.clone());continue;},Shape::Record{fields,..}|Shape::Tuple{fields,..}=>fields.clone(),Shape::Sum{variants,..}=>variants.iter().flat_map(|v|v.fields.clone()).collect(),_=>vec![]};if children.iter().any(|child|resources.contains(child)){resources.insert(ty.clone());}}if resources.len()==before{break;}}
+        loop{let before=resources.len();for (ty,layout) in &self.program.layouts{let children=match &layout.shape{Shape::Resource{..}=>{resources.insert(ty.clone());continue;},Shape::Record{fields,..}|Shape::Tuple{fields,..}=>fields.clone(),Shape::Sum{variants,..}=>variants.iter().flat_map(|v|v.fields.clone()).collect(),_=>vec![]};if children.iter().any(|child|resources.contains(child)){resources.insert(ty.clone());}}if resources.len()==before{break;}}
         for ty in types{for operation in ["trace","drop","clone","json"]{
             if operation=="clone"&&resources.contains(&ty){continue;}
             let parameters=if operation=="clone"{vec!["ctx","out","src","entity","length"]}else{vec!["ctx","src"]};
@@ -21,14 +21,14 @@ impl Lower{
     }
     fn helper_body(&mut self,b:&mut Builder,operation:&str,ty:&str,src:Operand,out:Operand)->Result<()>{
         let layout=self.program.layouts[ty].clone();let ctx=Operand::reg("ctx");
-        if operation=="json"{self.raw(b,"{\"type\":");self.json_string(b,ty);self.raw(b,",\"data\":{\"kind\":");let kind=match layout.shape{Shape::Unit|Shape::Never=>"unit",Shape::Bool=>"bool",Shape::Integer{..}=>"integer",Shape::Buffer{utf8:true}=>"string",Shape::Buffer{utf8:false}=>"bytes",Shape::File=>"resource",Shape::Record{..}=>"record",Shape::Tuple{..}=>"tuple",Shape::Sum{..}=>"variant"};self.json_string(b,kind);if !matches!(layout.shape,Shape::Unit|Shape::Never){self.raw(b,",\"value\":");}}
+        if operation=="json"{self.raw(b,"{\"type\":");self.json_string(b,ty);self.raw(b,",\"data\":{\"kind\":");let kind=match layout.shape{Shape::Unit|Shape::Never=>"unit",Shape::Bool=>"bool",Shape::Integer{..}=>"integer",Shape::Buffer{utf8:true}=>"string",Shape::Buffer{utf8:false}=>"bytes",Shape::Resource{..}=>"resource",Shape::Record{..}=>"record",Shape::Tuple{..}=>"tuple",Shape::Sum{..}=>"variant"};self.json_string(b,kind);if !matches!(layout.shape,Shape::Unit|Shape::Never){self.raw(b,",\"value\":");}}
         if operation=="clone"&&!layout.owned{b.copy(out,src,layout.size);return Ok(());}
         if matches!(operation,"trace"|"drop")&&!layout.owned{return Ok(());}
         match layout.shape{
             Shape::Unit|Shape::Never=>{},
             Shape::Bool=>{if operation=="json"{let value=b.load(src,Type::int(8),1);let condition=b.cmp(Predicate::Ne,value,Operand::int(8,0));let yes=b.label("true");let no=b.label("false");let done=b.label("done");b.function.blocks[b.at].terminator=Terminator::CondBranch{condition,yes:yes.clone(),no:no.clone()};b.at=b.block(yes);self.raw(b,"true");b.goto(&done);b.at=b.block(no);self.raw(b,"false");b.goto(&done);b.at=b.block(done);}},
             Shape::Integer{signed,bits}=>{if operation=="json"{let value=b.load(src,Type::int(bits),layout.align);let value=b.cast(value,bits,64,signed);b.rt(if signed{"json_i64"}else{"json_u64"},vec![ctx,value],false);}},
-            Shape::File=>{let symbol=match operation{"trace"=>"trace_file","drop"=>"file_drop","json"=>"json_file",_=>return Err(self.error(ty,"E_UNSUPPORTED_FEATURE","File values cannot be cloned"))};b.rt(symbol,vec![ctx,src],false);},
+            Shape::Resource{resource}=>{let name=match resource{il_graph::ResourceKind::File=>"file",il_graph::ResourceKind::Listener=>"listener",il_graph::ResourceKind::Stream=>"stream"};let symbol=match operation{"trace"=>format!("trace_{name}"),"drop"=>format!("{name}_drop"),"json"=>format!("json_{name}"),_=>return Err(self.error(ty,"E_UNSUPPORTED_FEATURE","resources cannot be cloned"))};b.rt(&symbol,vec![ctx,src],false);},
             Shape::Buffer{utf8}=>match operation{
                 "trace"=>{b.rt("trace_buffer",vec![ctx,src],false);},
                 "drop"=>{b.rt("buffer_free",vec![ctx,src],false);},

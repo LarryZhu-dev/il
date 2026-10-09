@@ -116,7 +116,7 @@ fn helper(operation:&str,ty:&str)->String{format!("il_{operation}_{}",symbol(ty)
 
 fn validate_value(value:&Value,ty:&str,table:&LayoutTable,depth:usize,nodes:&mut usize,heap:&mut u64)->std::result::Result<(),String>{
     *nodes+=1;if depth>64||*nodes>100_000{return Err("argument shape budget exceeded".into());}if value.type_ref!=ty{return Err("argument type mismatch".into());}
-    if matches!(table[ty].shape,Shape::File)||matches!(value.data,ValueData::Resource(_)){return Err("captured arguments cannot forge resource handles".into());}
+    if matches!(table[ty].shape,Shape::Resource{..})||matches!(value.data,ValueData::Resource(_)){return Err("captured arguments cannot forge resource handles".into());}
     let fields=match(&table[ty].shape,&value.data){
         (Shape::Unit,ValueData::Unit)|(Shape::Bool,ValueData::Bool(_))=>return Ok(()),
         (Shape::Integer{signed,bits},ValueData::Integer(value))=>{let n=value.parse::<i128>().map_err(|_|"invalid integer")?;let(min,max)=if *signed{(-(1i128<<(*bits-1)),(1i128<<(*bits-1))-1)}else{(0,(1i128<<*bits)-1)};if value!=&n.to_string()||n<min||n>max{return Err("integer argument out of range".into());}return Ok(());},

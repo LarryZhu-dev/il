@@ -242,3 +242,13 @@ fn implicit_file_cleanup_requires_fs_but_transfer_does_not(){
     let mut wrapped=graph.clone();wrapped.types.push(TypeDef{entity_id:"app.Wrapped".into(),kind:TypeKind::Option,parameters:vec!["core.File".into()],layout:Layout::Inferred,integer:None,fields:vec![],variants:vec![]});wrapped.modules[0].declarations.push("app.Wrapped".into());wrapped.functions[0].parameters[0].type_ref="app.Wrapped".into();wrapped.functions[0].result="Unit".into();wrapped.functions[0].effects=vec![Effect::Fs];wrapped.functions[0].blocks[0].terminator.inputs.clear();wrapped.functions[0].blocks[0].terminator.consumes.clear();
     let mut mir=lower(&wrapped);mir.functions[0].effects.clear();assert_code(&mir,"E_EFFECT_UNDECLARED");
 }
+
+#[test]
+fn mixed_resource_cleanup_requires_fs_and_net_but_return_transfers_both(){
+    let mut graph=cleanup_graph();graph.types.clear();
+    for kind in [ResourceKind::File,ResourceKind::Stream]{graph.types.push(TypeDef{entity_id:kind.nominal_type().into(),kind:TypeKind::Record,parameters:vec![],layout:Layout::Opaque,integer:None,fields:vec![Field{name:"slot".into(),type_ref:"U64".into()},Field{name:"generation".into(),type_ref:"U64".into()}],variants:vec![]});}
+    graph.types.push(TypeDef{entity_id:"Mixed".into(),kind:TypeKind::Tuple,parameters:vec!["core.File".into(),"net.Stream".into()],layout:Layout::Inferred,integer:None,fields:vec![],variants:vec![]});graph.modules[0].declarations.extend(graph.types.iter().map(|ty|ty.entity_id.clone()));
+    let f=&mut graph.functions[0];f.parameters.truncate(1);f.parameters[0].type_ref="Mixed".into();f.blocks[0].operations.clear();f.effects=vec![Effect::Fs,Effect::Net];
+    let original=lower(&graph);for effect in [Effect::Fs,Effect::Net]{let mut p=original.clone();p.functions[0].effects.retain(|e|*e!=effect);assert_code(&p,"E_EFFECT_UNDECLARED");}
+    let f=&mut graph.functions[0];f.effects.clear();f.result="Mixed".into();f.blocks[0].terminator.inputs=vec![f.parameters[0].entity_id.clone()];f.blocks[0].terminator.consumes=f.blocks[0].terminator.inputs.clone();assert!(il_mir::verify(&lower(&graph)).is_empty());
+}

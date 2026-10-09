@@ -1,5 +1,5 @@
 //! Linux resource ownership and actual partial I/O, shared by the interpreter and native facade.
-use il_graph::CapabilityKind;
+use il_graph::{CapabilityKind,ResourceKind};
 use il_runtime_allocator::{AllocFailure,Allocator,OwnedBuffer};
 use il_runtime_startup::{GrantId,InheritedStdio,ValidatedPolicy};
 use std::{ffi::CString,os::fd::{AsRawFd,FromRawFd,IntoRawFd,OwnedFd,RawFd}};
@@ -21,8 +21,8 @@ pub enum HandleEventKind{Opened,Closed,Dropped}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct HandleEvent{pub kind:HandleEventKind,pub handle:HandleId,pub error:Option<IoError>}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
-enum Access{Read,Write}
-struct Resource{fd:OwnedFd,access:Access,regular:bool}
+enum Access{Read,Write,Duplex}
+struct Resource{fd:OwnedFd,kind:ResourceKind,access:Access,regular:bool,opened_at:u64}
 struct Slot{generation:u64,resource:Option<Resource>}
 struct IoFaults{successful:u64,max_chunk:Option<u64>,fail_after:Option<u64>}
 pub struct HostResources{policy:ValidatedPolicy,stdio:InheritedStdio,allocator:Allocator,slots:Vec<Slot>,events:Vec<HandleEvent>,faults:IoFaults}
@@ -37,7 +37,41 @@ impl HostResources{
     pub fn live_handles(&self)->u64{self.slots.iter().filter(|slot|slot.resource.is_some()).count()as u64}
     pub fn take_events(&mut self)->Vec<HandleEvent>{std::mem::take(&mut self.events)}
     pub fn successful_io_calls(&self)->u64{self.faults.successful}
-    pub fn validate_handle(&self,handle:HandleId)->Result<(),IoFailure>{self.slots.get(handle.slot as usize).filter(|slot|slot.generation==handle.generation&&slot.resource.is_some()).map(|_|()).ok_or(IoFailure::Error(IoError::Closed))}
+    pub fn validate_handle(&self,handle:HandleId,kind:ResourceKind)->Result<(),IoFailure>{let resource=self.lookup(handle)?;if resource.kind!=kind{return Err(IoError::InvalidData.into())}Ok(())}
+    fn lookup(&self,handle:HandleId)->Result<&Resource,IoFailure>{self.slots.get(handle.slot as usize).filter(|slot|slot.generation==handle.generation).and_then(|slot|slot.resource.as_ref()).ok_or(IoFailure::Error(IoError::Closed))}
+    fn insert(&mut self,resource:Resource)->HandleId{let slot=if let Some(index)=self.slots.iter().position(|slot|slot.resource.is_none()&&slot.generation<u64::MAX){self.slots[index].resource=Some(resource);index}else{self.slots.push(Slot{generation:1,resource:Some(resource)});self.slots.len()-1};let handle=HandleId{slot:slot as u64,generation:self.slots[slot].generation};self.events.push(HandleEvent{kind:HandleEventKind::Opened,handle,error:None});handle}
+
+    pub fn net_listen(&mut self,grant:GrantId)->Result<HandleId,IoFailure>{
+        let endpoint=self.policy.endpoint(grant,CapabilityKind::Listen).map_err(|_|IoError::PermissionDenied)?;let fd=socket(endpoint)?;let one:libc::c_int=1;
+        if endpoint.is_ipv6()&&unsafe{libc::setsockopt(fd.as_raw_fd(),libc::IPPROTO_IPV6,libc::IPV6_V6ONLY,(&one as *const libc::c_int).cast(),std::mem::size_of_val(&one)as libc::socklen_t)}<0{return Err(last_error(Access::Write))}
+        if unsafe{libc::setsockopt(fd.as_raw_fd(),libc::SOL_SOCKET,libc::SO_REUSEADDR,(&one as *const libc::c_int).cast(),std::mem::size_of_val(&one)as libc::socklen_t)}<0{return Err(last_error(Access::Write))}
+        let(address,len)=socket_address(endpoint);if unsafe{libc::bind(fd.as_raw_fd(),(&address as *const libc::sockaddr_storage).cast(),len)}<0||unsafe{libc::listen(fd.as_raw_fd(),128)}<0{return Err(last_error(Access::Write))}
+        Ok(self.insert(Resource{fd,kind:ResourceKind::Listener,access:Access::Read,regular:false,opened_at:0}))
+    }
+    pub fn net_connect(&mut self,grant:GrantId,deadline:Deadline)->Result<HandleId,IoFailure>{
+        check_deadline(deadline)?;let endpoint=self.policy.endpoint(grant,CapabilityKind::Connect).map_err(|_|IoError::PermissionDenied)?;let fd=socket(endpoint)?;let(address,len)=socket_address(endpoint);
+        let result=unsafe{libc::connect(fd.as_raw_fd(),(&address as *const libc::sockaddr_storage).cast(),len)};
+        if result<0{let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if !matches!(error,libc::EINPROGRESS|libc::EALREADY|libc::EINTR|libc::EISCONN){return Err(map_errno(error,Access::Write).into())}
+            if error!=libc::EISCONN{loop{wait(fd.as_raw_fd(),false,true,deadline)?;let mut error:libc::c_int=0;let mut size=std::mem::size_of_val(&error)as libc::socklen_t;if unsafe{libc::getsockopt(fd.as_raw_fd(),libc::SOL_SOCKET,libc::SO_ERROR,(&mut error as *mut libc::c_int).cast(),&mut size)}<0{return Err(last_error(Access::Write))}if error==0{break}if error==libc::EINPROGRESS||error==libc::EALREADY{continue}return Err(map_errno(error,Access::Write).into())}}
+        }
+        Ok(self.insert(Resource{fd,kind:ResourceKind::Stream,access:Access::Duplex,regular:false,opened_at:monotonic_now()?}))
+    }
+    pub fn net_accept(&mut self,listener:HandleId,deadline:Deadline)->Result<HandleId,IoFailure>{
+        self.validate_handle(listener,ResourceKind::Listener)?;let raw=self.lookup(listener)?.fd.as_raw_fd();
+        loop{wait(raw,false,false,deadline)?;let fd=unsafe{libc::accept4(raw,std::ptr::null_mut(),std::ptr::null_mut(),libc::SOCK_NONBLOCK|libc::SOCK_CLOEXEC)};
+            if fd>=0{return Ok(self.insert(Resource{fd:unsafe{OwnedFd::from_raw_fd(fd)},kind:ResourceKind::Stream,access:Access::Duplex,regular:false,opened_at:monotonic_now()?}))}
+            let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if error==libc::EINTR||error==libc::EAGAIN{continue}return Err(map_errno(error,Access::Read).into())
+        }
+    }
+    pub fn net_opened_at(&self,stream:HandleId)->Result<u64,IoFailure>{self.validate_handle(stream,ResourceKind::Stream)?;Ok(self.lookup(stream)?.opened_at)}
+    pub fn net_read(&mut self,stream:HandleId,maximum:usize,deadline:Deadline)->Result<OwnedBuffer,IoFailure>{
+        self.validate_handle(stream,ResourceKind::Stream)?;let fd=self.lookup(stream)?.fd.as_raw_fd();let maximum=self.faults.chunk(maximum);let mut buffer=self.allocator.allocate(maximum)?;if maximum==0{return Ok(buffer)}
+        loop{self.faults.check(Access::Read)?;wait(fd,false,false,deadline)?;let count=unsafe{libc::recv(fd,buffer.as_mut_ptr().cast(),maximum,0)};if count>=0{let count=count as usize;buffer.truncate(count);self.faults.completed(count);return Ok(buffer)}let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if error==libc::EINTR||error==libc::EAGAIN{continue}return Err(map_errno(error,Access::Read).into())}
+    }
+    pub fn net_write(&mut self,stream:HandleId,bytes:&[u8],offset:usize,deadline:Deadline)->Result<usize,IoFailure>{
+        self.validate_handle(stream,ResourceKind::Stream)?;let fd=self.lookup(stream)?.fd.as_raw_fd();if offset>bytes.len(){return Err(IoError::InvalidData.into())}if offset==bytes.len(){return Ok(0)}let count=self.faults.chunk(bytes.len()-offset);
+        loop{self.faults.check(Access::Write)?;wait(fd,false,true,deadline)?;let wrote=unsafe{libc::send(fd,bytes[offset..].as_ptr().cast(),count,libc::MSG_NOSIGNAL)};if wrote>=0{let wrote=wrote as usize;self.faults.completed(wrote);return Ok(wrote)}let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if error==libc::EINTR||error==libc::EAGAIN{continue}return Err(map_errno(error,Access::Write).into())}
+    }
     pub fn open_read(&mut self,grant:GrantId,path:&str)->Result<HandleId,IoFailure>{self.open(grant,path,Access::Read)}
     pub fn open_write(&mut self,grant:GrantId,path:&str)->Result<HandleId,IoFailure>{self.open(grant,path,Access::Write)}
     fn open(&mut self,grant:GrantId,path:&str,access:Access)->Result<HandleId,IoFailure>{
@@ -58,17 +92,17 @@ impl HostResources{
             return Err(map_errno(error,access).into())
         };
         let fd=unsafe{OwnedFd::from_raw_fd(fd)};let regular=regular(fd.as_raw_fd())?;
-        let resource=Resource{fd,access,regular};
-        let slot=if let Some(index)=self.slots.iter().position(|slot|slot.resource.is_none()&&slot.generation<u64::MAX){self.slots[index].resource=Some(resource);index}else{self.slots.push(Slot{generation:1,resource:Some(resource)});self.slots.len()-1};
-        let handle=HandleId{slot:slot as u64,generation:self.slots[slot].generation};self.events.push(HandleEvent{kind:HandleEventKind::Opened,handle,error:None});Ok(handle)
+        Ok(self.insert(Resource{fd,kind:ResourceKind::File,access,regular,opened_at:0}))
     }
+
     fn resource(&self,handle:HandleId,access:Access)->Result<(RawFd,bool),IoFailure>{
-        let resource=self.slots.get(handle.slot as usize).filter(|slot|slot.generation==handle.generation).and_then(|slot|slot.resource.as_ref()).ok_or(IoError::Closed)?;
+        let resource=self.lookup(handle)?;if resource.kind!=ResourceKind::File{return Err(IoError::InvalidData.into())}
         if resource.access!=access{return Err(IoError::PermissionDenied.into())}Ok((resource.fd.as_raw_fd(),resource.regular))
     }
-    pub fn close(&mut self,handle:HandleId)->Result<(),IoFailure>{self.release(handle,HandleEventKind::Closed)}
-    pub fn drop_handle(&mut self,handle:HandleId)->Result<(),IoFailure>{self.release(handle,HandleEventKind::Dropped)}
-    fn release(&mut self,handle:HandleId,kind:HandleEventKind)->Result<(),IoFailure>{
+    pub fn close(&mut self,handle:HandleId,kind:ResourceKind)->Result<(),IoFailure>{self.release(handle,kind,HandleEventKind::Closed)}
+    pub fn drop_handle(&mut self,handle:HandleId,kind:ResourceKind)->Result<(),IoFailure>{self.release(handle,kind,HandleEventKind::Dropped)}
+    fn release(&mut self,handle:HandleId,expected:ResourceKind,kind:HandleEventKind)->Result<(),IoFailure>{
+        if let Err(error)=self.validate_handle(handle,expected){let IoFailure::Error(error)=error else{unreachable!()};self.events.push(HandleEvent{kind,handle,error:Some(error)});return Err(error.into())}
         let Some(slot)=self.slots.get_mut(handle.slot as usize).filter(|slot|slot.generation==handle.generation&&slot.resource.is_some())else{
             self.events.push(HandleEvent{kind,handle,error:Some(IoError::Closed)});return Err(IoError::Closed.into())
         };
@@ -92,11 +126,11 @@ impl HostResources{
                 let length=data.len().checked_add(count).ok_or(IoError::Other)?;self.allocator.check_capacity(length)?;
                 data.try_reserve(count).map_err(|_|IoError::Other)?;data.extend_from_slice(&scratch[..count]);}
             self.allocator.copy(&data).map_err(IoFailure::from)
-        })();let close=self.close(handle);match result{Err(error)=>Err(error),Ok(buffer)=>close.map(|_|buffer)}
+        })();let close=self.close(handle,ResourceKind::File);match result{Err(error)=>Err(error),Ok(buffer)=>close.map(|_|buffer)}
     }
     pub fn write_all(&mut self,grant:GrantId,path:&str,bytes:&[u8])->Result<usize,IoFailure>{
         let handle=self.open_write(grant,path)?;let result=(||{let mut offset=0;while offset<bytes.len(){let count=self.write_some(handle,bytes,offset,Deadline::Infinite)?;if count==0{return Err(IoError::Write.into())}offset+=count;}Ok(offset)})();
-        let close=self.close(handle);match result{Err(error)=>Err(error),Ok(count)=>close.map(|_|count)}
+        let close=self.close(handle,ResourceKind::File);match result{Err(error)=>Err(error),Ok(count)=>close.map(|_|count)}
     }
     fn read(&mut self,fd:RawFd,regular:bool,maximum:usize,deadline:Deadline)->Result<OwnedBuffer,IoFailure>{
         let maximum=self.faults.chunk(maximum);let mut buffer=self.allocator.allocate(maximum)?;
@@ -146,4 +180,17 @@ fn wait(fd:RawFd,regular:bool,writing:bool,deadline:Deadline)->Result<(),IoFailu
         if let Deadline::At(at)=deadline{if monotonic_now()?>=at{return Err(IoError::Timeout.into())}}
         return Ok(())
     }
+}
+
+fn check_deadline(deadline:Deadline)->Result<(),IoFailure>{if let Deadline::At(at)=deadline{if monotonic_now()?>=at{return Err(IoError::Timeout.into())}}Ok(())}
+fn last_error(access:Access)->IoFailure{map_errno(std::io::Error::last_os_error().raw_os_error().unwrap_or(0),access).into()}
+fn socket(endpoint:std::net::SocketAddr)->Result<OwnedFd,IoFailure>{
+    let fd=unsafe{libc::socket(if endpoint.is_ipv4(){libc::AF_INET}else{libc::AF_INET6},libc::SOCK_STREAM|libc::SOCK_NONBLOCK|libc::SOCK_CLOEXEC,libc::IPPROTO_TCP)};if fd<0{return Err(last_error(Access::Write))}let fd=unsafe{OwnedFd::from_raw_fd(fd)};
+    Ok(fd)
+}
+fn socket_address(endpoint:std::net::SocketAddr)->(libc::sockaddr_storage,libc::socklen_t){
+    let mut storage:libc::sockaddr_storage=unsafe{std::mem::zeroed()};let size=match endpoint{
+        std::net::SocketAddr::V4(endpoint)=>{let value=libc::sockaddr_in{sin_family:libc::AF_INET as libc::sa_family_t,sin_port:endpoint.port().to_be(),sin_addr:libc::in_addr{s_addr:u32::from_ne_bytes(endpoint.ip().octets())},sin_zero:[0;8]};unsafe{std::ptr::write((&mut storage as *mut libc::sockaddr_storage).cast::<libc::sockaddr_in>(),value);}std::mem::size_of::<libc::sockaddr_in>()},
+        std::net::SocketAddr::V6(endpoint)=>{let value=libc::sockaddr_in6{sin6_family:libc::AF_INET6 as libc::sa_family_t,sin6_port:endpoint.port().to_be(),sin6_flowinfo:endpoint.flowinfo(),sin6_addr:libc::in6_addr{s6_addr:endpoint.ip().octets()},sin6_scope_id:endpoint.scope_id()};unsafe{std::ptr::write((&mut storage as *mut libc::sockaddr_storage).cast::<libc::sockaddr_in6>(),value);}std::mem::size_of::<libc::sockaddr_in6>()},
+    };(storage,size as libc::socklen_t)
 }

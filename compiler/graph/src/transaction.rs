@@ -124,6 +124,21 @@ pub fn apply_transaction(base: &Graph, transaction: &Transaction) -> (Graph, Vec
             TransactionOperation::ReplaceProgram { graph } => candidate = graph.clone(),
         }
     }
+    match crate::http::expected_dispatchers(&candidate) {
+        Err(errors) => diagnostics.extend(errors),
+        Ok(functions) => {
+            for generated in functions {
+                let current = candidate.functions.iter_mut().find(|f| f.entity_id == generated.entity_id).expect("validated dispatcher");
+                if current != &generated {
+                    if scopes.contains(&"program".to_owned()) || scopes.contains(&generated.entity_id) {
+                        *current = generated;
+                    } else {
+                        diagnostics.push(Diagnostic::error("E_INVALID_SCOPE", Some(&generated.entity_id), "HTTP expansion modifies a dispatcher outside the exact transaction scope", base.revision));
+                    }
+                }
+            }
+        }
+    }
     diagnostics.extend(candidate.validate_structural());
     (candidate, diagnostics)
 }
