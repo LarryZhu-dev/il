@@ -1,0 +1,114 @@
+{
+  "contract_version": "1.0.0",
+  "cases": [
+    {
+      "id": "mixed_record_layout_and_call",
+      "source": "module app { @id(\"Pair\") type Pair=record {small:I8,wide:U64,flag:Bool}; fn identity(value:Pair)->Pair{return value;} @id(\"main\") fn main()->Pair{return identity(Pair {wide:18446744073709551615,flag:true,small:-128});} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Pair","data":{"kind":"record","value":[{"type":"I8","data":{"kind":"integer","value":"-128"}},{"type":"U64","data":{"kind":"integer","value":"18446744073709551615"}},{"type":"Bool","data":{"kind":"bool","value":true}}]}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "tuple_nested_option_result_owned_return",
+      "source": "module app { @id(\"Pair\") type Pair=Tuple<I8,String>; @id(\"Maybe\") type Maybe=Option<Pair>; @id(\"Out\") type Out=Result<Maybe,I64>; fn identity(value:Out)->Out{return value;} @id(\"main\") fn main()->Out effects [alloc] {return identity(Ok(Some(tuple(-7,\"世界\"))));} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Out","data":{"kind":"variant","value":{"tag":"Ok","fields":[{"type":"Maybe","data":{"kind":"variant","value":{"tag":"Some","fields":[{"type":"Pair","data":{"kind":"tuple","value":[{"type":"I8","data":{"kind":"integer","value":"-7"}},{"type":"String","data":{"kind":"string","value":"世界"}}]}}]}}}]}}},"stdout":"","live_allocations":1}
+    },
+    {
+      "id": "owned_argument_select_true",
+      "source": "module app { @id(\"main\") fn main(flag:Bool,left:String,right:String)->String {if flag {return left;}else{return right;}} }",
+      "arguments": [{"type":"Bool","data":{"kind":"bool","value":true}},{"type":"String","data":{"kind":"string","value":"left"}},{"type":"String","data":{"kind":"string","value":"right"}}],
+      "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":"left"}},"stdout":"","live_allocations":1}
+    },
+    {
+      "id": "owned_argument_select_false",
+      "source": "module app { @id(\"main\") fn main(flag:Bool,left:String,right:String)->String {if flag {return left;}else{return right;}} }",
+      "arguments": [{"type":"Bool","data":{"kind":"bool","value":false}},{"type":"String","data":{"kind":"string","value":"left"}},{"type":"String","data":{"kind":"string","value":"right"}}],
+      "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":"right"}},"stdout":"","live_allocations":1}
+    },
+    {
+      "id": "empty_string_clone",
+      "source": "module app { @id(\"main\") fn main()->String effects [alloc] {let a:String=\"\";return clone(a);} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":""}},"stdout":"","live_allocations":1}
+    },
+    {
+      "id": "owned_string_loop_and_cleanup",
+      "source": "module app { @id(\"main\") fn main()->I32 effects [alloc] {let text:String=\"abc\";let mut n:I32=0;while n<3 {let size:Usize=runtime.string_len(text);n=n+1;}return n;} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"I32","data":{"kind":"integer","value":"3"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "loop_parallel_values",
+      "source": "module app { @id(\"main\") fn main()->I32 {let mut a:I32=1;let mut b:I32=2;let mut n:I32=0;while n<3 {let old:I32=a;a=b;b=old;n=n+1;}return a*10+b;} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"I32","data":{"kind":"integer","value":"21"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "break_continue_nested_join",
+      "source": "module app { @id(\"main\") fn main()->I32 {let mut n:I32=0;let mut total:I32=0;while n<10 {n=n+1;if n==3 {continue;}if n==7 {break;}total=total+n;}return total;} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"I32","data":{"kind":"integer","value":"18"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "utf8_capture_and_unit_result",
+      "source": "module app { @id(\"main\") fn main()->Unit effects [alloc,process] {runtime.print_i64(-42);runtime.print_string(\"\\n你好\");return;} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Unit","data":{"kind":"unit"}},"stdout":"-42\n你好","live_allocations":0}
+    },
+    {
+      "id": "record_source_evaluation_order",
+      "source": "module app { @id(\"Pair\") type Pair=record {first:I64,second:I64};fn mark(n:I64)->I64 effects [process] {runtime.print_i64(n);return n;}@id(\"main\") fn main()->Pair effects [process] {return Pair {second:mark(2),first:mark(1)};} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Pair","data":{"kind":"record","value":[{"type":"I64","data":{"kind":"integer","value":"1"}},{"type":"I64","data":{"kind":"integer","value":"2"}}]}},"stdout":"21","live_allocations":0}
+    },
+    {
+      "id": "question_error_releases_owner",
+      "source": "module app { @id(\"Out\") type Out=Result<I32,I32>;fn fail()->Out{return Err(9);}@id(\"main\") fn main()->Out effects [alloc] {let owner:String=\"alive\";let n:I32=fail()?;return Ok(n);} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Out","data":{"kind":"variant","value":{"tag":"Err","fields":[{"type":"I32","data":{"kind":"integer","value":"9"}}]}}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "template_success",
+      "source": "module app { @id(\"Out\") type Out=Result<I64,core.AllocError>;@id(\"main\") fn main()->Out effects [alloc] {let name:String=\"World\";let text:String=f\"Hello ${name}\"?;let n:Usize=runtime.string_len(text);return Ok(cast<I64>(n));} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"Out","data":{"kind":"variant","value":{"tag":"Ok","fields":[{"type":"I64","data":{"kind":"integer","value":"11"}}]}}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "template_allocation_error",
+      "source": "module app { @id(\"Out\") type Out=Result<String,core.AllocError>;@id(\"main\") fn main()->Out effects [alloc] {let name:String=\"12345678\";return f\"abcdefgh${name}\";} }",
+      "arguments": [],
+      "limits": {"max_heap_bytes":20},
+      "expected": {"status":"returned","value":{"type":"Out","data":{"kind":"variant","value":{"tag":"Err","fields":[{"type":"core.AllocError","data":{"kind":"variant","value":{"tag":"OutOfMemory","fields":[]}}}]}}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "option_owned_payload_match",
+      "source": "module app { @id(\"Maybe\") type Maybe=Option<String>;@id(\"main\") fn main()->I64 effects [alloc] {let value:Maybe=Some(\"abc\");match value {Some(text)=>{let n:Usize=runtime.string_len(text);return cast<I64>(n);}None=>{return 0;}}} }",
+      "arguments": [],
+      "expected": {"status":"returned","value":{"type":"I64","data":{"kind":"integer","value":"3"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "byte_buffer_argument",
+      "source": "module app { @id(\"main\") fn main(data:Bytes)->Usize{return runtime.bytes_len(data);} }",
+      "arguments": [{"type":"Bytes","data":{"kind":"bytes","value":[0,127,128,255]}}],
+      "expected": {"status":"returned","value":{"type":"Usize","data":{"kind":"integer","value":"4"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "embedded_nul_string_argument",
+      "source": "module app { @id(\"main\") fn main(data:String)->Usize{return runtime.string_len(data);} }",
+      "arguments": [{"type":"String","data":{"kind":"string","value":"a\u0000世界"}}],
+      "expected": {"status":"returned","value":{"type":"Usize","data":{"kind":"integer","value":"8"}},"stdout":"","live_allocations":0}
+    },
+    {
+      "id": "trap_retains_live_owners_without_unwinding",
+      "source": "module app { @id(\"main\") fn main()->I64 effects [alloc] {let owner:String=\"alive\";@id(\"explode\") let n:I64=1/0;return n;} }",
+      "arguments": [],
+      "expected": {"status":"trapped","code":"E_DIVIDE_BY_ZERO","entity_id":"explode","stdout":"","live_allocations":1}
+    },
+    {
+      "id": "mixed_alignment_sum_argument",
+      "source": "module app { @id(\"Choice\") type Choice=sum {Empty,Data(I8,U64,String)};@id(\"main\") fn main(value:Choice)->U64 {match value {Empty=>{return 0;}Data(small,wide,text)=>{drop(text);return wide;}}} }",
+      "arguments": [{"type":"Choice","data":{"kind":"variant","value":{"tag":"Data","fields":[{"type":"I8","data":{"kind":"integer","value":"-128"}},{"type":"U64","data":{"kind":"integer","value":"18446744073709551615"}},{"type":"String","data":{"kind":"string","value":"owned"}}]}}}],
+      "expected": {"status":"returned","value":{"type":"U64","data":{"kind":"integer","value":"18446744073709551615"}},"stdout":"","live_allocations":0}
+    }
+  ]
+}

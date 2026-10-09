@@ -38,5 +38,7 @@ jobs:
           path: |
             build/ci/
             build/*_report.json
+            build/*-failed-artifacts/
+            build/failures/
           if-no-files-found: warn
           retention-days: 30
