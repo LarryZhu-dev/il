@@ -1,9 +1,26 @@
 use std::{io::Read,process::{Command,Stdio},sync::{Arc,atomic::{AtomicBool,Ordering}},time::{Duration,Instant}};
 pub const OUTPUT_LIMIT:u64=8*1024*1024;
 pub struct ProcessFailure{pub message:String,pub exit_code:Option<i32>,pub stdout:Vec<u8>,pub stderr:Vec<u8>}
+/// Keep an owned command from surviving a killed worker, even in its own group.
+/// The parent check closes the fork-to-prctl race; Linux does not deliver the
+/// configured signal retroactively when the parent has already died.
+pub fn kill_on_parent_death(command:&mut Command){
+    #[cfg(target_os="linux")]{
+        use std::os::unix::process::CommandExt;
+        let parent=std::process::id() as i32;
+        unsafe{command.pre_exec(move||{
+            unsafe extern "C"{fn prctl(option:i32,...)->i32;fn getppid()->i32;}
+            if prctl(1,9usize,0usize,0usize,0usize)<0{return Err(std::io::Error::last_os_error())}
+            if getppid()!=parent{return Err(std::io::Error::from_raw_os_error(3))}
+            Ok(())
+        });}
+    }
+    #[cfg(not(target_os="linux"))]let _=command;
+}
 pub fn bounded_command(mut command:Command,timeout:Duration)->Result<(Option<i32>,Vec<u8>,Vec<u8>),ProcessFailure>{
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(unix)]{use std::os::unix::process::CommandExt;command.process_group(0);}
+    kill_on_parent_death(&mut command);
     let mut child=command.spawn().map_err(|e|ProcessFailure{message:e.to_string(),exit_code:None,stdout:vec![],stderr:vec![]})?;
     let out=child.stdout.take().unwrap();let err=child.stderr.take().unwrap();
     let capped=Arc::new(AtomicBool::new(false));
@@ -32,3 +49,21 @@ fn terminate(child:&mut std::process::Child){
     let _=child.kill();
 }
 
+#[cfg(all(test,target_os="linux"))]
+#[path="process_test_support.rs"]
+mod process_test_support;
+
+#[cfg(all(test,target_os="linux"))]
+mod tests{
+    use super::*;
+    #[test]
+    fn bounded_child_dies_and_is_reaped_after_parent_sigkill(){
+        if let Some(directory)=std::env::var_os("IL_PARENT_DEATH_WORKER"){
+            let mut command=Command::new("/usr/bin/python3");
+            command.current_dir(directory).args(["-c","import os,time;open('child.pid','w').write(str(os.getpid()));time.sleep(30)"]);
+            let _=bounded_command(command,Duration::from_secs(30));
+            panic!("worker returned before supervisor killed it");
+        }
+        process_test_support::assert_parent_death("process::tests::bounded_child_dies_and_is_reaped_after_parent_sigkill",|_|{});
+    }
+}
