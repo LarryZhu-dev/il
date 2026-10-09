@@ -54,6 +54,8 @@ stable_codes:
   - E_NATIVE_EXECUTION_FAILED
   - E_HOST_POLICY_INVALID
   - E_ALLOCATION_FAILED
+  - E_INDEX_OUT_OF_BOUNDS
+  - E_HTTP_DECLARATION
   - E_UNSUPPORTED_TARGET
 retryable_false: stop_automatic_retry_and_set_DESIGN_REQUIRED_or_BLOCKED
 diagnostic_identity: deterministic_revision_stage_entity_code_and_ordinal

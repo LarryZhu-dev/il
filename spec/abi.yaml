@@ -18,6 +18,8 @@ layout:
   String: owned_pointer_length_capacity
   Bytes: owned_pointer_length_capacity
   core.File: opaque_slot_u64_generation_u64_size16_align8
+  net.Listener: opaque_slot_u64_generation_u64_size16_align8
+  net.Stream: opaque_slot_u64_generation_u64_size16_align8
   core.Deadline: sum_Infinite_At_u64_size16_align8
   Record: declaration_order_with_natural_alignment_padding
   Tuple: position_order_with_natural_alignment_padding
