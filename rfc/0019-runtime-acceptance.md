@@ -93,3 +93,13 @@ are checked from the evidence; artifact bytes must agree within a fixed profile
 and optimization mode. Invalid builds retain candidates and never destroy an
 earlier executable or object. All fixture descriptors/processes are closed before
 the suite returns, including failure paths.
+
+
+The runtime CLI suite additionally checks that captured output uses actual blocking
+pipes: a finite stdout deadline returns InvalidData consistently in interpreter
+and native execution. It also exercises repeated 20,000-byte call identifiers.
+The independent 1 MiB active stack budget traps without truncating accepted frames;
+the CLI separately enforces its 256 KiB envelope budget and returns
+E_CONTEXT_INSUFFICIENT for oversized execution responses. Native attack receipts
+are therefore inspected through the retained artifact and a fresh fd-3 process
+run, while interpreter unit acceptance directly inspects the full bounded report.

@@ -1,0 +1,91 @@
+{
+  "contract_version": "1.0.0",
+  "fixture": {
+    "read_file": "input.bin",
+    "read_bytes": [0, 65, 127, 128, 255, 10],
+    "write_file": "output.bin",
+    "existing_bytes": [111, 108, 100, 45, 99, 111, 110, 116, 101, 110, 116],
+    "write_bytes": [65, 0, 255, 66],
+    "outside_file": "sentinel.bin",
+    "outside_bytes": [111, 117, 116, 115, 105, 100, 101],
+    "symlink": "escape"
+  },
+  "io_cases": [
+    {"id":"file_read_all_bytes","operation":"file_read","expected":{"tag":"Ok","bytes":[0,65,127,128,255,10],"live_handles":0}},
+    {"id":"file_read_some_first_chunk","operation":"file_read_some","maximum":3,"deadline":"Infinite","expected":{"tag":"Ok","bytes":[0,65,127],"live_handles":0}},
+    {"id":"file_read_some_zero","operation":"file_read_some","maximum":0,"deadline":"Infinite","expected":{"tag":"Ok","bytes":[],"live_handles":0}},
+    {"id":"file_read_some_eof","operation":"file_read_some","read_before":6,"maximum":3,"deadline":"Infinite","expected":{"tag":"Ok","bytes":[],"live_handles":0}},
+    {"id":"file_write_all_truncates","operation":"file_write","expected":{"tag":"Ok","count":4,"file_bytes":[65,0,255,66],"live_handles":0}},
+    {"id":"file_write_some_offset","operation":"file_write_some","offset":1,"deadline":"Infinite","expected":{"tag":"Ok","count":3,"file_bytes":[0,255,66],"live_handles":0}},
+    {"id":"file_write_some_end_offset","operation":"file_write_some","offset":4,"deadline":"Infinite","expected":{"tag":"Ok","count":0,"file_bytes":[],"live_handles":0}},
+    {"id":"file_write_some_invalid_offset","operation":"file_write_some","offset":5,"deadline":"Infinite","expected":{"tag":"Err","error":"InvalidData","file_bytes":[],"live_handles":0}},
+    {"id":"explicit_close_releases_owner","operation":"file_close","expected":{"tag":"Ok","unit":true,"live_handles":0}},
+    {"id":"implicit_close_on_return","operation":"drop_at_return","expected":{"return_integer":"42","live_handles":0}},
+    {"id":"aggregate_implicit_close","operation":"drop_aggregate_at_return","expected":{"return_integer":"42","live_handles":0}},
+    {"id":"question_error_closes_file","operation":"question_error_cleanup","expected":{"tag":"Err","error_integer":"9","live_handles":0}},
+    {"id":"returned_file_is_output_only_owner","operation":"return_file","expected":{"resource_kind":"file","live_handles":1}},
+    {"id":"expired_file_read_deadline","operation":"file_read_some","maximum":3,"deadline":{"At":"0"},"expected":{"tag":"Err","error":"Timeout","live_handles":0}},
+    {"id":"expired_file_write_deadline","operation":"file_write_some","offset":0,"deadline":{"At":"0"},"expected":{"tag":"Err","error":"Timeout","file_bytes":[],"live_handles":0}}
+  ],
+  "containment_cases": [
+    {"id":"parent_traversal_read","grant":"read","relative_path":"../outside/sentinel.bin","expected_error":"PermissionDenied"},
+    {"id":"parent_traversal_write","grant":"write","relative_path":"../outside/sentinel.bin","expected_error":"PermissionDenied"},
+    {"id":"absolute_path_read","grant":"read","path_fixture":"outside_absolute","expected_error":"PermissionDenied"},
+    {"id":"nul_path_read","grant":"read","relative_path":"input.bin\u0000suffix","expected_error":"PermissionDenied"},
+    {"id":"symlink_escape_read","grant":"read","relative_path":"escape/sentinel.bin","expected_error":"PermissionDenied"},
+    {"id":"symlink_escape_write","grant":"write","relative_path":"escape/sentinel.bin","expected_error":"PermissionDenied"}
+  ],
+  "fault_cases": [
+    {"id":"read_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null},"operation":"file_read_some","maximum":6,"expected":{"tag":"Ok","bytes":[0,65],"live_handles":0}},
+    {"id":"write_chunk_cap","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":null},"operation":"file_write_some","expected":{"tag":"Ok","count":2,"file_bytes":[65,0],"live_handles":0}},
+    {"id":"second_read_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"two_file_reads","expected":{"first_bytes":[0,65],"tag":"Err","error":"Read","live_handles":0}},
+    {"id":"second_write_fails","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"two_file_writes","expected":{"first_count":2,"tag":"Err","error":"Write","file_bytes":[65,0],"live_handles":0}},
+    {"id":"complete_print_stops_after_partial_failure","faults":{"allocation_fail_after":null,"io_max_chunk":2,"io_fail_after":1},"operation":"print_i64","integer":123456,"expected":{"tag":"Err","error":"Write","stdout":[49,50],"live_handles":0}},
+    {"id":"stdin_allocation_failure_is_other","faults":{"allocation_fail_after":0,"io_max_chunk":null,"io_fail_after":null},"operation":"stdin_read","maximum":6,"stdin":[0,65,127,128,255,10],"expected":{"tag":"Err","error":"Other","live_handles":0}}
+  ],
+  "stream_cases": [
+    {"id":"blocking_stdin_finite_deadline","nonblocking":false,"writer_open":true,"deadline_after_ms":100,"expected":{"tag":"Err","error":"InvalidData","elapsed_max_ms":2000}},
+    {"id":"nonblocking_stdin_deadline","nonblocking":true,"writer_open":true,"deadline_after_ms":100,"expected":{"tag":"Err","error":"Timeout","elapsed_min_ms":60,"elapsed_max_ms":2000}},
+    {"id":"nonblocking_stdin_ready","nonblocking":true,"writer_open":true,"stdin":[65,0,255,66],"deadline_after_ms":1000,"expected":{"tag":"Ok","bytes":[65,0,255,66]}},
+    {"id":"nonblocking_stdin_eof","nonblocking":true,"writer_open":false,"deadline_after_ms":1000,"expected":{"tag":"Ok","bytes":[]}},
+    {"id":"stdin_eintr_preserves_deadline","execution_owner":"runtime_handles_module","nonblocking":true,"writer_open":true,"deadline_after_ms":100,"interrupt_after_ms":[20,40,60],"expected":{"tag":"Err","error":"Timeout","elapsed_min_ms":60,"elapsed_max_ms":2000}}
+  ],
+  "rejections": [
+    {"id":"missing_selected_grant","reason":"declared requirement absent from trusted grants"},
+    {"id":"same_kind_wrong_grant","reason":"different grant ID cannot satisfy selected capability"},
+    {"id":"selected_grant_scope_mismatch","reason":"same ID with another directory is not the same grant"},
+    {"id":"missing_capability_selector","reason":"privileged operation must select a stable capability ID"},
+    {"id":"extra_capability_selector","reason":"unprivileged operation must not accept a capability selector"},
+    {"id":"transaction_mints_grant","reason":"requirement transaction cannot create host authority"},
+    {"id":"policy_duplicate_grant_id","reason":"duplicate trusted capability IDs are invalid"},
+    {"id":"policy_unknown_field","reason":"host-policy schema is closed"},
+    {"id":"policy_exceeds_64kib","reason":"host-policy byte limit is enforced before parsing"},
+    {"id":"fault_zero_io_chunk","reason":"non-null io_max_chunk must be positive"},
+    {"id":"request_injects_faults","reason":"ordinary tool request cannot supply trusted faults"},
+    {"id":"application_fault_policy","reason":"test faults require captured execution"},
+    {"id":"startup_missing_policy","reason":"required native authority must be injected on descriptor 4"},
+    {"id":"startup_malformed_policy","reason":"native startup independently parses host policy"},
+    {"id":"startup_insufficient_policy","reason":"compiled requirements are not embedded permission"},
+    {"id":"captured_resource_argument","reason":"resource descriptors cannot be imported as arguments"},
+    {"id":"nested_resource_argument","reason":"aggregate resource descriptors cannot recreate authority"},
+    {"id":"file_clone","reason":"File cannot be cloned"},
+    {"id":"file_field_projection","reason":"File ABI fields are not language-readable fields"},
+    {"id":"file_construction","reason":"File ABI fields cannot create resources"},
+    {"id":"file_use_after_close","reason":"explicit close consumes the File owner"}
+  ],
+  "stack": {
+    "source": "module app {@id(\"main\") fn main()->I64 {@id(\"main.call\") let n:I64=outer();return n;} @id(\"outer\") fn outer()->I64 {@id(\"outer.call\") let n:I64=inner();return n;} @id(\"inner\") fn inner()->I64 {@id(\"inner.divide\") let n:I64=1/0;return n;}}",
+    "expected":{"status":"trapped","code":"E_DIVIDE_BY_ZERO","entity_id":"inner.divide","function_order":["inner","outer","main"],"call_sites":["outer.call","main.call"],"application_exit":101}
+  },
+  "profiles": {
+    "full":{"runtime_archive":true,"executable":true,"captured":true},
+    "minimal":{"runtime_archive":true,"executable":true,"captured":false,"elf_type":"executable","interpreter_segment":false,"dynamic_dependencies":[],"undefined_symbols":[],"forbidden_symbol_fragments":["il_rt_","serde","malloc","__libc","rust_eh_personality"],"stdout":"42","normal_exit":0,"trap_exit":101,"reject":["String","Bytes","core.File","alloc","fs","net","clock","forbidden_unused_function"]},
+    "none":{"runtime_archive":false,"executable":false,"captured":false,"elf_type":"relocatable","interpreter_segment":false,"dynamic_dependencies":[],"undefined_symbols":[],"export_entity":"math.add","export_symbol":"il_6d6174682e616464","arguments":[20,22],"return_integer":42,"reject":["empty_exports","unknown_export","private_export","external_aggregate_argument","external_aggregate_result","managed_value","host_effect","forbidden_unused_function"]}
+  },
+  "profile_sources": {
+    "minimal_output":"module app {@id(\"main\") fn main()->I32 effects [process] {runtime.print_i64(42);return 0;}}",
+    "minimal_trap":"module app {@id(\"main\") fn main()->I32 {@id(\"main.divide\") let n:I32=1/0;return n;}}",
+    "none_add":"module math visibility public {@id(\"math.add\") fn add(a:I64,b:I64)->I64 {return a+b;}}"
+  },
+  "host_resource_module_requirements":["stale_slot_generation_rejected","double_close_does_not_close_replacement","close_not_retried_after_eintr","process_fd_count_returns_to_baseline","returned_owner_context_cleanup","trap_context_cleanup","absolute_deadline_not_restarted"]
+}
