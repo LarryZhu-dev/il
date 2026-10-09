@@ -48,7 +48,9 @@ Runtime startup independently checks the requirement table against the policy,
 opens directory grants and holds their descriptors. A compiled grant index names
 that checked table; untrusted dynamic integers cannot supply an index to a
 privileged runtime call. Build evidence binds requirements and policy identity;
-execution evidence binds the policy actually used. Compiler checks alone do not
+execution evidence binds the policy actually used. Policy identity hashes a JSON
+object with recursively sorted property names, two-space indentation and a final
+LF; the absent-policy case hashes the canonical empty policy, never null. Compiler checks alone do not
 authorize a subsequently launched application.
 
 ## Owned file resources
@@ -65,7 +67,8 @@ Explicit close consumes the language owner regardless of its result. The slot
 is invalidated before closing the descriptor; a stale or repeated close returns
 `IoError::Closed` without touching any replacement descriptor. Linux close is
 not retried on EINTR. Implicit drop uses the same invalidation and close path,
-records any close failure, and never duplicates ownership. Context destruction
+records any close failure, and never duplicates ownership. Explicit and implicit
+File cleanup requires the containing function to declare the fs effect. Context destruction
 closes any remaining host resources, including after a captured returned owner
 has been reported. Unrecoverable guest traps do not unwind language frames.
 
@@ -92,7 +95,9 @@ Read returns one actual chunk; an empty chunk means EOF (or a zero-sized request
 Write returns the actual byte count. An offset equal to the buffer length returns
 zero; an offset beyond it is InvalidData. Partial I/O is never reported as full
 completion. Allocation failure in a Result whose error is IoError returns Other;
-executor quota violations remain diagnostic E_RESOURCE_LIMIT traps.
+executor quota violations in these IoError-returning calls remain diagnostic
+E_RESOURCE_LIMIT traps. Existing string_concat returns AllocError::OutOfMemory
+on allocation quota exhaustion, preserving its locked P04/P05 Result contract.
 
 Regular-file disk syscalls cannot be cancelled by poll or O_NONBLOCK. Their
 deadline is checked before a syscall; P06 does not claim hard real-time disk
@@ -118,6 +123,52 @@ convenience contracts and must use the same authority and resource core. Existin
 print_i64/print_string keep their complete-write Result<Unit,IoError> contract.
 The IoError and AllocError variant order from RFC0007 remains unchanged.
 
+Whole-buffer reads loop to EOF with fixed 8192-byte host scratch space, use
+fallible accumulation with guest-quota checks before growth, and allocate the
+final guest buffer once. Scratch bytes are not language allocations or lifecycle
+events. They accept any contained readable file supported by the host core;
+the infinite deadline does not promise bounded latency. Whole-buffer writes loop
+over partial progress and return the total only on completion. Both always close
+the temporary handle. An operation error takes precedence over a close error;
+otherwise close failure becomes the Result error. Quotas and allocation faults
+use the shared allocator and identical counters in both execution engines.
+
+## Full runtime ABI
+
+All names below have the `il_rt_` prefix. Context and aggregate arguments are
+pointers. Grant indices and lengths are u64. Status-returning calls return u32:
+zero is success, otherwise the stable IoError tag plus one. Out arguments are
+initialized only on success. Buffer is pointer/length/capacity (24 bytes), File
+is slot/generation (16 bytes), Deadline is tag/payload (16 bytes).
+
+```
+authorize(ctx, requirements_json_ptr, length:u64, policy_fd:i32) -> void
+file_open_read/write(ctx, out_file, grant:u64, path_buffer) -> u32
+file_read_some(ctx, out_buffer, file, max:u64, deadline) -> u32
+file_write_some(ctx, out_count, file, buffer, offset:u64, deadline) -> u32
+file_close(ctx, file) -> u32
+file_drop(ctx, file) -> void
+trace_file(ctx, file) -> void
+json_file(ctx, file) -> void
+file_read(ctx, out_buffer, grant:u64, path_buffer) -> u32
+file_write(ctx, out_count, grant:u64, path_buffer, buffer) -> u32
+stdin_read(ctx, out_buffer, max:u64, deadline) -> u32
+stdout_write/stderr_write(ctx, out_count, buffer, offset:u64, deadline) -> u32
+clock_now(ctx, grant:u64) -> u64
+```
+
+Authorization runs after context construction and entry location initialization,
+before captured argument import or user code. `context_new` starts deny-all.
+The requirement JSON is a canonical array of Capability sorted by entity ID.
+`trace_file` validates a live handle; it never invents an allocation ID. File
+descriptors are output-only ValueData resource objects containing
+`{kind:"file",slot,generation}`. Handle events contain `kind` (opened/closed/dropped),
+`entity_id`, `slot`, `generation`, and required-nullable IoError variant `error`.
+Stack frames contain `function_id`, required-nullable `call_site`, and `entity_id`.
+The call site is the caller's current entity when entering the callee. Existing
+enter/leave/location/tick ABI maintains these frames. Reports always include
+`live_handles`, `handle_events`, and `stack_trace` (empty on success/rejection).
+
 ## Runtime implementation boundaries
 
 Safe host-resource code lives in `runtime/handles`; grant validation and inherited
@@ -140,6 +191,26 @@ stack trace. Resource returns use an output-only typed resource descriptor with
 kind, slot and generation; captured arguments always reject resource descriptors,
 including nested descriptors. They cannot recreate authority. Reported live
 owners are guest ownership counts before the harness releases returned resources.
+
+The active language stack has an independent 1,048,576-byte budget in Full
+application and captured execution. Its size is the exact compact UTF-8 JSON
+array encoding of all active StackFrame objects, including punctuation and JSON
+string escaping. It is independent of max_output_bytes and does not restrict
+which stable IDs are valid in a graph. Enter checks the prospective full frame
+before pushing; location changes check the replacement innermost frame before
+changing either the frame or current entity. Leave releases the popped frame's
+bytes. The initial empty stack costs two bytes. Before any frame exists, a
+current entity's compact JSON string must also fit this limit.
+
+If a push or location update exceeds the budget, execution traps with
+E_RESOURCE_LIMIT and `stack trace budget exhausted` at the previous current
+entity. The rejected frame/location never becomes active. The report retains
+all previously active frames in order without truncation, and does not repeat
+the rejected oversized ID in its cause or related entities. Explicit diagnostic
+entity overrides must fit the same JSON string limit; an oversized override
+produces this budget trap using the existing current entity instead. These
+checks occur before copying prospective IDs into runtime state, so oversized
+text cannot allocate an unbounded stack frame merely to calculate its size.
 
 ## Independent runtime profiles
 

@@ -14,7 +14,7 @@ capability_origin: host_injection_only
 capability_construction_by_graph: forbidden
 capability_forgery_by_cast: forbidden
 capability_argument: explicit
-path_scope: canonical_path_containment_checked_at_open
+path_scope: held_dirfd_openat2_RESOLVE_BENEATH_and_RESOLVE_NO_MAGICLINKS
 address_scope: normalized_address_and_port_exact_match
 command_scope: locked_executable_and_argument_policy
 effect_capability_pairs:
@@ -23,4 +23,13 @@ effect_capability_pairs:
   listen: [net, Listen]
   connect: [net, Connect]
   spawn: [process, SpawnProcess]
-  now: [clock, ClockRead]
+  clock_now: [clock, ClockRead]
+  file_open_read: [fs, FileRead]
+  file_open_write: [fs, FileWrite]
+  file_read_some: [fs, alloc, derived_handle]
+  file_write_some: [fs, derived_handle]
+  file_close: [fs, derived_handle]
+  file_drop: [fs, derived_handle]
+  stdin_read: [process, alloc]
+  stdout_write: [process]
+  stderr_write: [process]
