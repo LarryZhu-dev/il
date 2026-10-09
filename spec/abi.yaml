@@ -17,6 +17,8 @@ layout:
   Usize: unsigned_pointer_width
   String: owned_pointer_length_capacity
   Bytes: owned_pointer_length_capacity
+  core.File: opaque_slot_u64_generation_u64_size16_align8
+  core.Deadline: sum_Infinite_At_u64_size16_align8
   Record: declaration_order_with_natural_alignment_padding
   Tuple: position_order_with_natural_alignment_padding
   Sum: u32_discriminant_then_maximum_aligned_payload
@@ -28,9 +30,19 @@ allocator_owner: allocating_runtime
 cross_boundary_unwinding: forbidden
 entrypoint:
   source: 'fn main() -> I32'
-  host: runtime_startup_calls_il_main
+  host: llvm_main_creates_context_authorizes_fd4_then_calls_encoded_entry
   success_exit: 0
   trap_exit: 101
+  no_runtime: explicit_public_scalar_exports_in_relocatable_object
+  no_runtime_trap: llvm_trap_machine_signal
+runtime_profiles:
+  full: libil_native_runtime.a
+  minimal: libil_minimal_runtime.a_static_no_std_syscalls
+  none: no_archive_no_startup
+capture_report_fd: 3
+trusted_policy_fd: 4
+grant_index: u64_sorted_requirement_index_not_authority
+stack_trace_max_json_bytes: 1048576
 debug_information: source_entity_id_and_text_span_when_available
 symbol_naming: il_prefix_and_hex_encoded_entity_id
 target_extension_requires: [abi, runtime, syscall, linker, blackbox, reproducibility]

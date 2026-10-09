@@ -2,7 +2,10 @@ spec_version: '1.0.0'
 scalar: copy
 scalar_types: [Unit, Bool, I8, I16, I32, I64, U8, U16, U32, U64, Usize]
 owned_heap_value: move
-copy_owned_value: explicit_clone
+copy_owned_value: explicit_clone_except_nonduplicable_resources
+owned_resource_value: move_only_no_field_projection
+file_cleanup_effect: fs
+file_close: invalidate_generation_before_single_syscall_no_EINTR_retry
 aggregate_copy: all_fields_copy
 borrow_shared: lexical_non_escaping
 borrow_mut: unique_lexical_non_escaping
