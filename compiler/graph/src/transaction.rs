@@ -76,7 +76,6 @@ pub fn apply_transaction(base: &Graph, transaction: &Transaction) -> (Graph, Vec
         if !scopes.contains(&operation.entity_id().to_owned()) { reject("E_INVALID_SCOPE", Some(operation.entity_id()), "modified entity is outside the exact transaction scope"); }
         if let TransactionOperation::ReplaceProgram { graph } = operation {
             if graph.revision != base.revision { reject("E_STALE_REVISION", Some("program"), "imported program must identify the transaction base revision"); }
-            if graph.capabilities != base.capabilities { reject("E_CAPABILITY_MISSING", Some("program"), "ordinary transactions cannot create or change host-injected capabilities"); }
         }
     }
     drop(reject);

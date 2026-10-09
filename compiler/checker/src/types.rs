@@ -79,3 +79,17 @@ impl<'a> Types<'a> {
 }
 
 pub fn is_owned_type(graph: &Graph, name: &str) -> bool { Types::new(graph).is_owned(name) }
+
+/// Whether recursive destruction may close an owned host file.
+pub fn contains_file_type(graph: &Graph, name: &str) -> bool {
+    let mut pending = vec![name];
+    let mut seen = BTreeSet::new();
+    while let Some(name) = pending.pop() {
+        if name == "core.File" { return true; }
+        if !seen.insert(name) { continue; }
+        if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == name) {
+            pending.extend(ty.parameters.iter().chain(ty.fields.iter().map(|field| &field.type_ref)).chain(ty.variants.iter().flat_map(|variant| &variant.fields)).map(String::as_str));
+        }
+    }
+    false
+}

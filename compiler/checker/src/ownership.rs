@@ -76,6 +76,7 @@ pub(super) fn check_function(context: &Context<'_>, function: &Function, facts: 
         let edges = edges(operation);
         if edges.is_empty() {
             apply_operation(context, operation, facts.get(&operation.entity_id), &mut state);
+            if operation.opcode == Opcode::Return { check_cleanup_effect(context, function, operation, &state, true); }
             for loan in state.loans.values().filter(|loan| loan.active) {
                 context.error("E_BORROW_ESCAPE", &operation.entity_id, format!("live loan of {} crosses lexical block end", loan.owner));
             }
@@ -98,6 +99,7 @@ pub(super) fn check_function(context: &Context<'_>, function: &Function, facts: 
                 }
                 if let (Some(destination), Some(variant)) = (target_block.arguments.get(index), refined.get(argument).cloned()) { refined.insert(destination.entity_id.clone(), variant); }
             }
+            check_cleanup_effect(context, function, operation, &edge_state, false);
             let parameters = function.parameters.iter().map(|parameter| (parameter.entity_id.clone(), *edge_state.life.get(&parameter.entity_id).unwrap_or(&Life::Conflict))).collect();
             refined.retain(|id, _| function.parameters.iter().any(|parameter| &parameter.entity_id == id) || target_block.arguments.iter().any(|argument| &argument.entity_id == id));
             let next = Incoming { parameters, refinements: refined };
@@ -118,6 +120,15 @@ pub(super) fn check_function(context: &Context<'_>, function: &Function, facts: 
             if changed { queue.push_back(target); }
         }
     }
+}
+
+fn check_cleanup_effect(context: &Context<'_>, function: &Function, operation: &Operation, state: &State, include_parameters: bool) {
+    if function.effects.contains(&Effect::Fs) { return; }
+    let closes_file = state.life.iter().any(|(id, life)| *life == Life::Live
+        && !state.loans.contains_key(id)
+        && (include_parameters || !function.parameters.iter().any(|parameter| &parameter.entity_id == id))
+        && state.types.get(id).is_some_and(|ty| super::contains_file_type(context.graph, ty)));
+    if closes_file { context.error("E_EFFECT_UNDECLARED", &operation.entity_id, "implicit File cleanup requires the fs effect"); }
 }
 
 fn apply_operation(context: &Context<'_>, operation: &Operation, facts: Option<&Facts>, state: &mut State) {

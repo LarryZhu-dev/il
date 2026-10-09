@@ -148,7 +148,11 @@ pub enum Literal { Bool(bool), Integer(i64), Unsigned(u64), String(String), Byte
 pub enum Attributes {
     Constant { value: Literal },
     Call { callee: EntityId },
-    RuntimeCall { symbol: String },
+    RuntimeCall {
+        symbol: String,
+        #[serde(default, deserialize_with = "optional_non_null", skip_serializing_if = "Option::is_none")]
+        capability: Option<EntityId>,
+    },
     Cast { target_type: TypeRef },
     Record { type_id: TypeRef },
     Field { field: String },
@@ -451,7 +455,7 @@ impl Operation {
     pub fn attributes_match(&self) -> bool {
         let fields_valid = match &self.attributes {
             Attributes::Call { callee } => valid_id(callee),
-            Attributes::RuntimeCall { symbol } => !symbol.is_empty(),
+            Attributes::RuntimeCall { symbol, capability } => !symbol.is_empty() && capability.as_ref().is_none_or(|id| valid_id(id)),
             Attributes::Cast { target_type } => !target_type.is_empty(),
             Attributes::Record { type_id } => !type_id.is_empty(),
             Attributes::Field { field } => valid_id(field),

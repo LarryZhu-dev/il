@@ -4,7 +4,7 @@ mod types;
 mod ownership;
 
 pub use runtime::*;
-pub use types::is_owned_type;
+pub use types::{is_owned_type, contains_file_type};
 
 use il_graph::*;
 use std::cell::RefCell;
@@ -87,6 +87,21 @@ impl Context<'_> {
             }
             if ty.kind != TypeKind::Record && !ty.fields.is_empty() || ty.kind != TypeKind::Sum && !ty.variants.is_empty() {
                 self.error("E_SCHEMA_INVALID", &ty.entity_id, "type members do not match its kind");
+            }
+        }
+        for ty in &self.graph.types {
+            let valid = match ty.entity_id.as_str() {
+                "core.File" => ty.kind == TypeKind::Record && ty.layout == Layout::Opaque
+                    && ty.parameters.is_empty() && ty.integer.is_none() && ty.variants.is_empty()
+                    && ty.fields == [Field { name:"slot".into(), type_ref:"U64".into() }, Field { name:"generation".into(), type_ref:"U64".into() }],
+                "core.Deadline" => ty.kind == TypeKind::Sum && ty.layout == Layout::Inferred
+                    && ty.parameters.is_empty() && ty.integer.is_none() && ty.fields.is_empty()
+                    && ty.variants == [Variant { name:"Infinite".into(), fields:vec![] }, Variant { name:"At".into(), fields:vec!["U64".into()] }],
+                _ => true,
+            };
+            if !valid { self.error("E_TYPE_MISMATCH", &ty.entity_id, "runtime nominal type differs from its locked ABI"); }
+            if ty.layout == Layout::Opaque && ty.entity_id != "core.File" {
+                self.error("E_UNSUPPORTED_FEATURE", &ty.entity_id, "opaque resource type has no implemented runtime ABI");
             }
         }
         for capability in &self.graph.capabilities {
@@ -297,7 +312,7 @@ impl Context<'_> {
             }
             Opcode::EndBorrow | Opcode::Drop => {
                 self.signature(operation, values, &[one_in.into()], &empty);
-                if operation.opcode == Opcode::Drop { self.move_owned(&mut facts, &operation.inputs, values); }
+                if operation.opcode == Opcode::Drop { self.move_owned(&mut facts, &operation.inputs, values); if contains_file_type(self.graph, one_in) { facts.effects.insert(Effect::Fs); } }
             }
             Opcode::Branch => {
                 if !outputs.is_empty() { self.error("E_TYPE_MISMATCH", &operation.entity_id, "branch cannot produce values"); }
@@ -368,7 +383,7 @@ impl Context<'_> {
     }
 
     fn runtime_call(&self, function: &Function, operation: &Operation, values: &BTreeMap<String, String>, facts: &mut Facts) {
-        let Attributes::RuntimeCall { symbol } = &operation.attributes else { return; };
+        let Attributes::RuntimeCall { symbol, capability } = &operation.attributes else { return; };
         let Some(signature) = runtime_signature(symbol) else { self.error("E_UNSUPPORTED_FEATURE", &operation.entity_id, "runtime symbol has no implemented static ABI contract"); return; };
         let output = match signature.result {
             RuntimeResult::Exact(name) => if name == "Unit" { vec![] } else { vec![name.into()] },
@@ -388,8 +403,11 @@ impl Context<'_> {
             if parameter.passing == Passing::Shared { facts.shared_inputs.insert(input.clone()); }
         }
         if let Some(kind) = signature.capability {
-            let granted = function.capabilities.iter().any(|id| self.graph.capabilities.iter().any(|capability| &capability.entity_id == id && capability.kind == kind && self.injected.contains(capability)));
-            if !granted { self.error("E_CAPABILITY_MISSING", &operation.entity_id, "runtime call lacks required trusted host capability"); }
+            let granted = capability.as_ref().is_some_and(|id| function.capabilities.contains(id)
+                && self.graph.capabilities.iter().any(|grant| &grant.entity_id == id && grant.kind == kind && self.injected.contains(grant)));
+            if !granted { self.error("E_CAPABILITY_MISSING", &operation.entity_id, "runtime call must explicitly select its required trusted host capability"); }
+        } else if capability.is_some() {
+            self.error("E_CAPABILITY_MISSING", &operation.entity_id, "runtime call does not accept a capability selector");
         }
     }
 

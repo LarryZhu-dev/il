@@ -107,7 +107,7 @@ impl Lower<'_> {
                 let signature = self.graph.functions.iter().find(|f| f.entity_id == *callee).ok_or_else(|| self.error("E_NAME_NOT_FOUND", "call target is not declared"))?;
                 operation.effects = signature.effects.clone();
             }
-            Attributes::RuntimeCall { symbol } => {
+            Attributes::RuntimeCall { symbol, .. } => {
                 let signature = runtime_signature(symbol).ok_or_else(|| self.error("E_UNSUPPORTED_FEATURE", "unknown runtime symbol"))?;
                 operation.effects = signature.effects.to_vec();
                 for (parameter, input) in signature.parameters.iter().zip(&operation.inputs) {
@@ -117,6 +117,7 @@ impl Lower<'_> {
             _ => {}
         }
         if opcode == Opcode::Const && operation.outputs.iter().any(|value| self.owns(&value.type_ref)) { operation.effects = vec![Effect::Alloc]; }
+        if opcode == Opcode::Drop && operation.inputs.first().and_then(|id| type_of(id)).is_some_and(|ty| il_checker::contains_file_type(self.graph, ty)) { operation.effects = vec![Effect::Fs]; }
         if opcode == Opcode::Clone && operation.inputs.first().and_then(|id| type_of(id)).is_some_and(|ty| self.owns(ty)) { operation.effects = vec![Effect::Alloc]; }
         operation.consumes = moved.into_iter().collect();
         if !matches!(opcode, Opcode::Borrow | Opcode::BorrowMut) { operation.produces = operation.outputs.iter().filter(|value| self.owns(&value.type_ref)).cloned().collect(); }
@@ -262,7 +263,7 @@ impl Lower<'_> {
             Expr::Literal(_) => None, Expr::Cast(ty, _) | Expr::Record(ty, _) => Some(ty.clone()),
             Expr::Unary(_, value) | Expr::Negate(value) => self.type_of_expression(value),
             Expr::Binary(opcode, left, right) => if matches!(opcode, Opcode::Eq | Opcode::Ne | Opcode::Lt | Opcode::Le | Opcode::Gt | Opcode::Ge) { Some("Bool".into()) } else { self.type_of_expression(left).or_else(|| self.type_of_expression(right)) },
-            Expr::Call(name, _) => {
+            Expr::Call(name, _, _) => {
                 let callee = resolve_name(self.graph, self.declarations, self.scope, name);
                 self.graph.functions.iter().find(|f| f.entity_id == callee).map(|f| f.result.clone())
                     .or_else(|| name.split_once("::").map(|(ty, _)| resolve_name(self.graph, self.declarations, self.scope, ty)))
@@ -302,7 +303,7 @@ impl Lower<'_> {
                 let input = self.expression(value, None, None)?;
                 self.output(Opcode::Cast, vec![input], expected.unwrap_or(target_type), Attributes::Cast { target_type: target_type.clone() }, preferred)
             }
-            Expr::Call(name, arguments) => self.call(name, arguments, expected, preferred),
+            Expr::Call(name, capability, arguments) => self.call(name, capability.as_deref(), arguments, expected, preferred),
             Expr::Record(ty, fields) => {
                 let declaration = self.graph.types.iter().find(|t| &t.entity_id == ty).cloned().ok_or_else(|| self.error("E_NAME_NOT_FOUND", "record type not found"))?;
                 if fields.len() != declaration.fields.len() || fields.iter().map(|(name, _)| name).collect::<BTreeSet<_>>().len() != fields.len() { return Err(self.error("E_TYPE_MISMATCH", "record fields must be supplied exactly once")); }
@@ -364,7 +365,7 @@ impl Lower<'_> {
         let module = self.graph.modules.iter_mut().find(|module| module.entity_id == self.scope).ok_or_else(|| Diagnostic::error("E_NAME_NOT_FOUND", None, "generated type requires an owning module", self.graph.revision))?;
         module.declarations.push(id.clone()); Ok(id)
     }
-    fn call(&mut self, name: &str, arguments: &[Expr], expected: Option<&str>, preferred: Option<(String, String)>) -> Result<String> {
+    fn call(&mut self, name: &str, capability: Option<&str>, arguments: &[Expr], expected: Option<&str>, preferred: Option<(String, String)>) -> Result<String> {
         if let Some(opcode) = match name { "move" => Some(Opcode::Move), "clone" => Some(Opcode::Clone), "borrow" => Some(Opcode::Borrow), "borrow_mut" => Some(Opcode::BorrowMut), "drop" => Some(Opcode::Drop), "end_borrow" => Some(Opcode::EndBorrow), _ => None } {
             if arguments.len() != 1 { return Err(self.error("E_TYPE_MISMATCH", "ownership operation requires one argument")); }
             let key = self.expression(&arguments[0], None, None)?;
@@ -382,7 +383,7 @@ impl Lower<'_> {
             let mut inputs = vec![];
             for (argument, parameter) in arguments.iter().zip(signature.parameters) { inputs.push(self.expression(argument, Some(parameter.type_ref), None)?); }
             let ty = match signature.result { RuntimeResult::Exact(ty) => ty.into(), RuntimeResult::Result { success, error } => self.ensure_result(success, error, expected)? };
-            return self.output(Opcode::RuntimeCall, inputs, &ty, Attributes::RuntimeCall { symbol: symbol.into() }, preferred);
+            return self.output(Opcode::RuntimeCall, inputs, &ty, Attributes::RuntimeCall { symbol: symbol.into(), capability: capability.map(str::to_owned) }, preferred);
         }
         let callee = resolve_name(self.graph, self.declarations, self.scope, name);
         if let Some(function) = self.graph.functions.iter().find(|function| function.entity_id == callee).cloned() {
@@ -506,7 +507,7 @@ impl Lower<'_> {
         let mut exits = vec![];
         let mut accumulator = values.remove(0);
         for (index, next) in values.into_iter().enumerate() {
-            let concat = self.output(Opcode::RuntimeCall, vec![accumulator, next], &result_type, Attributes::RuntimeCall { symbol: "string_concat".into() }, None)?;
+            let concat = self.output(Opcode::RuntimeCall, vec![accumulator, next], &result_type, Attributes::RuntimeCall { symbol: "string_concat".into(), capability: None }, None)?;
             let state = self.env.clone();
             let ok = self.target(format!("{id}.part.{index}.ok"), &state, None)?;
             let err = self.target(format!("{id}.part.{index}.err"), &state, None)?;

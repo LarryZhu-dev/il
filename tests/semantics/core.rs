@@ -88,7 +88,7 @@ fn capability_record_requires_identical_host_scope() {
 fn unknown_runtime_symbol_is_not_an_ffi_escape_hatch() {
     let mut graph = fixture("valid_integer_return");
     graph.functions[0].blocks[0].operations[0].opcode = Opcode::RuntimeCall;
-    graph.functions[0].blocks[0].operations[0].attributes = Attributes::RuntimeCall { symbol: "shell_eval".into() };
+    graph.functions[0].blocks[0].operations[0].attributes = Attributes::RuntimeCall { symbol: "shell_eval".into(), capability: None };
     assert_code(&graph, "E_UNSUPPORTED_FEATURE");
 }
 
@@ -96,7 +96,7 @@ fn unknown_runtime_symbol_is_not_an_ffi_escape_hatch() {
 fn stdout_runtime_cannot_discard_io_failure() {
     let mut graph = fixture("valid_integer_return");
     let input = graph.functions[0].blocks[0].operations[0].outputs[0].entity_id.clone();
-    let mut print = operation("main.print", Opcode::RuntimeCall, &[&input], &[], Attributes::RuntimeCall { symbol: "print_i64".into() });
+    let mut print = operation("main.print", Opcode::RuntimeCall, &[&input], &[], Attributes::RuntimeCall { symbol: "print_i64".into(), capability: None });
     print.effects = vec![Effect::Process];
     graph.functions[0].effects = vec![Effect::Process];
     graph.functions[0].blocks[0].operations.push(print);
@@ -290,4 +290,33 @@ fn huge_shallow_type_graph_is_budgeted_without_recursive_traversal() {
             fields: if index == 0 { vec![] } else { vec![Field { name: "next".into(), type_ref: format!("type_{}", index - 1) }] }, variants: vec![] });
     }
     assert_code(&graph, "E_RESOURCE_LIMIT");
+}
+
+#[test]
+fn privileged_runtime_calls_select_exact_grants() {
+    let mut graph = fixture("missing_host_capability");
+    let grants = graph.capabilities.clone();
+    let mut call = operation("main.clock", Opcode::RuntimeCall, &[], &[("main.now", "U64")],
+        Attributes::RuntimeCall { symbol:"clock_now".into(), capability:Some("host.clock".into()) });
+    call.effects = vec![Effect::Clock];
+    graph.functions[0].blocks[0].operations.push(call);
+    assert!(check_with_capabilities(&graph, &grants).is_empty());
+    for selector in [None, Some("ungranted.clock".into())] {
+        graph.functions[0].blocks[0].operations[0].attributes = Attributes::RuntimeCall { symbol:"clock_now".into(), capability:selector };
+        assert!(check_with_capabilities(&graph, &grants).iter().any(|d|d.code=="E_CAPABILITY_MISSING"));
+    }
+}
+
+#[test]
+fn host_resource_nominal_layout_cannot_be_redefined() {
+    let mut graph = fixture("valid_integer_return");
+    graph.modules[0].declarations.push("core.File".into());
+    graph.types.push(TypeDef { entity_id:"core.File".into(),kind:TypeKind::Record,layout:Layout::Opaque,
+        parameters:vec![],integer:None,fields:vec![Field{name:"slot".into(),type_ref:"U64".into()},Field{name:"generation".into(),type_ref:"U64".into()}],variants:vec![] });
+    assert!(check(&graph).is_empty());
+    graph.types[0].fields[1].type_ref="U32".into();
+    assert_code(&graph,"E_TYPE_MISMATCH");
+    graph.types[0].fields[1].type_ref="U64".into();
+    graph.types[0].layout=Layout::Inferred;
+    assert_code(&graph,"E_TYPE_MISMATCH");
 }

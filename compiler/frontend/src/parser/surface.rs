@@ -3,7 +3,7 @@ use super::*;
 #[derive(Clone)]
 pub(super) enum Expr {
     Literal(Literal), Name(String), Unary(Opcode, Box<Expr>), Negate(Box<Expr>),
-    Binary(Opcode, Box<Expr>, Box<Expr>), Call(String, Vec<Expr>), Cast(String, Box<Expr>),
+    Binary(Opcode, Box<Expr>, Box<Expr>), Call(String, Option<String>, Vec<Expr>), Cast(String, Box<Expr>),
     Try(Box<Expr>), Template(Vec<Expr>), Record(String, Vec<(String, Expr)>),
 }
 
@@ -121,7 +121,7 @@ fn statement_inner(parser: &mut Parser, scope: &str, owner: &str) -> Result<Stmt
             Statement::Assign(name, expr)
         } else {
             let expr = expression(parser, scope, 0)?; parser.expect(";")?;
-            if matches!(&expr, Expr::Call(name, _) if name == "eval") { return Err(parser.error("E_UNSUPPORTED_FEATURE", "runtime eval is forbidden")); }
+            if matches!(&expr, Expr::Call(name, _, _) if name == "eval") { return Err(parser.error("E_UNSUPPORTED_FEATURE", "runtime eval is forbidden")); }
             Statement::Eval(expr)
         }
     } else { return Err(parser.error("E_UNSUPPORTED_FEATURE", "unsupported statement")); };
@@ -160,10 +160,15 @@ fn expression_inner(parser: &mut Parser, scope: &str, min_precedence: u8) -> Res
             let content = parser.name()?; Expr::Template(template(parser, scope, &content)?)
         } else {
             let name = if parser.eat(":") { parser.expect(":")?; format!("{name}::{}", parser.name()?) } else { name };
+            let capability = if parser.eat("[") {
+                if !name.starts_with("runtime.") { return Err(parser.error("E_SCHEMA_INVALID", "only runtime calls accept a capability selector")); }
+                let id = parser.name()?; parser.expect("]")?; Some(id)
+            } else { None };
+            if capability.is_some() && !parser.is("(") { return Err(parser.error("E_SCHEMA_INVALID", "capability selector requires a call")); }
             if parser.eat("(") {
                 let mut args = vec![];
                 if !parser.eat(")") { loop { args.push(expression(parser, scope, 0)?); if parser.eat(")") { break; } parser.expect(",")?; }}
-                Expr::Call(name, args)
+                Expr::Call(name, capability, args)
             } else {
                 let ty = parser.resolve_name(scope, &name);
                 if parser.is("{") && parser.graph.types.iter().any(|t| t.entity_id == ty && t.kind == TypeKind::Record) {
@@ -204,7 +209,7 @@ fn check_expression_depth(parser: &Parser, expression: &Expr) -> Result<()> {
         match value {
             Expr::Unary(_, child) | Expr::Negate(child) | Expr::Cast(_, child) | Expr::Try(child) => pending.push((child, depth + 1)),
             Expr::Binary(_, left, right) => { pending.push((left, depth + 1)); pending.push((right, depth + 1)); }
-            Expr::Call(_, args) | Expr::Template(args) => pending.extend(args.iter().map(|arg| (arg, depth + 1))),
+            Expr::Call(_, _, args) | Expr::Template(args) => pending.extend(args.iter().map(|arg| (arg, depth + 1))),
             Expr::Record(_, fields) => pending.extend(fields.iter().map(|(_, value)| (value, depth + 1))),
             Expr::Literal(_) | Expr::Name(_) => {}
         }
