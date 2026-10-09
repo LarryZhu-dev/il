@@ -283,6 +283,27 @@
               "type": "string"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "route_table_id",
+            "route"
+          ],
+          "properties": {
+            "op": {
+              "const": "add_route"
+            },
+            "route_table_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+            },
+            "route": {
+              "$ref": "program_graph.schema.json#/$defs/http_route"
+            }
+          }
         }
       ]
     }

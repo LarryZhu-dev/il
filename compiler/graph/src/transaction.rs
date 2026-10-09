@@ -28,6 +28,7 @@ pub enum TransactionOperation {
     AddType { type_definition: TypeDef },
     AddFunction { function: Function },
     ReplaceFunction { function: Function },
+    AddRoute { route_table_id: EntityId, route: HttpRoute },
     RemoveEntity { entity_id: EntityId },
     ReplaceProgram { graph: Graph },
 }
@@ -41,6 +42,7 @@ impl TransactionOperation {
             Self::SetModuleDeclarations { entity_id, .. } | Self::RemoveEntity { entity_id } => entity_id,
             Self::AddType { type_definition } => &type_definition.entity_id,
             Self::AddFunction { function } | Self::ReplaceFunction { function } => &function.entity_id,
+            Self::AddRoute { route_table_id, .. } => route_table_id,
             Self::ReplaceProgram { .. } => "program",
         }
     }
@@ -74,6 +76,9 @@ pub fn apply_transaction(base: &Graph, transaction: &Transaction) -> (Graph, Vec
     }
     for operation in &transaction.operations {
         if !scopes.contains(&operation.entity_id().to_owned()) { reject("E_INVALID_SCOPE", Some(operation.entity_id()), "modified entity is outside the exact transaction scope"); }
+        if let TransactionOperation::AddRoute { route, .. } = operation {
+            if !scopes.contains(&route.entity_id) { reject("E_INVALID_SCOPE", Some(&route.entity_id), "new route is outside the exact transaction scope"); }
+        }
         if let TransactionOperation::ReplaceProgram { graph } = operation {
             if graph.revision != base.revision { reject("E_STALE_REVISION", Some("program"), "imported program must identify the transaction base revision"); }
         }
@@ -110,6 +115,19 @@ pub fn apply_transaction(base: &Graph, transaction: &Transaction) -> (Graph, Vec
             TransactionOperation::ReplaceFunction { function } => {
                 if let Some(existing) = candidate.functions.iter_mut().find(|value| value.entity_id == function.entity_id) { *existing = function.clone(); }
                 else { diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "function to replace does not exist", base.revision)); }
+            }
+            TransactionOperation::AddRoute { route_table_id, route } => {
+                if let Some(contract) = candidate.contracts.iter_mut().find(|contract| contract.entity_id == *route_table_id) {
+                    if !scopes.contains(&contract.subject) {
+                        diagnostics.push(Diagnostic::error("E_INVALID_SCOPE", Some(&contract.subject), "HTTP dispatcher is outside the exact transaction scope", base.revision));
+                    } else if contract.predicates.iter().filter(|predicate| matches!(predicate, ContractPredicate::HttpServer { .. })).count() != 1 {
+                        diagnostics.push(Diagnostic::error("E_HTTP_DECLARATION", Some(id), "route table must contain exactly one HTTP server predicate", base.revision));
+                    } else if let Some(ContractPredicate::HttpServer { routes, .. }) = contract.predicates.iter_mut().find(|predicate| matches!(predicate, ContractPredicate::HttpServer { .. })) {
+                        routes.push(route.clone());
+                    }
+                } else {
+                    diagnostics.push(Diagnostic::error("E_NAME_NOT_FOUND", Some(id), "HTTP route table does not exist", base.revision));
+                }
             }
             TransactionOperation::RemoveEntity { entity_id } => {
                 let before = candidate.modules.len() + candidate.types.len() + candidate.functions.len() + candidate.contracts.len() + candidate.packages.len();

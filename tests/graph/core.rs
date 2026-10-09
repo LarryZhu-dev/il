@@ -2,6 +2,8 @@ use il_graph::*;
 use std::fs;
 use std::sync::{Arc, Barrier};
 
+mod query;
+
 fn provenance() -> Provenance { Provenance { source_git_commit: "a".repeat(40), source_tree_hash: "b".repeat(40) } }
 fn module(id: &str) -> Module {
     Module { entity_id: id.into(), path: id.into(), imports: vec![], declarations: vec![], visibility: Visibility::Private }

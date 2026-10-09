@@ -405,6 +405,12 @@ mod tests {
         let index = entity_index(&graph).unwrap();
         assert!(index.contains_key("hello"));
         assert_eq!(entity_references(&graph, "hello"), ["app.hello"]);
+        let references = entity_reference_index(&graph);
+        assert_eq!(references.len(), index.len());
+        for id in index.keys() {
+            assert_eq!(references[id], entity_references(&graph, id), "{id}");
+            assert_eq!(entity_view(&graph, id, None).unwrap(), index[id]);
+        }
     }
 
     #[test]
@@ -443,6 +449,55 @@ mod tests {
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         assert_eq!(candidate.functions[0].effects, vec![Effect::Alloc]);
         assert!(candidate.functions[0].blocks.iter().flat_map(|b| &b.operations).any(|op| op.effects.contains(&Effect::Clock)));
+    }
+
+    #[test]
+    fn route_transaction_requires_exact_scope_and_preserves_failed_and_historical_revisions() {
+        let mut graph = fixture();
+        assert!(elaborate(&mut graph).is_empty());
+        let directory = tempfile::tempdir().unwrap();
+        let provenance = Provenance { source_git_commit: "a".repeat(40), source_tree_hash: "b".repeat(40) };
+        let store = Store::initialize(directory.path(), provenance.clone()).unwrap();
+        let initial = store.transact(&Transaction { task_id: "P08-initial".into(), base_revision: 0,
+            scope: vec!["program".into()], operations: vec![TransactionOperation::ReplaceProgram { graph }], required_checks: vec![] },
+            provenance.clone(), &Graph::validate_structural).unwrap();
+        assert!(initial.ok, "{:?}", initial.diagnostics);
+        let original = store.load(initial.result_revision).unwrap();
+        let route = HttpRoute { entity_id: "ready".into(), method: "GET".into(), path: "/ready".into(), handler: "app.health".into(), parameters: vec![] };
+        let mut transaction = Transaction { task_id: "P08-route".into(), base_revision: initial.result_revision,
+            scope: vec!["server".into(), "ready".into(), "app.dispatch".into()],
+            operations: vec![TransactionOperation::AddRoute { route_table_id: "server".into(), route }], required_checks: vec![] };
+        for scope in [vec!["program"], vec!["server", "ready"], vec!["server", "app.dispatch"], vec!["ready", "app.dispatch"]] {
+            let mut incomplete = transaction.clone(); incomplete.scope = scope.into_iter().map(str::to_owned).collect();
+            let outcome = store.transact(&incomplete, provenance.clone(), &Graph::validate_structural).unwrap();
+            assert!(!outcome.ok); assert!(outcome.candidate.is_some());
+            assert!(outcome.diagnostics.iter().any(|d| d.code == "E_INVALID_SCOPE"));
+            assert_eq!(store.read_head().unwrap().revision, initial.result_revision);
+        }
+        let added = store.transact(&transaction, provenance.clone(), &Graph::validate_structural).unwrap();
+        assert!(added.ok, "{:?}", added.diagnostics);
+        assert_eq!(store.inspect("ready", added.result_revision).unwrap()["path"], "/ready");
+        assert_eq!(store.load(initial.result_revision).unwrap(), original);
+        let candidate = store.load(added.result_revision).unwrap();
+        assert_ne!(candidate.functions[0], original.functions[0]);
+        assert_eq!(candidate.functions[1..], original.functions[1..]);
+        let stale = store.transact(&transaction, provenance.clone(), &Graph::validate_structural).unwrap();
+        assert!(!stale.ok); assert!(stale.diagnostics.iter().any(|d| d.code == "E_STALE_REVISION"));
+        transaction.base_revision = added.result_revision;
+        let duplicate = store.transact(&transaction, provenance.clone(), &Graph::validate_structural).unwrap();
+        assert!(!duplicate.ok); assert!(duplicate.candidate.is_some());
+        assert!(duplicate.diagnostics.iter().any(|d| d.code == "E_DUPLICATE_NAME"));
+        if let TransactionOperation::AddRoute { route, .. } = &mut transaction.operations[0] {
+            route.entity_id = "collision".into(); route.path = "/hello/someone".into();
+        }
+        transaction.scope[1] = "collision".into();
+        let collision = store.transact(&transaction, provenance.clone(), &Graph::validate_structural).unwrap();
+        assert!(!collision.ok); assert!(collision.diagnostics.iter().any(|d| d.code == "E_ROUTE_COLLISION"));
+        if let TransactionOperation::AddRoute { route_table_id, .. } = &mut transaction.operations[0] { *route_table_id = "missing".into(); }
+        transaction.scope[0] = "missing".into();
+        let missing = store.transact(&transaction, provenance, &Graph::validate_structural).unwrap();
+        assert!(!missing.ok); assert!(missing.diagnostics.iter().any(|d| d.code == "E_NAME_NOT_FOUND"));
+        assert_eq!(store.read_head().unwrap().revision, added.result_revision);
     }
 
     #[test]

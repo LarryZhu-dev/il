@@ -300,7 +300,7 @@ impl Store {
     }
 
     pub fn inspect(&self, entity_id: &str, revision: u64) -> StoreResult<serde_json::Value> {
-        entity_index(&self.load(revision)?)?.remove(entity_id).ok_or_else(|| StoreError::new("E_NAME_NOT_FOUND", "entity not found at revision"))
+        entity_view(&self.load(revision)?, entity_id, None)
     }
 
     pub fn diff(&self, base: u64, target: u64, scope: &[String]) -> StoreResult<Vec<DiffEntry>> {
@@ -339,6 +339,79 @@ impl Store {
     }
 }
 
+/// Locate one entity and serialize only requested fields of large containers.
+pub fn entity_view(graph: &Graph, id: &str, fields: Option<&[String]>) -> StoreResult<serde_json::Value> {
+    if let Some(fields) = fields {
+        if fields.iter().collect::<BTreeSet<_>>().len() != fields.len() {
+            return Err(StoreError::new("E_SCHEMA_INVALID", "entity fields must be unique"));
+        }
+    }
+    fn project<T: Serialize>(entity: &T, fields: Option<&[String]>) -> StoreResult<serde_json::Value> {
+        let mut value = serde_json::to_value(entity)?;
+        if let Some(fields) = fields {
+            let source = value.as_object_mut().expect("graph entities are objects");
+            let mut selected = serde_json::Map::new();
+            for field in fields {
+                selected.insert(field.clone(), source.remove(field).ok_or_else(|| StoreError::new("E_SCHEMA_INVALID", "unknown entity field"))?);
+            }
+            value = serde_json::Value::Object(selected);
+        }
+        Ok(value)
+    }
+    macro_rules! view {
+        ($entity:expr, $($name:literal => $value:expr),+ $(,)?) => {{
+            let Some(fields) = fields else { return Ok(serde_json::to_value($entity)?); };
+            let mut selected = serde_json::Map::new();
+            for field in fields {
+                let value = match field.as_str() {
+                    $($name => serde_json::to_value($value)?,)+
+                    _ => return Err(StoreError::new("E_SCHEMA_INVALID", "unknown entity field")),
+                };
+                selected.insert(field.clone(), value);
+            }
+            return Ok(serde_json::Value::Object(selected));
+        }};
+    }
+    if id == "program" {
+        view!(graph, "project_id" => &graph.project_id, "graph_version" => &graph.graph_version,
+            "revision" => graph.revision, "target" => &graph.target, "modules" => &graph.modules,
+            "types" => &graph.types, "functions" => &graph.functions, "capabilities" => &graph.capabilities,
+            "packages" => &graph.packages, "contracts" => &graph.contracts);
+    }
+    for value in &graph.modules { if value.entity_id == id { return project(value, fields); } }
+    for value in &graph.types { if value.entity_id == id { return project(value, fields); } }
+    for value in &graph.capabilities { if value.entity_id == id { return project(value, fields); } }
+    for value in &graph.packages { if value.entity_id == id { return project(value, fields); } }
+    for value in &graph.contracts {
+        if value.entity_id == id { return project(value, fields); }
+        for predicate in &value.predicates {
+            if let ContractPredicate::HttpServer { routes, .. } = predicate {
+                for route in routes { if route.entity_id == id { return project(route, fields); } }
+            }
+        }
+    }
+    for function in &graph.functions {
+        if function.entity_id == id {
+            view!(function, "entity_id" => &function.entity_id, "name" => &function.name,
+                "parameters" => &function.parameters, "result" => &function.result, "effects" => &function.effects,
+                "capabilities" => &function.capabilities, "blocks" => &function.blocks, "contracts" => &function.contracts);
+        }
+        for parameter in &function.parameters { if parameter.entity_id == id { return project(parameter, fields); } }
+        for block in &function.blocks {
+            if block.entity_id == id {
+                view!(block, "entity_id" => &block.entity_id, "arguments" => &block.arguments,
+                    "operations" => &block.operations, "terminator" => &block.terminator);
+            }
+            for argument in &block.arguments { if argument.entity_id == id { return project(argument, fields); } }
+            for operation in block.operations.iter().chain(std::iter::once(&block.terminator)) {
+                if operation.entity_id == id { return project(operation, fields); }
+                for output in &operation.outputs { if output.entity_id == id { return project(output, fields); } }
+            }
+        }
+    }
+    Err(StoreError::new("E_NAME_NOT_FOUND", "entity not found at revision"))
+}
+
 pub fn entity_index(graph: &Graph) -> StoreResult<BTreeMap<String, serde_json::Value>> {
     let mut index = BTreeMap::new();
     fn add<T: Serialize>(index: &mut BTreeMap<String, serde_json::Value>, id: &str, value: &T) -> StoreResult<()> {
@@ -372,37 +445,185 @@ pub fn entity_index(graph: &Graph) -> StoreResult<BTreeMap<String, serde_json::V
     Ok(index)
 }
 
+fn normalized(mut references: Vec<String>) -> Vec<String> {
+    references.sort(); references.dedup(); references
+}
+fn type_reference(references: &mut Vec<String>, name: &str) {
+    if !is_builtin_type(name) { references.push(name.into()); }
+}
+fn operation_references(operation: &Operation) -> Vec<String> {
+    let mut references = operation.inputs.iter().chain(&operation.consumes).cloned().collect::<Vec<_>>();
+    for value in operation.outputs.iter().chain(&operation.produces) { type_reference(&mut references, &value.type_ref); }
+    match &operation.attributes {
+        Attributes::Call { callee } => references.push(callee.clone()),
+        Attributes::RuntimeCall { capability: Some(capability), .. } => references.push(capability.clone()),
+        Attributes::Cast { target_type } => type_reference(&mut references, target_type),
+        Attributes::Record { type_id } | Attributes::Variant { type_id, .. } => type_reference(&mut references, type_id),
+        Attributes::Branch { target } => references.push(target.clone()),
+        Attributes::CondBranch { then_block, else_block, then_arguments, else_arguments } => {
+            references.extend([then_block.clone(), else_block.clone()]);
+            references.extend(then_arguments.iter().chain(else_arguments).cloned());
+        }
+        Attributes::Switch { cases, default, default_arguments } => {
+            references.push(default.clone()); references.extend(default_arguments.iter().cloned());
+            for case in cases { references.push(case.target.clone()); references.extend(case.arguments.iter().cloned()); }
+        }
+        _ => {}
+    }
+    let defined: BTreeSet<_> = operation.outputs.iter().map(|v| &v.entity_id).chain(std::iter::once(&operation.entity_id)).collect();
+    references.retain(|reference| !defined.contains(reference));
+    references
+}
+fn block_definitions(block: &Block) -> BTreeSet<&String> {
+    std::iter::once(&block.entity_id).chain(block.arguments.iter().map(|v| &v.entity_id))
+        .chain(block.operations.iter().chain(std::iter::once(&block.terminator))
+            .flat_map(|op| std::iter::once(&op.entity_id).chain(op.outputs.iter().map(|v| &v.entity_id))))
+        .collect()
+}
+fn block_references(block: &Block) -> Vec<String> {
+    let mut references = vec![];
+    for argument in &block.arguments { type_reference(&mut references, &argument.type_ref); }
+    for operation in block.operations.iter().chain(std::iter::once(&block.terminator)) {
+        references.extend(operation_references(operation));
+    }
+    let defined = block_definitions(block);
+    references.retain(|reference| !defined.contains(reference));
+    references
+}
+
+/// Semantic references exclude IDs already defined inside the returned entity.
+/// A function contains its CFG; a block contains its operations and local values.
 pub fn entity_references(graph: &Graph, id: &str) -> Vec<String> {
+    if let Some(package) = graph.packages.iter().find(|p| p.entity_id == id) {
+        return normalized(package.modules.iter().chain(&package.capabilities).cloned().collect());
+    }
     for contract in &graph.contracts {
         let mut references = vec![contract.subject.clone()];
         for predicate in &contract.predicates {
             match predicate {
                 ContractPredicate::HttpServer { entry, capability, routes, .. } => {
                     references.extend([entry.clone(), capability.clone()]);
-                    references.extend(routes.iter().map(|r| r.entity_id.clone()));
-                    if let Some(route) = routes.iter().find(|r| r.entity_id == id) { return vec![route.handler.clone()]; }
+                    // Routes are embedded in the contract, so use their external references.
+                    for route in routes {
+                        let mut route_references = vec![route.handler.clone()];
+                        for parameter in &route.parameters { type_reference(&mut route_references, &parameter.type_ref); }
+                        if route.entity_id == id { return normalized(route_references); }
+                        references.extend(route_references);
+                    }
                 }
                 ContractPredicate::RequiresCapability { capability } => references.push(capability.clone()),
-                ContractPredicate::Returns { type_ref } if !is_builtin_type(type_ref) => references.push(type_ref.clone()),
+                ContractPredicate::Returns { type_ref } => type_reference(&mut references, type_ref),
                 _ => {}
             }
         }
-        if contract.entity_id == id { references.sort(); references.dedup(); return references; }
+        if contract.entity_id == id { return normalized(references); }
     }
-    if let Some(module) = graph.modules.iter().find(|module| module.entity_id == id) { return module.imports.iter().chain(&module.declarations).cloned().collect(); }
-    if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == id) { return ty.parameters.iter().chain(ty.fields.iter().map(|f| &f.type_ref)).chain(ty.variants.iter().flat_map(|v| &v.fields)).filter(|name| !is_builtin_type(name)).cloned().collect(); }
-    if let Some(function) = graph.functions.iter().find(|function| function.entity_id == id) {
-        let mut references: Vec<String> = function.parameters.iter().map(|p| &p.type_ref).chain(std::iter::once(&function.result)).filter(|name| !is_builtin_type(name)).chain(&function.capabilities).chain(&function.contracts).cloned().collect();
+    if let Some(module) = graph.modules.iter().find(|module| module.entity_id == id) {
+        return normalized(module.imports.iter().chain(&module.declarations).cloned().collect());
+    }
+    if let Some(ty) = graph.types.iter().find(|ty| ty.entity_id == id) {
+        return normalized(ty.parameters.iter().chain(ty.fields.iter().map(|f| &f.type_ref))
+            .chain(ty.variants.iter().flat_map(|v| &v.fields)).filter(|name| !is_builtin_type(name)).cloned().collect());
+    }
+    for function in &graph.functions {
+        if function.entity_id == id {
+            let mut references = function.capabilities.iter().chain(&function.contracts).cloned().collect::<Vec<_>>();
+            for parameter in &function.parameters { type_reference(&mut references, &parameter.type_ref); }
+            type_reference(&mut references, &function.result);
+            for block in &function.blocks { references.extend(block_references(block)); }
+            let defined: BTreeSet<_> = function.parameters.iter().map(|p| &p.entity_id)
+                .chain(function.blocks.iter().flat_map(block_definitions)).collect();
+            references.retain(|reference| !defined.contains(reference));
+            return normalized(references);
+        }
+        if let Some(parameter) = function.parameters.iter().find(|p| p.entity_id == id) {
+            let mut references = vec![]; type_reference(&mut references, &parameter.type_ref); return references;
+        }
         for block in &function.blocks {
+            if block.entity_id == id { return normalized(block_references(block)); }
+            if let Some(argument) = block.arguments.iter().find(|v| v.entity_id == id) {
+                let mut references = vec![]; type_reference(&mut references, &argument.type_ref); return references;
+            }
             for operation in block.operations.iter().chain(std::iter::once(&block.terminator)) {
-                if let Attributes::Call { callee } = &operation.attributes { references.push(callee.clone()); }
-                for value in &operation.outputs {
-                    if !is_builtin_type(&value.type_ref) { references.push(value.type_ref.clone()); }
+                if operation.entity_id == id { return normalized(operation_references(operation)); }
+                if let Some(output) = operation.outputs.iter().find(|v| v.entity_id == id) {
+                    let mut references = vec![]; type_reference(&mut references, &output.type_ref); return references;
                 }
             }
         }
-        references.sort(); references.dedup();
-        return references;
     }
     vec![]
+}
+
+/// Compute all external references in bounded graph traversals, without serializing
+/// graph bodies. Reverse queries must not rescan the complete graph per entity.
+pub fn entity_reference_index(graph: &Graph) -> BTreeMap<String, Vec<String>> {
+    let mut index = BTreeMap::new();
+    for package in &graph.packages {
+        index.insert(package.entity_id.clone(), normalized(package.modules.iter().chain(&package.capabilities).cloned().collect()));
+    }
+    for capability in &graph.capabilities { index.insert(capability.entity_id.clone(), vec![]); }
+    for module in &graph.modules {
+        index.insert(module.entity_id.clone(), normalized(module.imports.iter().chain(&module.declarations).cloned().collect()));
+    }
+    for ty in &graph.types {
+        index.insert(ty.entity_id.clone(), normalized(ty.parameters.iter().chain(ty.fields.iter().map(|f| &f.type_ref))
+            .chain(ty.variants.iter().flat_map(|v| &v.fields)).filter(|name| !is_builtin_type(name)).cloned().collect()));
+    }
+    for contract in &graph.contracts {
+        let mut references = vec![contract.subject.clone()];
+        for predicate in &contract.predicates {
+            match predicate {
+                ContractPredicate::HttpServer { entry, capability, routes, .. } => {
+                    references.extend([entry.clone(), capability.clone()]);
+                    for route in routes {
+                        let mut route_references = vec![route.handler.clone()];
+                        for parameter in &route.parameters { type_reference(&mut route_references, &parameter.type_ref); }
+                        references.extend(route_references.iter().cloned());
+                        index.insert(route.entity_id.clone(), normalized(route_references));
+                    }
+                }
+                ContractPredicate::RequiresCapability { capability } => references.push(capability.clone()),
+                ContractPredicate::Returns { type_ref } => type_reference(&mut references, type_ref),
+                _ => {}
+            }
+        }
+        index.insert(contract.entity_id.clone(), normalized(references));
+    }
+    for function in &graph.functions {
+        let mut references = function.capabilities.iter().chain(&function.contracts).cloned().collect::<Vec<_>>();
+        type_reference(&mut references, &function.result);
+        let mut defined = BTreeSet::new();
+        for parameter in &function.parameters {
+            let mut parameter_references = vec![]; type_reference(&mut parameter_references, &parameter.type_ref);
+            references.extend(parameter_references.iter().cloned());
+            index.insert(parameter.entity_id.clone(), parameter_references);
+            defined.insert(&parameter.entity_id);
+        }
+        for block in &function.blocks {
+            let mut block_refs = vec![];
+            for argument in &block.arguments {
+                let mut argument_refs = vec![]; type_reference(&mut argument_refs, &argument.type_ref);
+                block_refs.extend(argument_refs.iter().cloned());
+                index.insert(argument.entity_id.clone(), argument_refs);
+            }
+            for operation in block.operations.iter().chain(std::iter::once(&block.terminator)) {
+                let operation_refs = operation_references(operation);
+                block_refs.extend(operation_refs.iter().cloned());
+                index.insert(operation.entity_id.clone(), normalized(operation_refs));
+                for output in &operation.outputs {
+                    let mut output_refs = vec![]; type_reference(&mut output_refs, &output.type_ref);
+                    index.insert(output.entity_id.clone(), output_refs);
+                }
+            }
+            let block_defined = block_definitions(block);
+            block_refs.retain(|reference| !block_defined.contains(reference));
+            references.extend(block_refs.iter().cloned());
+            index.insert(block.entity_id.clone(), normalized(block_refs));
+            defined.extend(block_defined);
+        }
+        references.retain(|reference| !defined.contains(reference));
+        index.insert(function.entity_id.clone(), normalized(references));
+    }
+    index
 }
