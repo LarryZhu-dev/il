@@ -9,3 +9,13 @@ il-native-ir.workspace = true
 il-graph.workspace = true
 il-hir.workspace = true
 serde.workspace = true
+
+[dev-dependencies]
+il-frontend.workspace = true
+il-mir.workspace = true
+il-link-driver.workspace = true
+il-object-emitter.workspace = true
+
+[[test]]
+name = "runtime_profiles"
+path = "../../tests/native_ir/profiles.rs"

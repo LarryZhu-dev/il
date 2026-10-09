@@ -18,6 +18,7 @@ pub fn verify_with_capabilities(program: &Program, injected: &[Capability]) -> V
         program.input_hash.len() != 71 || !program.input_hash.starts_with("sha256:") || !program.input_hash[7..].bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
         report("E_SCHEMA_INVALID", "mir", "invalid MIR version, target or input hash"); return diagnostics;
     }
+    let mut public=BTreeSet::new();for id in &program.public_functions{if !public.insert(id)||!program.functions.iter().any(|function|&function.entity_id==id){report("E_SCHEMA_INVALID",id,"public function must be a unique declared function");}}
     for function in &program.functions {
         if !valid_id(&function.name) { report("E_SCHEMA_INVALID", &function.entity_id, "MIR function name must be a valid logical identifier"); }
         for block in &function.blocks {
@@ -128,8 +129,9 @@ impl State {
         self.order.iter().skip(if all { 0 } else { self.parameter_count }).rev().filter(|id| self.live.contains(*id)).filter_map(|id| self.types.get(id).map(|ty| DropAction { value_id: id.clone(), type_ref: ty.clone() })).collect()
     }
 
-    fn cleanup(&mut self, program: &Program, diagnostics: &mut Vec<Diagnostic>, entity: &str, actions: &[DropAction], all: bool) {
+    fn cleanup(&mut self, program: &Program, diagnostics: &mut Vec<Diagnostic>, entity: &str, actions: &[DropAction], all: bool, function: &Function, graph: &Graph) {
         let expected = self.expected_cleanup(all);
+        if !function.effects.contains(&Effect::Fs) && expected.iter().chain(actions).any(|action| il_checker::contains_file_type(graph, &action.type_ref)) { error(program, diagnostics, "E_EFFECT_UNDECLARED", entity, "implicit File cleanup requires fs effect"); }
         let expected_ids: BTreeSet<_> = expected.iter().map(|action| &action.value_id).collect();
         let actual_ids: BTreeSet<_> = actions.iter().map(|action| &action.value_id).collect();
         if expected_ids.difference(&actual_ids).next().is_some() { error(program, diagnostics, "E_MIR_MISSING_DROP", entity, "MIR omits cleanup for a live owned value"); }
@@ -148,7 +150,7 @@ fn inferred_moves(operation: &Operation, state: &State, graph: &Graph) -> Vec<St
     let candidates: Vec<_> = match operation.opcode {
         Opcode::Move | Opcode::Drop | Opcode::Call | Opcode::Record | Opcode::Tuple | Opcode::Variant | Opcode::Payload => operation.inputs.clone(),
         Opcode::RuntimeCall => match &operation.attributes {
-            Attributes::RuntimeCall { symbol } => il_checker::runtime_signature(symbol).map(|signature| operation.inputs.iter().zip(signature.parameters).filter(|(_, parameter)| parameter.passing == il_checker::Passing::Owned).map(|(id, _)| id.clone()).collect()).unwrap_or_default(),
+            Attributes::RuntimeCall { symbol, .. } => il_checker::runtime_signature(symbol).map(|signature| operation.inputs.iter().zip(signature.parameters).filter(|(_, parameter)| parameter.passing == il_checker::Passing::Owned).map(|(id, _)| id.clone()).collect()).unwrap_or_default(),
             _ => vec![],
         },
         _ => vec![],
@@ -198,7 +200,7 @@ fn verify_lifetimes(program: &Program, function: &Function, graph: &Graph, diagn
             Terminator::Return { value, cleanup, .. } => {
                 if let Some(value) = value { state.transfer(program, diagnostics, entity, value, graph); }
                 if !state.loans.is_empty() { error(program, diagnostics, "E_BORROW_ESCAPE", entity, "MIR returns with live lexical loans"); }
-                state.cleanup(program, diagnostics, entity, cleanup, true);
+                state.cleanup(program, diagnostics, entity, cleanup, true, function, graph);
             }
             Terminator::Trap { .. } => {},
             terminator => {
@@ -206,7 +208,7 @@ fn verify_lifetimes(program: &Program, function: &Function, graph: &Graph, diagn
                 for edge in terminator.edges() {
                     let mut outgoing = state.clone();
                     for argument in &edge.arguments { outgoing.transfer(program, diagnostics, entity, argument, graph); }
-                    outgoing.cleanup(program, diagnostics, entity, &edge.cleanup, false);
+                    outgoing.cleanup(program, diagnostics, entity, &edge.cleanup, false, function, graph);
                     let next: BTreeSet<_> = outgoing.live.into_iter().filter(|id| parameters.contains_key(id)).collect();
                     match incoming.get(&edge.target) {
                         Some(previous) if previous != &next => error(program, diagnostics, "E_OWNERSHIP_JOIN", &edge.target, "MIR parameter lifetime differs across incoming edges"),

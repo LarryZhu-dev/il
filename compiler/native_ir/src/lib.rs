@@ -13,7 +13,16 @@ fn required_nullable<'de,D:serde::Deserializer<'de>,T:Deserialize<'de>>(d:D)->Re
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
 #[serde(tag="kind",rename_all="snake_case",deny_unknown_fields)]
-pub enum BuildMode { Application { entry:String }, Captured { entry:String, arguments:Vec<Value>, limits:Limits } }
+pub enum BuildMode { Application { entry:String }, Captured { entry:String, arguments:Vec<Value>, limits:Limits }, Exports { entries:Vec<String> } }
+#[derive(Clone,Copy,Debug,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(rename_all="snake_case")]
+pub enum RuntimeProfile { Full, Minimal, None }
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BuildOptions { pub mode:BuildMode,pub runtime_profile:RuntimeProfile }
+#[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(tag="kind",rename_all="snake_case",deny_unknown_fields)]
+pub enum TrapStrategy { Runtime { context:Operand }, Minimal, Intrinsic }
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq,PartialOrd,Ord)]
 #[serde(tag="kind",rename_all="snake_case",deny_unknown_fields)]
@@ -60,8 +69,9 @@ pub enum InstructionKind {
     Binary { operation:Binary, left:Operand, right:Operand },
     Compare { predicate:Predicate, left:Operand, right:Operand },
     Convert { operation:Conversion, value:Operand, bits:u16 },
-    Checked { operation:Checked, signed:bool, left:Operand, right:Operand, context:Operand },
-    CheckedCast { signed_source:bool, signed_target:bool, bits:u16, value:Operand, context:Operand },
+    Checked { operation:Checked, signed:bool, left:Operand, right:Operand, trap:TrapStrategy },
+    CheckedCast { signed_source:bool, signed_target:bool, bits:u16, value:Operand, trap:TrapStrategy },
+    Trap,
     Call { symbol:String, arguments:Vec<Operand> },
 }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
@@ -75,12 +85,13 @@ pub enum Terminator { Return { #[serde(deserialize_with="required_nullable")] va
 pub struct Block { pub name:String, pub instructions:Vec<Instruction>, pub terminator:Terminator }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
 #[serde(deny_unknown_fields)]
-pub struct Function { pub symbol:String, pub entity_id:String, pub signature:Signature, pub parameters:Vec<String>, pub blocks:Vec<Block> }
+pub struct Function { pub symbol:String, pub entity_id:String, pub public:bool, pub signature:Signature, pub parameters:Vec<String>, pub blocks:Vec<Block> }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq,Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Program {
     pub schema_version:String, pub compiler_version:String, pub input_hash:String,
-    pub source_revision:u64, pub target:String, pub mode:BuildMode,
+    pub source_revision:u64, pub target:String, pub mode:BuildMode, pub runtime_profile:RuntimeProfile,
+    pub requirements:Vec<il_graph::Capability>,
     pub layouts:LayoutTable, pub globals:Vec<Global>, pub externs:Vec<External>, pub functions:Vec<Function>,
 }
 impl Program {

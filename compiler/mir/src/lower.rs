@@ -14,7 +14,8 @@ pub fn lower_with_capabilities(hir: &il_hir::Program, capabilities: &[Capability
     for function in &graph.functions { functions.push(lower_function(graph, function)?); }
     let program = Program { schema_version: "1.0.0".into(), compiler_version: env!("CARGO_PKG_VERSION").into(),
         input_hash: hir.hash().map_err(|error| vec![Diagnostic::error("E_SCHEMA_INVALID", None, error.to_string(), graph.revision)])?, source_revision: graph.revision,
-        target: graph.target.clone(), types: graph.types.clone(), capabilities: graph.capabilities.clone(), functions };
+        target: graph.target.clone(), types: graph.types.clone(), capabilities: graph.capabilities.clone(),
+        public_functions: graph.functions.iter().filter(|function|graph.modules.iter().any(|module|module.visibility==Visibility::Public&&module.declarations.contains(&function.entity_id))).map(|function|function.entity_id.clone()).collect(), functions };
     let diagnostics = crate::verify::verify_with_capabilities(&program, capabilities);
     if diagnostics.is_empty() { Ok(program) } else { Err(diagnostics) }
 }

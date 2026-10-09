@@ -14,7 +14,9 @@
     "layouts",
     "globals",
     "externs",
-    "functions"
+    "functions",
+    "runtime_profile",
+    "requirements"
   ],
   "properties": {
     "schema_version": {
@@ -95,6 +97,20 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/function"
+      }
+    },
+    "runtime_profile": {
+      "enum": [
+        "full",
+        "minimal",
+        "none"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "program_graph.schema.json#/$defs/capability"
       }
     }
   },
@@ -276,6 +292,27 @@
             },
             "limits": {
               "$ref": "execution.schema.json#/$defs/limits"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entries"
+          ],
+          "properties": {
+            "kind": {
+              "const": "exports"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "uniqueItems": true
             }
           }
         }
@@ -470,6 +507,18 @@
               "items": {
                 "$ref": "#/$defs/variant"
               }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
             }
           }
         }
@@ -756,7 +805,7 @@
             "signed",
             "left",
             "right",
-            "context"
+            "trap"
           ],
           "properties": {
             "kind": {
@@ -782,8 +831,8 @@
             "right": {
               "$ref": "#/$defs/operand"
             },
-            "context": {
-              "$ref": "#/$defs/operand"
+            "trap": {
+              "$ref": "#/$defs/trap_strategy"
             }
           }
         },
@@ -796,7 +845,7 @@
             "signed_target",
             "bits",
             "value",
-            "context"
+            "trap"
           ],
           "properties": {
             "kind": {
@@ -816,8 +865,8 @@
             "value": {
               "$ref": "#/$defs/operand"
             },
-            "context": {
-              "$ref": "#/$defs/operand"
+            "trap": {
+              "$ref": "#/$defs/trap_strategy"
             }
           }
         },
@@ -841,6 +890,18 @@
               "items": {
                 "$ref": "#/$defs/operand"
               }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "trap"
             }
           }
         }
@@ -1023,7 +1084,8 @@
         "entity_id",
         "signature",
         "parameters",
-        "blocks"
+        "blocks",
+        "public"
       ],
       "properties": {
         "symbol": {
@@ -1046,8 +1108,55 @@
           "items": {
             "$ref": "#/$defs/block"
           }
+        },
+        "public": {
+          "type": "boolean"
         }
       }
+    },
+    "trap_strategy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "context"
+          ],
+          "properties": {
+            "kind": {
+              "const": "runtime"
+            },
+            "context": {
+              "$ref": "#/$defs/operand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "minimal"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "intrinsic"
+            }
+          }
+        }
+      ]
     }
   }
 }

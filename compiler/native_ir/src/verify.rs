@@ -7,14 +7,20 @@ pub fn verify(program:&Program)->Vec<Diagnostic>{
     let mut errors=vec![];let mut error=|entity:&str,message:&str|{if errors.len()<100{let mut d=Diagnostic::error("E_NATIVE_IR_INVALID",Some(entity),message,program.source_revision);d.stage="verify_native_ir".into();errors.push(d);}};
     if program.schema_version!="1.0.0"||program.target!="x86_64-unknown-linux-gnu"||program.input_hash.len()!=71||!program.input_hash.starts_with("sha256:")||!program.input_hash[7..].bytes().all(|b|b.is_ascii_hexdigit()){error("native","invalid Native IR envelope");}
     if program.functions.len()>4096||program.globals.len()>100_000||program.layouts.len()>300||program.functions.iter().map(|f|f.blocks.iter().map(|b|b.instructions.len()).sum::<usize>()).sum::<usize>()>500_000{return vec![Diagnostic::error("E_RESOURCE_LIMIT",None,"Native IR budget exceeded",program.source_revision)];}
-    let expected=runtime_externals();if program.externs!=expected{error("native","external ABI is a closed exact runtime function table");}
+    verify_authority(program,&mut error);
+    let expected=runtime_externals(program.runtime_profile);if program.externs!=expected{error("native","external ABI is a closed exact runtime function table");}
     for(ty,layout)in &program.layouts{if layout.size>67_108_864||layout.align>8||!layout.align.is_power_of_two(){error(ty,"invalid bounded native layout");}}
     if !errors.is_empty(){return errors;}
     let mut error=|entity:&str,message:&str|{if errors.len()<100{let mut d=Diagnostic::error("E_NATIVE_IR_INVALID",Some(entity),message,program.source_revision);d.stage="verify_native_ir".into();errors.push(d);}};
-    for(ty,layout)in &program.layouts{if layout::compute(layout.shape.clone(),&program.layouts).as_ref()!=Some(layout){error(ty,"invalid computed type layout");}}
+    for(ty,layout)in &program.layouts{if (ty=="core.File")!=matches!(layout.shape,Shape::File){error(ty,"File must retain its exact opaque nominal resource layout");}if layout::compute(layout.shape.clone(),&program.layouts).as_ref()!=Some(layout){error(ty,"invalid computed type layout");}}
     let mut globals=BTreeSet::new();for global in &program.globals{if !name(&global.name)||!globals.insert(global.name.clone())||global.bytes.len()>1_048_576{error(&global.name,"invalid or duplicate native global");}}
     let mut signatures:BTreeMap<String,Signature>=expected.into_iter().map(|e|(e.symbol,e.signature)).collect();for function in &program.functions{if !name(&function.symbol)||globals.contains(&function.symbol)||signatures.insert(function.symbol.clone(),function.signature.clone()).is_some(){error(&function.entity_id,"invalid or duplicate function symbol");}}
-    if signatures.get("main")!=Some(&Signature{result:Type::int(32),parameters:vec![]}){error("native","missing native main ABI");}
+    match (&program.mode,program.runtime_profile) {
+        (BuildMode::Application{..}|BuildMode::Captured{..},RuntimeProfile::Full)=>if signatures.get("main")!=Some(&Signature{result:Type::int(32),parameters:vec![]}){error("native","missing native main ABI");},
+        (BuildMode::Application{..},RuntimeProfile::Minimal)=>if signatures.get("il_entry_main")!=Some(&Signature{result:Type::int(32),parameters:vec![]}){error("native","missing minimal entry ABI");},
+        (BuildMode::Exports{entries},RuntimeProfile::None)=>{let mut seen=BTreeSet::new();if entries.is_empty(){error("native","exports cannot be empty");}for entry in entries{if !seen.insert(entry)||!program.functions.iter().any(|f|f.entity_id==*entry&&f.public)||signatures.get(&symbol(entry)).is_none_or(|s|s.result==Type::Ptr||s.parameters.contains(&Type::Ptr)){error(entry,"export requires unique scalar ABI");}}},
+        _=>error("native","runtime and entry mode disagree")
+    }
     for function in &program.functions{
         let entity=&function.entity_id;if function.blocks.is_empty()||function.blocks.len()>1024||function.parameters.len()!=function.signature.parameters.len(){error(entity,"invalid function parameter or block count");continue;}
         if !legal(&function.signature.result)||function.signature.parameters.iter().any(|t|!legal(t)||*t==Type::Void){error(entity,"invalid physical function signature");}
@@ -44,6 +50,26 @@ pub fn verify(program:&Program)->Vec<Diagnostic>{
     let mut calls=call_safety(program);errors.append(&mut calls);errors.truncate(100);errors
 }
 
+fn verify_authority(program:&Program,error:&mut impl FnMut(&str,&str)){
+    if program.requirements.len()>256||program.requirements.windows(2).any(|pair|pair[0].entity_id>=pair[1].entity_id)||program.requirements.iter().any(|r|!il_graph::valid_id(&r.entity_id)||r.scope.as_ref().is_some_and(|s|s.len()>4096)){error("native","invalid canonical capability requirements");}
+    if program.runtime_profile!=RuntimeProfile::Full{if !program.requirements.is_empty(){error("native","reduced profiles cannot require host authority");}return;}
+    let bytes=il_graph::canonical_bytes(&program.requirements).unwrap_or_default();
+    let mut authorizations=0;let mut contexts=0;
+    for function in &program.functions{let calls:Vec<_>=function.blocks.iter().flat_map(|b|&b.instructions).filter_map(|i|if let InstructionKind::Call{symbol,arguments}=&i.operation{Some((symbol.as_str(),arguments))}else{None}).collect();
+        if function.symbol=="main"{let entry_calls:Vec<_>=function.blocks.first().into_iter().flat_map(|b|&b.instructions).filter_map(|i|if let InstructionKind::Call{symbol,..}=&i.operation{Some(symbol.as_str())}else{None}).collect();if entry_calls.len()<3||entry_calls[0]!="il_rt_context_new"||entry_calls[1]!="il_rt_location"||entry_calls[2]!="il_rt_authorize"{error(&function.entity_id,"entry must authorize immediately after context and initial location before any branch");}}
+        for(symbol,args)in calls{
+            if symbol=="il_rt_context_new"{contexts+=1;}
+            if symbol=="il_rt_authorize"{authorizations+=1;
+                let valid=args.len()==4&&function.symbol=="main"&&matches!(&args[1],Operand::Global{name} if program.globals.iter().any(|g|g.name==*name&&g.bytes==bytes))&&args[2]==Operand::int(64,bytes.len())&&args[3]==Operand::int(32,4);
+                if !valid{error(&function.entity_id,"authorization requires exact embedded requirements and inherited policy descriptor 4");}
+            }
+            let requirement=match symbol{"il_rt_file_open_read"|"il_rt_file_read"=>Some((2,il_graph::CapabilityKind::FileRead)),"il_rt_file_open_write"|"il_rt_file_write"=>Some((2,il_graph::CapabilityKind::FileWrite)),"il_rt_clock_now"=>Some((1,il_graph::CapabilityKind::ClockRead)),_=>None};
+            if let Some((index,kind))=requirement{let selected=args.get(index).and_then(|arg|if let Operand::Integer{bits:64,value}=arg{value.parse::<usize>().ok()}else{None}).and_then(|index|program.requirements.get(index));if selected.is_none_or(|r|r.kind!=kind){error(&function.entity_id,"privileged runtime operation requires a constant matching requirement index");}}
+        }
+    }
+    if authorizations!=1||contexts!=1{error("native","full runtime requires exactly one context and authorization");}
+}
+
 #[derive(Clone,Default,PartialEq,Eq)]
 struct Requirement{bytes:u64,align:u32,write:bool}
 #[derive(Clone)]
@@ -58,11 +84,13 @@ fn call_safety(program:&Program)->Vec<Diagnostic>{
         let mut changed=false;
         for f in &program.functions{
             let mut own=requirements[&f.symbol].clone();let mut map=BTreeMap::new();let mut regtypes:BTreeMap<String,Type>=f.parameters.iter().cloned().zip(f.signature.parameters.iter().cloned()).collect();
-            for(index,(name,ty))in f.parameters.iter().zip(&f.signature.parameters).enumerate(){if *ty==Type::Ptr{map.insert(name.clone(),if index==0{Address::Context}else{Address::Parameter(index,0)});}}
+            for(index,(name,ty))in f.parameters.iter().zip(&f.signature.parameters).enumerate(){if *ty==Type::Ptr{map.insert(name.clone(),if index==0&&program.runtime_profile==RuntimeProfile::Full{Address::Context}else{Address::Parameter(index,0)});}}
             for block in &f.blocks{for i in &block.instructions{
-                if let InstructionKind::Checked{context,..}|InstructionKind::CheckedCast{context,..}=&i.operation{if !matches!(address(context,&map),Some(Address::Context)){report(&i.entity_id,"checked operation requires the live runtime context");}}
+                if let InstructionKind::Checked{trap,..}|InstructionKind::CheckedCast{trap,..}=&i.operation{match(trap,program.runtime_profile){(TrapStrategy::Runtime{context},RuntimeProfile::Full)=>if !matches!(address(context,&map),Some(Address::Context)){report(&i.entity_id,"checked operation requires the live runtime context");},(TrapStrategy::Minimal,RuntimeProfile::Minimal)|(TrapStrategy::Intrinsic,RuntimeProfile::None)=>{},_=>report(&i.entity_id,"trap strategy disagrees with runtime profile")}}
+                if matches!(i.operation,InstructionKind::Trap)&&program.runtime_profile!=RuntimeProfile::None{report(&i.entity_id,"intrinsic trap requires no-runtime profile");}
                 let mut needs=vec![];let mut result_address=None;let mut result_type=None;
                 match &i.operation{
+                    InstructionKind::Trap=>{},
                     InstructionKind::Alloca{bytes,align}=>{result_address=Some(Address::Allocation(*bytes,*align,true));result_type=Some(Type::Ptr);},
                     InstructionKind::Offset{pointer,bytes}=>{result_address=match address(pointer,&map){Some(Address::Parameter(index,offset))=>Some(Address::Parameter(index,offset.saturating_add(*bytes))),Some(Address::Allocation(size,a,w))=>Some(Address::Allocation(size.saturating_sub(*bytes),if *bytes==0{a}else{a.min(1<<bytes.trailing_zeros().min(31))},w)),_=>{report(&i.entity_id,"offset cannot use a runtime context or unknown pointer");None}};result_type=Some(Type::Ptr);},
                     InstructionKind::Load{pointer,ty,align}=>{needs.push((pointer.clone(),size(ty),*align,false));result_type=Some(ty.clone());},
@@ -72,11 +100,20 @@ fn call_safety(program:&Program)->Vec<Diagnostic>{
                     InstructionKind::Call{symbol,arguments}=>{
                         let Some(signature)=program.externs.iter().find(|e|e.symbol==*symbol).map(|e|&e.signature).or_else(||program.functions.iter().find(|f|f.symbol==*symbol).map(|f|&f.signature))else{continue};result_type=Some(signature.result.clone());
                         if symbol=="il_rt_context_new"{if f.symbol!="main"{report(&i.entity_id,"only the native entry may create a runtime context");}result_address=Some(Address::Context);}
-                        else if arguments.first().is_none_or(|ctx|!matches!(address(ctx,&map),Some(Address::Context))){report(&i.entity_id,"call requires the live function runtime context");}
+                        else if program.runtime_profile==RuntimeProfile::Full&&arguments.first().is_none_or(|ctx|!matches!(address(ctx,&map),Some(Address::Context))){report(&i.entity_id,"call requires the live function runtime context");}
                         if let Some(callee)=requirements.get(symbol){for(argument,need)in arguments.iter().zip(callee){if need.bytes>0{needs.push((argument.clone(),need.bytes,need.align,need.write));}}}
                         else{
                             let mut add=|index:usize,bytes:u64,align:u32,write:bool|{if let Some(value)=arguments.get(index){needs.push((value.clone(),bytes,align,write));}};
                             match symbol.as_str(){
+                                "il_rt_authorize"=>{if let Some(bytes)=arguments.get(2).and_then(constant){add(1,bytes,1,false);}else{report(&i.entity_id,"authorization bytes require static extent");}},
+                                "il_rt_file_open_read"|"il_rt_file_open_write"=>{add(1,16,8,true);add(3,24,8,false);},
+                                "il_rt_file_read"=>{add(1,24,8,true);add(3,24,8,false);},
+                                "il_rt_file_write"=>{add(1,8,8,true);add(3,24,8,false);add(4,24,8,false);},
+                                "il_rt_file_read_some"=>{add(1,24,8,true);add(2,16,8,false);add(4,16,8,false);},
+                                "il_rt_file_write_some"=>{add(1,8,8,true);add(2,16,8,false);add(3,24,8,false);add(5,16,8,false);},
+                                "il_rt_file_close"|"il_rt_file_drop"|"il_rt_trace_file"|"il_rt_json_file"=>add(1,16,8,matches!(symbol.as_str(),"il_rt_file_close"|"il_rt_file_drop")),
+                                "il_rt_stdin_read"=>{add(1,24,8,true);add(3,16,8,false);},
+                                "il_rt_stdout_write"|"il_rt_stderr_write"=>{add(1,8,8,true);add(2,24,8,false);add(4,16,8,false);},
                                 "il_rt_buffer_new"=>{add(1,24,8,true);let bytes=arguments.get(3).and_then(constant);if let Some(bytes)=bytes{add(2,bytes,1,false);}else{report(&i.entity_id,"buffer construction requires a constant source extent");}},
                                 "il_rt_buffer_free"|"il_rt_trace_buffer"|"il_rt_print_buffer"=>add(1,24,8,symbol=="il_rt_buffer_free"),
                                 "il_rt_buffer_clone"=>{add(1,24,8,true);add(2,24,8,false);},
@@ -112,21 +149,22 @@ pub(crate) fn operand_type(value:&Operand,defs:&Definitions,globals:&BTreeSet<St
 fn infer(op:&InstructionKind,defs:&Definitions,globals:&BTreeSet<String>,signatures:&BTreeMap<String,Signature>)->Result<Type,String>{
     let ty=|v:&Operand|operand_type(v,defs,globals);let pointer=|v:&Operand|->Result<(),String>{if ty(v)?==Type::Ptr{Ok(())}else{Err("memory address must be pointer".into())}};let aligned=|a:u32|if a.is_power_of_two()&&a<=16{Ok(())}else{Err("invalid memory alignment".to_string())};
     match op{
+        InstructionKind::Trap=>Ok(Type::Void),
         InstructionKind::Alloca{bytes,align}=>{aligned(*align)?;if *bytes==0||*bytes>67_108_864{return Err("alloca size out of bounds".into());}Ok(Type::Ptr)},
         InstructionKind::Offset{pointer:p,bytes}=>{pointer(p)?;if *bytes>67_108_864{return Err("pointer offset out of bounds".into());}Ok(Type::Ptr)},
         InstructionKind::Load{pointer:p,ty:t,align}=>{pointer(p)?;aligned(*align)?;if !legal(t)||*t==Type::Void{return Err("invalid loaded type".into());}Ok(t.clone())},
         InstructionKind::Store{pointer:p,value,align}=>{pointer(p)?;ty(value)?;aligned(*align)?;Ok(Type::Void)},
         InstructionKind::Copy{destination,source,bytes}=>{pointer(destination)?;pointer(source)?;if *bytes>67_108_864{return Err("copy size out of bounds".into());}Ok(Type::Void)},
         InstructionKind::Zero{pointer:p,bytes}=>{pointer(p)?;if *bytes>67_108_864{return Err("zero size out of bounds".into());}Ok(Type::Void)},
-        InstructionKind::Binary{left,right,..}|InstructionKind::Checked{left,right,..}=>{let t=ty(left)?;if !matches!(t,Type::Int{..})||ty(right)?!=t{return Err("binary integer types differ".into());}if let InstructionKind::Checked{context,..}=op{pointer(context)?;if !matches!(t,Type::Int{bits:8|16|32|64}){return Err("checked integer width unsupported".into());}}Ok(t)},
+        InstructionKind::Binary{left,right,..}|InstructionKind::Checked{left,right,..}=>{let t=ty(left)?;if !matches!(t,Type::Int{..})||ty(right)?!=t{return Err("binary integer types differ".into());}if let InstructionKind::Checked{trap,..}=op{if let TrapStrategy::Runtime{context}=trap{pointer(context)?;}if !matches!(t,Type::Int{bits:8|16|32|64}){return Err("checked integer width unsupported".into());}}Ok(t)},
         InstructionKind::Compare{left,right,..}=>{let t=ty(left)?;if !matches!(t,Type::Int{..})||ty(right)?!=t{return Err("comparison types differ".into());}Ok(Type::int(1))},
         InstructionKind::Convert{operation,value,bits}=>{let Type::Int{bits:source}=ty(value)?else{return Err("integer conversion needs integer".into())};if !legal(&Type::int(*bits))||match operation{Conversion::Truncate=>source<=*bits,_=>source>=*bits}{return Err("invalid conversion widths".into());}Ok(Type::int(*bits))},
-        InstructionKind::CheckedCast{value,bits,context,..}=>{pointer(context)?;if !matches!(ty(value)?,Type::Int{bits:8|16|32|64})||!matches!(bits,8|16|32|64){return Err("checked cast width invalid".into());}Ok(Type::int(*bits))},
+        InstructionKind::CheckedCast{value,bits,trap,..}=>{if let TrapStrategy::Runtime{context}=trap{pointer(context)?;}if !matches!(ty(value)?,Type::Int{bits:8|16|32|64})||!matches!(bits,8|16|32|64){return Err("checked cast width invalid".into());}Ok(Type::int(*bits))},
         InstructionKind::Call{symbol,arguments}=>{let signature=signatures.get(symbol).ok_or("undefined callee")?;if arguments.len()!=signature.parameters.len(){return Err(format!("callee {symbol} argument count mismatch"));}for(value,expected)in arguments.iter().zip(&signature.parameters){if ty(value)?!=*expected{return Err(format!("callee {symbol} argument type mismatch"));}}Ok(signature.result.clone())},
     }
 }
 fn targets(term:&Terminator)->Vec<&str>{match term{Terminator::Branch{target}=>vec![target],Terminator::CondBranch{yes,no,..}=>vec![yes,no],Terminator::Switch{cases,default,..}=>cases.iter().map(|(_,target)|target.as_str()).chain(std::iter::once(default.as_str())).collect(),_=>vec![]}}
-fn operands(op:&InstructionKind)->Vec<&Operand>{match op{InstructionKind::Alloca{..}=>vec![],InstructionKind::Offset{pointer,..}|InstructionKind::Load{pointer,..}|InstructionKind::Zero{pointer,..}=>vec![pointer],InstructionKind::Store{pointer,value,..}=>vec![pointer,value],InstructionKind::Copy{destination,source,..}=>vec![destination,source],InstructionKind::Binary{left,right,..}|InstructionKind::Compare{left,right,..}=>vec![left,right],InstructionKind::Convert{value,..}=>vec![value],InstructionKind::Checked{left,right,context,..}=>vec![left,right,context],InstructionKind::CheckedCast{value,context,..}=>vec![value,context],InstructionKind::Call{arguments,..}=>arguments.iter().collect()}}
+fn operands(op:&InstructionKind)->Vec<&Operand>{match op{InstructionKind::Alloca{..}|InstructionKind::Trap=>vec![],InstructionKind::Offset{pointer,..}|InstructionKind::Load{pointer,..}|InstructionKind::Zero{pointer,..}=>vec![pointer],InstructionKind::Store{pointer,value,..}=>vec![pointer,value],InstructionKind::Copy{destination,source,..}=>vec![destination,source],InstructionKind::Binary{left,right,..}|InstructionKind::Compare{left,right,..}=>vec![left,right],InstructionKind::Convert{value,..}=>vec![value],InstructionKind::Checked{left,right,trap,..}=>{let mut v=vec![left,right];if let TrapStrategy::Runtime{context}=trap{v.push(context);}v},InstructionKind::CheckedCast{value,trap,..}=>{let mut v=vec![value];if let TrapStrategy::Runtime{context}=trap{v.push(context);}v},InstructionKind::Call{arguments,..}=>arguments.iter().collect()}}
 fn check_use(value:&Operand,block:usize,position:usize,defs:&Definitions,dom:&[BTreeSet<usize>],error:&mut impl FnMut(&str)){if let Operand::Register{name}=value{if let Some((_,owner,at))=defs.get(name){if *owner!=usize::MAX&&((*owner==block&&*at>=position)||(*owner!=block&&!dom[block].contains(owner))){error("register definition does not dominate its use");}}else{error("undefined SSA register");}}}
 
 #[derive(Clone)]

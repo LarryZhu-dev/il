@@ -12,7 +12,8 @@
     "target",
     "types",
     "capabilities",
-    "functions"
+    "functions",
+    "public_functions"
   ],
   "properties": {
     "schema_version": {
@@ -51,6 +52,13 @@
       "items": {
         "$ref": "#/$defs/function"
       }
+    },
+    "public_functions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
     }
   },
   "$defs": {

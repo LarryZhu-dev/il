@@ -21,6 +21,7 @@ pub struct Program {
     pub target: String,
     pub types: Vec<TypeDef>,
     pub capabilities: Vec<Capability>,
+    pub public_functions: Vec<EntityId>,
     pub functions: Vec<Function>,
 }
 

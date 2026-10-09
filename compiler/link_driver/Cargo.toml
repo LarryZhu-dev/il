@@ -9,3 +9,4 @@ il-execution-model.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 il-object-emitter.workspace = true
+il-native-ir.workspace = true
