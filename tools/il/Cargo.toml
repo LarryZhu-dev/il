@@ -20,3 +20,4 @@ il-codegen-x86-64.workspace = true
 il-link-driver.workspace = true
 tempfile.workspace = true
 il-object-emitter.workspace = true
+il-runtime-startup.workspace = true

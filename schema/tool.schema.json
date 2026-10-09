@@ -342,8 +342,51 @@
             "debug",
             "release"
           ]
+        },
+        "runtime_profile": {
+          "enum": [
+            "full",
+            "minimal",
+            "none"
+          ],
+          "default": "full"
+        },
+        "exports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]*$"
+          }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "runtime_profile"
+            ],
+            "properties": {
+              "runtime_profile": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "exports"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "exports"
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }

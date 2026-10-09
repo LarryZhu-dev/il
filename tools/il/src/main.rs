@@ -81,7 +81,13 @@ struct Build {
     revision: u64,
     target: String,
     profile: il_object_emitter::Profile,
+    #[serde(default = "full_runtime")]
+    runtime_profile: il_native_ir::RuntimeProfile,
+    #[serde(default, deserialize_with = "optional")]
+    exports: Option<Vec<String>>,
 }
+
+fn full_runtime() -> il_native_ir::RuntimeProfile { il_native_ir::RuntimeProfile::Full }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -125,13 +131,15 @@ struct Options {
     repository: PathBuf,
     store: PathBuf,
     command: String,
+    host_policy: il_runtime_startup::HostPolicy,
 }
 
-fn options() -> Result<Options, Failure> {
+fn options() -> Result<(Options, Option<PathBuf>), Failure> {
     let mut args = env::args_os().skip(1);
     let mut repository = env::current_dir().map_err(Failure::io)?;
     let mut store = None;
     let mut command = None;
+    let mut policy_path = None;
     let mut repository_seen = false;
     while let Some(argument) = args.next() {
         if command.is_some() { return Err(Failure::input("unexpected argument after command")); }
@@ -143,13 +151,16 @@ fn options() -> Result<Options, Failure> {
             Some("--store") if store.is_none() => {
                 store = Some(PathBuf::from(args.next().ok_or_else(|| Failure::input("--store requires a path"))?));
             }
+            Some("--host-policy") if policy_path.is_none() => {
+                policy_path = Some(PathBuf::from(args.next().ok_or_else(|| Failure::input("--host-policy requires a path"))?));
+            }
             Some(value) if !value.starts_with('-') => command = Some(value.to_owned()),
             _ => return Err(Failure::input("unknown or duplicate option")),
         }
     }
     let command = command.ok_or_else(|| Failure::input("expected an il command"))?;
     let store = store.unwrap_or_else(|| repository.join(".il/project"));
-    Ok(Options { repository, store, command })
+    Ok((Options { repository, store, command, host_policy: il_runtime_startup::HostPolicy::empty() }, policy_path))
 }
 
 fn request<T: serde::de::DeserializeOwned>(input: &str) -> Result<T, Failure> {
@@ -195,6 +206,7 @@ fn outcome(tool: &str, outcome: TransactionOutcome) -> Value {
 }
 
 fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mut u64) -> Result<Value, Failure> {
+    let check = |graph: &Graph| il_checker::check_with_capabilities(graph, &options.host_policy.grants);
     let store = if options.store.join(".il/HEAD").exists() { Some(Store::open(&options.store)?) }
         else if options.store.join(".il").exists() && options.command != "transact" {
             return Err(Failure::new("E_STATE_INCONSISTENT", "store initialization is incomplete or HEAD is missing"));
@@ -240,7 +252,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
                 }
             };
             match parsed {
-                Ok(transaction) => Ok(outcome(tool, store.transact(&transaction, context.provenance.clone(), &il_checker::check)?)),
+                Ok(transaction) => Ok(outcome(tool, store.transact(&transaction, context.provenance.clone(), &check)?)),
                 Err(error) => {
                     let request: Value = request(input)?;
                     let revision = request["base_revision"].as_u64().unwrap();
@@ -252,7 +264,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let args: Restore = request(input)?;
             if args.reason.trim().is_empty() { return Err(Failure::input("restore reason cannot be empty")); }
             let store = store.ok_or_else(|| Failure::new("E_NAME_NOT_FOUND", "application store has not been initialized"))?;
-            Ok(outcome(tool, store.restore(args.revision, &args.reason, context.provenance.clone(), &il_checker::check)?))
+            Ok(outcome(tool, store.restore(args.revision, &args.reason, context.provenance.clone(), &check)?))
         }
         "inspect" => {
             let args: Inspect = request(input)?;
@@ -280,7 +292,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let graph = if let Some(revision) = args.graph_or_revision.as_u64() {
                 load(store.as_ref(), context, revision)?
             } else { serde_json::from_value::<Graph>(args.graph_or_revision).map_err(Failure::json)? };
-            let diagnostics = il_checker::check(&graph);
+            let diagnostics = check(&graph);
             let mut response = envelope(tool, current, graph.revision,
                 json!({"valid": diagnostics.is_empty(), "checks": ["schema", "names", "references", "types", "ownership", "effects", "capabilities", "contracts"]}));
             response["ok"] = json!(diagnostics.is_empty());
@@ -290,7 +302,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
         "schema-check" => {
             let args: SourceText = request(input)?;
             let graph = il_frontend::parse(&args.source, current).map_err(Failure::diagnostics)?;
-            let diagnostics = il_checker::check(&graph);
+            let diagnostics = check(&graph);
             if !diagnostics.is_empty() { return Err(Failure::diagnostics(diagnostics)); }
             let source = il_frontend::format(&graph).map_err(Failure::diagnostics)?;
             Ok(envelope(tool, current, current, json!({"graph": graph, "source": source})))
@@ -299,8 +311,8 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let args: Test = request(input)?;
             if !["captured", "native_debug", "native_release"].contains(&args.isolation.as_str()) { return Err(Failure::input("unknown execution isolation")); }
             let graph = load(store.as_ref(), context, args.revision)?;
-            let result = if args.isolation == "captured" { execution::run(&graph, args.suite)? }
-                else { native::test(&graph, args.suite, &args.isolation, &options.store, context)? };
+            let result = if args.isolation == "captured" { execution::run(&graph, args.suite, &options.host_policy)? }
+                else { native::test(&graph, args.suite, &args.isolation, &options.store, context, &options.host_policy)? };
             let mut response = envelope(tool, current, args.revision, result);
             response["ok"] = json!(response["result"]["execution"]["status"] == "returned");
             response["diagnostics"] = response["result"]["execution"]["diagnostics"].clone();
@@ -310,7 +322,7 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
             let args: Build = request(input)?;
             if args.target != TARGET { return Err(Failure::new("E_UNSUPPORTED_TARGET", "native compilation requires x86_64-unknown-linux-gnu")); }
             let graph = load(store.as_ref(), context, args.revision)?;
-            let result = native::build(&graph, args.profile, &options.store, context)?;
+            let result = native::build(&graph, args.profile, args.runtime_profile, args.exports, &options.store, context, &options.host_policy)?;
             Ok(envelope(tool, current, args.revision, result))
         }
         "diff" => {
@@ -375,8 +387,13 @@ fn main() {
     let mut tool = "unknown".to_owned();
     let mut base_revision = 0;
     let result = (|| -> Result<Value, Failure> {
-        let options = options()?;
+        let (mut options, policy_path) = options()?;
         tool = options.command.clone();
+        if let Some(path) = policy_path {
+            let mut bytes = Vec::new();
+            std::fs::File::open(path).map_err(Failure::io)?.take(65_537).read_to_end(&mut bytes).map_err(Failure::io)?;
+            options.host_policy = il_runtime_startup::HostPolicy::parse(&bytes).map_err(|error| Failure::new(error.code, &error.message))?;
+        }
         let context = source::verify(&options.repository)?;
         let mut input = String::new();
         io::stdin().take((INPUT_LIMIT + 1) as u64).read_to_string(&mut input).map_err(Failure::io)?;

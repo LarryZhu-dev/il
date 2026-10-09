@@ -59,7 +59,10 @@
         "mode",
         "target",
         "profile",
-        "tools"
+        "tools",
+        "runtime_profile",
+        "requirements",
+        "policy_hash"
       ],
       "properties": {
         "graph_hash": {
@@ -79,8 +82,15 @@
           "pattern": "^sha256:[0-9a-f]{64}$"
         },
         "runtime_hash": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "toolchain_lock_hash": {
           "type": "string",
@@ -132,6 +142,28 @@
                   "$ref": "execution.schema.json#/$defs/limits"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "entries"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "exports"
+                },
+                "entries": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           ]
         },
@@ -146,7 +178,7 @@
         },
         "tools": {
           "type": "array",
-          "minItems": 3,
+          "minItems": 2,
           "maxItems": 3,
           "items": {
             "type": "object",
@@ -171,6 +203,23 @@
               }
             }
           }
+        },
+        "runtime_profile": {
+          "enum": [
+            "full",
+            "minimal",
+            "none"
+          ]
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "program_graph.schema.json#/$defs/capability"
+          }
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },
@@ -194,7 +243,14 @@
           "$ref": "#/$defs/artifact"
         },
         "executable": {
-          "$ref": "#/$defs/artifact"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifact"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -203,11 +259,90 @@
     },
     "stages": {
       "type": "array",
-      "minItems": 11,
+      "minItems": 9,
       "maxItems": 11,
       "items": {
         "$ref": "#/$defs/stage"
-      }
+      },
+      "prefixItems": [
+        {
+          "properties": {
+            "stage": {
+              "const": "lower_to_hir"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "lower_to_mir"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "verify_mir"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "lower_to_native_ir"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "verify_native_ir"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "codegen_x86_64"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "verify_llvm"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "optimize_llvm"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "emit_object"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "link_runtime"
+            }
+          }
+        },
+        {
+          "properties": {
+            "stage": {
+              "const": "emit_elf"
+            }
+          }
+        }
+      ]
     }
   },
   "$defs": {
@@ -276,5 +411,144 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "input": {
+            "properties": {
+              "runtime_profile": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "properties": {
+              "runtime_hash": {
+                "type": "null"
+              },
+              "mode": {
+                "properties": {
+                  "kind": {
+                    "const": "exports"
+                  }
+                }
+              },
+              "tools": {
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          },
+          "artifacts": {
+            "properties": {
+              "executable": {
+                "type": "null"
+              }
+            }
+          },
+          "stages": {
+            "minItems": 9,
+            "maxItems": 9
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "input": {
+            "properties": {
+              "runtime_hash": {
+                "type": "string"
+              },
+              "mode": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "application",
+                      "captured"
+                    ]
+                  }
+                }
+              },
+              "tools": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          },
+          "artifacts": {
+            "properties": {
+              "executable": {
+                "$ref": "#/$defs/artifact"
+              }
+            }
+          },
+          "stages": {
+            "minItems": 11,
+            "maxItems": 11
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input": {
+            "properties": {
+              "runtime_profile": {
+                "const": "minimal"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "properties": {
+              "mode": {
+                "properties": {
+                  "kind": {
+                    "const": "application"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input": {
+            "properties": {
+              "runtime_profile": {
+                "enum": [
+                  "minimal",
+                  "none"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "properties": {
+              "requirements": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
