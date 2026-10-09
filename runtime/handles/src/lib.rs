@@ -58,8 +58,9 @@ impl HostResources{
     }
     pub fn net_accept(&mut self,listener:HandleId,deadline:Deadline)->Result<HandleId,IoFailure>{
         self.validate_handle(listener,ResourceKind::Listener)?;let raw=self.lookup(listener)?.fd.as_raw_fd();
-        loop{wait(raw,false,false,deadline)?;
+        loop{
             if self.faults.accept_fail_after.is_some_and(|after|self.faults.accepts>=after){return Err(IoError::Read.into())}
+            wait(raw,false,false,deadline)?;
             let fd=unsafe{libc::accept4(raw,std::ptr::null_mut(),std::ptr::null_mut(),libc::SOCK_NONBLOCK|libc::SOCK_CLOEXEC)};
             if fd>=0{self.faults.accepts+=1;return Ok(self.insert(Resource{fd:unsafe{OwnedFd::from_raw_fd(fd)},kind:ResourceKind::Stream,access:Access::Duplex,regular:false,opened_at:monotonic_now()?}))}
             let error=std::io::Error::last_os_error().raw_os_error().unwrap_or(0);if error==libc::EINTR||error==libc::EAGAIN{continue}return Err(map_errno(error,Access::Read).into())
