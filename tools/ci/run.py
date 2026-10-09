@@ -30,7 +30,19 @@ def main() -> int:
         "gates": [],
     }
 
+    def publish_report() -> None:
+        pending = OUTPUT / "result.pending"
+        with pending.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        pending.replace(OUTPUT / "result.json")
+
+    publish_report()
+
     def run(name: str, arguments: list[str]) -> None:
+        result["active_gate"] = {"name": name, "command": arguments}
+        publish_report()
         started = time.monotonic()
         process = subprocess.run(
             arguments, cwd=ROOT, text=True, stdout=subprocess.PIPE,
@@ -83,6 +95,8 @@ def main() -> int:
             "log": log.relative_to(ROOT).as_posix(),
             "log_sha256": hashlib.sha256(log.read_bytes()).hexdigest(),
         })
+        result.pop("active_gate", None)
+        publish_report()
         if process.returncode:
             raise RuntimeError(f"gate {name} failed with exit code {process.returncode}")
 
@@ -146,15 +160,17 @@ def main() -> int:
         run("bootstrap-strict", [sys.executable, "tools/bootstrap_check.py"])
         result["status"] = "PASSED"
         return 0
+    except KeyboardInterrupt:
+        result["status"] = "INTERRUPTED"
+        result["error"] = "CI run interrupted before all required gates completed"
+        return 130
     except (OSError, ValueError, subprocess.SubprocessError, RuntimeError) as error:
         result["status"] = "FAILED"
         result["error"] = str(error)
         print(f"CI gate failure: {error}", file=sys.stderr)
         return 1
     finally:
-        (OUTPUT / "result.json").write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8",
-        )
+        publish_report()
 
 
 if __name__ == "__main__":

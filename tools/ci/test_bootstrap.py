@@ -153,5 +153,35 @@ class BootstrapSchemaTests(unittest.TestCase):
             self.assertIn("dependencies not VERIFIED", dependency["error"])
 
 
+
+class EvidenceReportTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("record_evidence", ROOT / "tools/record_evidence.py")
+        cls.recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.recorder)
+
+    def report(self):
+        return {"source_commit": "a" * 40, "status": "PASSED", "gates": [
+            {"name": "contract", "exit_code": 0, "is_test": True, "test_count": 1}]}
+
+    def test_only_matching_complete_report_can_be_recorded(self):
+        report = self.report()
+        self.assertEqual(self.recorder.validate_report(report, "a" * 40), report["gates"])
+        with self.assertRaisesRegex(ValueError, "source commit"):
+            self.recorder.validate_report(report, "b" * 40)
+
+    def test_interrupted_running_or_empty_evidence_cannot_be_promoted(self):
+        variants = []
+        for status in ["RUNNING", "INTERRUPTED", "FAILED"]:
+            report = self.report(); report["status"] = status; variants.append(report)
+        report = self.report(); report["active_gate"] = {"name": "native"}; variants.append(report)
+        report = self.report(); report["gates"][0]["exit_code"] = 1; variants.append(report)
+        report = self.report(); report["gates"][0]["test_count"] = 0; variants.append(report)
+        report = self.report(); report["gates"] = []; variants.append(report)
+        for report in variants:
+            with self.subTest(report=report), self.assertRaises(ValueError):
+                self.recorder.validate_report(report, "a" * 40)
+
 if __name__ == "__main__":
     unittest.main()
