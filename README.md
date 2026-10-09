@@ -31,6 +31,33 @@ with captured output and explicit step, call-depth, heap and output budgets.
 Its JSON interface is defined by `schema/tool.schema.json` and RFC 0013. A passing
 interpreter result does not claim native-code or operating-system runtime support.
 
+The P05 native tool path is under acceptance. Build the CLI and native runtime
+archive together with `./tools/dev.ps1 build`. To publish and compile
+an application into a real Linux ELF in Docker:
+
+```powershell
+@{
+    task_id = 'native-hello'
+    base_revision = 0
+    scope = @('program')
+    operations = @(@{
+        op = 'import_text'
+        source = Get-Content examples/core/native_hello.il -Raw -Encoding utf8
+    })
+    required_checks = @()
+} | ConvertTo-Json -Depth 10 | ./tools/dev.ps1 il --store /workspace/.il/hello transact
+
+@{ revision = 1; target = 'x86_64-unknown-linux-gnu'; profile = 'release' } |
+    ConvertTo-Json | ./tools/dev.ps1 il --store /workspace/.il/hello build
+```
+
+The example uses a fresh store; subsequent transactions use its current revision.
+`result.native.artifacts.executable.path` identifies the ELF inside Docker. Native
+compilation requires the runtime archive beside the CLI executable. The request's profile controls optimization of the generated application.
+`test` also accepts `native_debug` and `native_release` isolation with the same
+explicit suite arguments and limits as `captured`. RFC 0017 defines the build,
+execution and persistent candidate records.
+
 ## Normative inputs
 
 - The development document is

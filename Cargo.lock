@@ -105,15 +105,20 @@ name = "il"
 version = "0.1.0"
 dependencies = [
  "il-checker",
+ "il-codegen-x86-64",
  "il-execution-model",
  "il-frontend",
  "il-graph",
  "il-hir",
  "il-interpreter",
+ "il-link-driver",
  "il-mir",
+ "il-native-ir",
+ "il-object-emitter",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]
@@ -122,6 +127,16 @@ version = "0.1.0"
 dependencies = [
  "il-graph",
  "serde_json",
+]
+
+[[package]]
+name = "il-codegen-x86-64"
+version = "0.1.0"
+dependencies = [
+ "il-graph",
+ "il-hir",
+ "il-native-ir",
+ "serde",
 ]
 
 [[package]]
@@ -181,6 +196,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "il-link-driver"
+version = "0.1.0"
+dependencies = [
+ "il-execution-model",
+ "il-object-emitter",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "il-mir"
 version = "0.1.0"
 dependencies = [
@@ -192,9 +217,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "il-native-ir"
+version = "0.1.0"
+dependencies = [
+ "il-checker",
+ "il-execution-model",
+ "il-frontend",
+ "il-graph",
+ "il-hir",
+ "il-mir",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "il-native-probe"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "il-native-runtime"
+version = "0.1.0"
+dependencies = [
+ "il-execution-model",
+ "il-graph",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "il-object-emitter"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "serde_json",
  "sha2",
 ]

@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/native_build.schema.json",
+  "title": "Verified native compilation record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "scope",
+    "revision",
+    "source",
+    "input",
+    "artifacts",
+    "driver_record",
+    "stages"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "status": {
+      "const": "VERIFIED"
+    },
+    "scope": {
+      "const": "native_compilation"
+    },
+    "revision": {
+      "$ref": "tool.schema.json#/$defs/revision"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_git_commit",
+        "source_tree_hash"
+      ],
+      "properties": {
+        "source_git_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_tree_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graph_hash",
+        "mir_hash",
+        "native_ir_hash",
+        "compiler_hash",
+        "runtime_hash",
+        "toolchain_lock_hash",
+        "mode",
+        "target",
+        "profile",
+        "tools"
+      ],
+      "properties": {
+        "graph_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "mir_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "native_ir_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "compiler_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "runtime_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "toolchain_lock_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "mode": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "entry"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "application"
+                },
+                "entry": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "entry",
+                "arguments",
+                "limits"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "captured"
+                },
+                "entry": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "arguments": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "execution.schema.json#/$defs/value"
+                  }
+                },
+                "limits": {
+                  "$ref": "execution.schema.json#/$defs/limits"
+                }
+              }
+            }
+          ]
+        },
+        "target": {
+          "const": "x86_64-unknown-linux-gnu"
+        },
+        "profile": {
+          "enum": [
+            "debug",
+            "release"
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256",
+              "version"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "native_ir",
+        "llvm_ir",
+        "object",
+        "executable"
+      ],
+      "properties": {
+        "native_ir": {
+          "$ref": "#/$defs/artifact"
+        },
+        "llvm_ir": {
+          "$ref": "#/$defs/artifact"
+        },
+        "object": {
+          "$ref": "#/$defs/artifact"
+        },
+        "executable": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "driver_record": {
+      "$ref": "#/$defs/artifact"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "input_hash",
+        "output_hash",
+        "compiler_version",
+        "diagnostics"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "lower_to_hir",
+            "lower_to_mir",
+            "verify_mir",
+            "lower_to_native_ir",
+            "verify_native_ir",
+            "codegen_x86_64",
+            "verify_llvm",
+            "optimize_llvm",
+            "emit_object",
+            "link_runtime",
+            "emit_elf"
+          ]
+        },
+        "input_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "output_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "compiler_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagnostics": {
+          "type": "array",
+          "maxItems": 0,
+          "items": {
+            "$ref": "diagnostic.schema.json"
+          }
+        }
+      }
+    }
+  }
+}

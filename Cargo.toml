@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "runtime/execution_model", "tools/il"]
+members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "runtime/execution_model", "compiler/native_ir", "compiler/codegen_x86_64", "runtime/native", "compiler/link_driver", "compiler/object_emitter", "tools/il"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,7 +10,7 @@ rust-version = "1.90"
 
 [workspace.dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
-serde_json = "=1.0.145"
+serde_json = { version = "=1.0.145", features = ["unbounded_depth"] }
 sha2 = "=0.10.9"
 fs2 = "=0.4.3"
 tempfile = "=3.23.0"
@@ -22,6 +22,12 @@ il-mir = { path = "compiler/mir" }
 il-interpreter = { path = "runtime/interpreter" }
 
 il-execution-model = { path = "runtime/execution_model" }
+
+il-native-ir = { path = "compiler/native_ir" }
+il-codegen-x86-64 = { path = "compiler/codegen_x86_64" }
+il-native-runtime = { path = "runtime/native" }
+il-link-driver = { path = "compiler/link_driver" }
+il-object-emitter = { path = "compiler/object_emitter" }
 
 [profile.release]
 debug = false

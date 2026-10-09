@@ -291,7 +291,11 @@
           "$ref": "#/$defs/revision"
         },
         "isolation": {
-          "const": "captured"
+          "enum": [
+            "captured",
+            "native_debug",
+            "native_release"
+          ]
         },
         "suite": {
           "type": "object",
@@ -315,6 +319,29 @@
               "$ref": "execution.schema.json#/$defs/limits"
             }
           }
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "target",
+        "profile"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "target": {
+          "const": "x86_64-unknown-linux-gnu"
+        },
+        "profile": {
+          "enum": [
+            "debug",
+            "release"
+          ]
         }
       }
     }

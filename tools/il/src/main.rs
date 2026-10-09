@@ -2,6 +2,7 @@ mod protocol;
 mod source;
 mod strict_json;
 mod execution;
+mod native;
 
 use il_graph::*;
 use protocol::*;
@@ -72,6 +73,14 @@ struct Test {
     revision: u64,
     suite: execution::Suite,
     isolation: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Build {
+    revision: u64,
+    target: String,
+    profile: il_object_emitter::Profile,
 }
 
 #[derive(Deserialize)]
@@ -288,13 +297,21 @@ fn dispatch(options: &Options, context: &source::Context, input: &str, base: &mu
         }
         "test" => {
             let args: Test = request(input)?;
-            if args.isolation != "captured" { return Err(Failure::input("interpreter tests require captured isolation")); }
+            if !["captured", "native_debug", "native_release"].contains(&args.isolation.as_str()) { return Err(Failure::input("unknown execution isolation")); }
             let graph = load(store.as_ref(), context, args.revision)?;
-            let result = execution::run(&graph, args.suite)?;
+            let result = if args.isolation == "captured" { execution::run(&graph, args.suite)? }
+                else { native::test(&graph, args.suite, &args.isolation, &options.store, context)? };
             let mut response = envelope(tool, current, args.revision, result);
             response["ok"] = json!(response["result"]["execution"]["status"] == "returned");
             response["diagnostics"] = response["result"]["execution"]["diagnostics"].clone();
             Ok(response)
+        }
+        "build" => {
+            let args: Build = request(input)?;
+            if args.target != TARGET { return Err(Failure::new("E_UNSUPPORTED_TARGET", "native compilation requires x86_64-unknown-linux-gnu")); }
+            let graph = load(store.as_ref(), context, args.revision)?;
+            let result = native::build(&graph, args.profile, &options.store, context)?;
+            Ok(envelope(tool, current, args.revision, result))
         }
         "diff" => {
             let args: Diff = request(input)?;
