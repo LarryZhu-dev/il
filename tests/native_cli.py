@@ -97,7 +97,7 @@ class NativeCliAcceptance(unittest.TestCase):
         return {"entry": "main", "arguments": arguments,
                 "limits": dict(execution_cli.LIMITS, **(limits or {}))}
 
-    def test_request(self, suite, isolation):
+    def execution_request(self, suite, isolation):
         return {"revision": 1, "suite": suite, "isolation": isolation}
 
     def validate_execution(self, execution):
@@ -243,12 +243,12 @@ class NativeCliAcceptance(unittest.TestCase):
         self.records.append(record)
         self.save_progress()
         success = expected["status"] == "returned"
-        interpreted = self.invoke("test", self.test_request(suite, "captured"), success)["result"]["execution"]
+        interpreted = self.invoke("test", self.execution_request(suite, "captured"), success)["result"]["execution"]
         self.validate_execution(interpreted)
         self.assert_expected(interpreted, expected, numeric_type)
         profiles = record["profiles"]
         for profile in PROFILES:
-            response = self.invoke("test", self.test_request(suite, "native_" + profile), success)
+            response = self.invoke("test", self.execution_request(suite, "native_" + profile), success)
             execution = response["result"]["execution"]
             self.validate_execution(execution)
             native = self.validate_native(response, profile)
@@ -338,7 +338,7 @@ class NativeCliAcceptance(unittest.TestCase):
             self.publish(source=case["source"])
             hashes = {}
             for profile in PROFILES:
-                response = self.invoke("test", self.test_request(self.suite(case["arguments"]), "native_" + profile))
+                response = self.invoke("test", self.execution_request(self.suite(case["arguments"]), "native_" + profile))
                 native = self.validate_native(response, profile)
                 directory = str(Path(native["artifacts"]["executable"]["path"]).parent)
                 self.assertNotIn(directory, directories, "clean build reused another build's artifact directory")
@@ -395,7 +395,7 @@ class NativeCliAcceptance(unittest.TestCase):
         self.publish(graph=execution_cli.numeric_graph(case))
         suite = self.suite([execution_cli.integer("I64", n) for n in case["operands"]])
         for profile in PROFILES:
-            request = self.test_request(suite, "native_" + profile)
+            request = self.execution_request(suite, "native_" + profile)
             self.assert_code(self.invoke("test", dict(request, shell="forbidden"), False), "E_SCHEMA_INVALID")
             self.assert_code(self.invoke("test", dict(request, environment={"PATH": "/tmp"}), False), "E_SCHEMA_INVALID")
             self.assert_code(self.invoke("test", dict(request, isolation="native_shell"), False), "E_SCHEMA_INVALID")
@@ -409,6 +409,80 @@ class NativeCliAcceptance(unittest.TestCase):
             wrong["suite"]["arguments"][0] = execution_cli.integer("U64", 20)
             self.assert_code(self.invoke("test", wrong, False), "E_TYPE_MISMATCH")
         self.assertEqual(self.head_revision(), 1)
+
+    def closed_stdout_run(self, executable, report_path=None):
+        """An inherited pipe with no reader tests the actual process I/O boundary."""
+        with tempfile.TemporaryDirectory(prefix="il-native-closed-stdout-") as cwd:
+            reader, writer = os.pipe()
+            os.close(reader)
+            try:
+                if report_path is None:
+                    return subprocess.run([executable], cwd=cwd, env={}, stdin=subprocess.DEVNULL,
+                        stdout=writer, stderr=subprocess.PIPE, timeout=30, restore_signals=True)
+                with report_path.open("wb") as report:
+                    def report_descriptor():
+                        os.dup2(report.fileno(), 3)
+                        os.set_inheritable(3, True)
+                    return subprocess.run([executable], cwd=cwd, env={}, stdin=subprocess.DEVNULL,
+                        stdout=writer, stderr=subprocess.PIPE, timeout=30, restore_signals=True,
+                        preexec_fn=report_descriptor, close_fds=False)
+            finally:
+                os.close(writer)
+
+    def test_closed_stdout_returns_typed_write_error_and_continues(self):
+        contract = json.loads(ABI_CONTRACT.read_text(encoding="utf-8"))
+        for case in contract["closed_stdout"]:
+            for mode in ("captured", "application"):
+                identity = case["id"] + "_" + mode
+                with self.subTest(case=identity), self.isolated_case(identity):
+                    declaration = '@id("Out") type Out=Result<Unit,core.IoError>;'
+                    if mode == "captured":
+                        body = f'return {case["expression"]};'
+                        result_type = "Out"
+                    else:
+                        # Only the typed Write branch succeeds. Both a false Ok
+                        # and another error trap, proving execution continued.
+                        failure = 'let fail:I32=1/0;return fail;'
+                        body = (f'let output:Out={case["expression"]};'
+                                'match output {Ok(unit)=>{' + failure + '}'
+                                'Err(error)=>{match error {Write=>{return 0;}_=>{' + failure + '}}}}')
+                        result_type = "I32"
+                    source = ('module app {' + declaration + f'@id("main") fn main()->{result_type} '
+                              f'effects [{case["effects"]}] {{' + body + '}}')
+                    self.publish(source=source)
+                    record = {"id": identity, "passed": False, "profiles": {}}
+                    self.records.append(record)
+                    self.save_progress()
+                    for profile in PROFILES:
+                        if mode == "captured":
+                            response = self.invoke("test", self.execution_request(self.suite([]), "native_" + profile))
+                            native = self.validate_native(response, profile)
+                            open_execution = response["result"]["execution"]
+                            self.assert_expected(open_execution, {"status": "returned", "live_allocations": 0,
+                                "stdout": case["open_stdout"], "value": {"type": "Out", "data": {
+                                "kind": "variant", "value": {"tag": "Ok", "fields": [
+                                {"type": "Unit", "data": {"kind": "unit"}}]}}}})
+                            report_path = self.store / ("closed-stdout-" + profile + ".json")
+                            completed = self.closed_stdout_run(native["artifacts"]["executable"]["path"], report_path)
+                            self.assertEqual(completed.returncode, 0, f"closed pipe killed or trapped process: {completed.stderr!r}")
+                            self.assertEqual(completed.stderr, b"")
+                            execution = json.loads(report_path.read_text(encoding="utf-8"))
+                            self.validate_execution(execution)
+                            self.assert_expected(execution, contract["closed_stdout_expected"])
+                            result = {"exit_code": completed.returncode, "execution": observables(execution)}
+                        else:
+                            response = self.invoke("build", {"revision": 1, "target": graph_cli.TARGET, "profile": profile})
+                            native = self.validate_native(response, profile, captured=False)
+                            completed = self.closed_stdout_run(native["artifacts"]["executable"]["path"])
+                            self.assertEqual(completed.returncode, contract["closed_stdout_application_exit"],
+                                             f"application did not reach typed Write branch: {completed.stderr!r}")
+                            self.assertEqual(completed.stderr, b"")
+                            result = {"exit_code": completed.returncode}
+                        result["executable_sha256"] = native["artifacts"]["executable"]["sha256"]
+                        record["profiles"][profile] = result
+                        self.save_progress()
+                    record["passed"] = True
+                    self.save_progress()
 
     def test_unknown_cli_flag_is_rejected_before_build(self):
         completed = subprocess.run([str(graph_cli.BINARY), "--repository", str(self.repository),

@@ -48,6 +48,20 @@ and physical LLVM verifier rejection of malformed supplied IR. Direct Native IR
 mutation tests validate layouts, def/use, calls, branches, and ownership cleanup
 without trusting a source graph or original MIR.
 
+Entry argument import failures retain the stable entry function ID as the
+diagnostic entity. A one-byte capture budget with an owned String argument must
+trap at `main` consistently in the interpreter and both native profiles.
+
+Real output failures are tested independently of captured interpreter I/O. The
+external client connects stdout to a pipe whose reader is already closed and
+restores default signal dispositions before starting the ELF. Runtime startup
+must handle SIGPIPE; writes return typed `Err(core.IoError::Write)` and execution
+continues. Tests cover integers and strings with and without a newline. Captured
+ELFs report the typed error through the separate fd 3, with empty stdout/stderr
+and no live allocations. Application ELFs succeed only after matching the Write
+variant; an unexpected Ok or other error executes a checked trap. Reports count
+only bytes actually written, never buffered bytes lost during a later flush.
+
 ## Reproducibility and publication
 
 Native results retain paths and SHA-256 hashes for Native IR, LLVM IR, object,

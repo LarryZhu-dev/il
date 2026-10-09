@@ -121,6 +121,25 @@
       "source": "module app { @id(\"main\") fn main()->String effects [alloc,process] {let text:String=\"世界世界世界世界\";let n:Usize=runtime.string_len(text);runtime.print_i64(cast<I64>(n));return text;} }",
       "arguments": [],
       "expected": {"status":"returned","value":{"type":"String","data":{"kind":"string","value":"世界世界世界世界"}},"stdout":"24","live_allocations":1}
+    },
+    {
+      "id": "entry_owned_argument_capture_limit_location",
+      "source": "module app { @id(\"main\") fn main(x:String)->String {return x;} }",
+      "arguments": [{"type":"String","data":{"kind":"string","value":"owned"}}],
+      "limits": {"max_output_bytes":1},
+      "expected": {"status":"trapped","code":"E_RESOURCE_LIMIT","entity_id":"main","stdout":"","live_allocations":0}
     }
-  ]
+  ],
+  "closed_stdout": [
+    {"id":"integer_closed_stdout","expression":"runtime.print_i64(-42)","effects":"process","open_stdout":"-42"},
+    {"id":"string_closed_stdout","expression":"runtime.print_string(\"write\")","effects":"alloc,process","open_stdout":"write"},
+    {"id":"utf8_newline_closed_stdout","expression":"runtime.print_string(\"你好\\n\")","effects":"alloc,process","open_stdout":"你好\n"}
+  ],
+  "closed_stdout_expected": {
+    "status":"returned",
+    "value":{"type":"Out","data":{"kind":"variant","value":{"tag":"Err","fields":[{"type":"core.IoError","data":{"kind":"variant","value":{"tag":"Write","fields":[]}}}]}}},
+    "stdout":"",
+    "live_allocations":0
+  },
+  "closed_stdout_application_exit": 0
 }
