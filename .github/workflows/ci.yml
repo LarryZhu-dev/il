@@ -41,3 +41,37 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 30
+      - name: Produce trusted P10 evidence
+        if: always()
+        run: >-
+          docker run --rm --platform linux/amd64 --network none
+          --volume "$GITHUB_WORKSPACE:/workspace"
+          --env CI=true
+          il-bootstrap:ci python3 tools/p10/produce.py
+          --output build/p10/run
+      - name: Assemble P10 evidence bundle
+        if: always()
+        run: >-
+          docker run --rm --platform linux/amd64 --network none
+          --volume "$GITHUB_WORKSPACE:/workspace"
+          --env CI=true
+          il-bootstrap:ci python3 tools/p10/assemble.py
+          --journal build/p10/run/journal.json
+          --output build/p10/bundle
+      - name: Validate P10 evidence structure
+        if: always()
+        run: >-
+          docker run --rm --platform linux/amd64 --network none
+          --volume "$GITHUB_WORKSPACE:/workspace"
+          --env CI=true
+          il-bootstrap:ci python3 tools/p10/runner.py
+          --bundle build/p10/bundle
+      - name: Preserve P10 evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: p10-evidence-linux-x86_64-${{ github.sha }}
+          path: build/p10/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
