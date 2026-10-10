@@ -24,21 +24,42 @@ def operation(identity, opcode, inputs, outputs, attributes):
             "consumes": [], "produces": []}
 
 
-def numeric_graph(case):
-    parameters = [{"entity_id": f"arg{i}", "name": f"arg{i}", "type": case["type"]}
+def numeric_graph(case, function_name="main"):
+    parameters = [{"entity_id": f"{function_name}.arg{i}", "name": f"arg{i}", "type": case["type"]}
                   for i in range(len(case["operands"]))]
     result_type = case.get("result_type", case["type"])
     attributes = {"target_type": result_type} if case["opcode"] == "cast" else {}
     graph = {"project_id": "il", "graph_version": "1.0.0", "revision": 0,
              "target": graph_cli.TARGET, "modules": [{"entity_id": "app", "path": "app",
-             "imports": [], "declarations": ["main"], "visibility": "public"}],
+             "imports": [], "declarations": [function_name], "visibility": "public"}],
              "types": [], "functions": [], "capabilities": [], "packages": [], "contracts": []}
-    graph["functions"] = [{"entity_id": "main", "name": "main", "parameters": parameters,
+    graph["functions"] = [{"entity_id": function_name, "name": function_name, "parameters": parameters,
         "result": result_type, "effects": [], "capabilities": [], "contracts": [],
-        "blocks": [{"entity_id": "main.entry", "arguments": [],
-            "operations": [operation("main.calculate", case["opcode"],
-                [p["entity_id"] for p in parameters], [{"entity_id": "value", "type": result_type}], attributes)],
-            "terminator": operation("main.return", "return", ["value"], [], {})}]}]
+        "blocks": [{"entity_id": f"{function_name}.entry", "arguments": [],
+            "operations": [operation(f"{function_name}.calculate", case["opcode"],
+                [p["entity_id"] for p in parameters],
+                [{"entity_id": f"{function_name}.value", "type": result_type}], attributes)],
+            "terminator": operation(f"{function_name}.return", "return", [f"{function_name}.value"], [], {})}]}]
+    return graph
+
+
+def numeric_matrix_graph(cases):
+    """Put the full numeric contract in one published graph.
+
+    Each case still gets two independent CLI test requests below, while one
+    transaction avoids paying the graph publication and Git fixture cost 180
+    times during the acceptance gate.
+    """
+    functions = []
+    declarations = []
+    for index, case in enumerate(cases):
+        function_name = f"numeric_{index}"
+        fixture = numeric_graph(case, function_name)
+        declarations.append(function_name)
+        functions.extend(fixture["functions"])
+    graph = numeric_graph(cases[0], "numeric_0")
+    graph["modules"][0]["declarations"] = declarations
+    graph["functions"] = functions
     return graph
 
 
@@ -60,18 +81,19 @@ class ExecutionCliAcceptance(unittest.TestCase):
             "scope": ["program"], "operations": [{"op": "replace_program", "graph": graph}],
             "required_checks": []})
 
-    def request_for(self, case):
-        return {"revision": 1, "isolation": "captured", "suite": {"entry": "main",
+    def request_for(self, case, entry="main"):
+        return {"revision": 1, "isolation": "captured", "suite": {"entry": entry,
             "arguments": [integer(case["type"], v) for v in case["operands"]], "limits": dict(LIMITS)}}
 
     def test_locked_numeric_execution_matrix(self):
         cases = json.loads(CONTRACT.read_text(encoding="utf-8"))["cases"]
+        self.store = self.root / "numeric-matrix"
+        self.publish(numeric_matrix_graph(cases))
         for index, case in enumerate(cases):
             with self.subTest(case=case["id"]):
-                self.store = self.root / f"numeric-{index}"
-                self.publish(numeric_graph(case))
+                entry = f"numeric_{index}"
                 expected = case["expected"]
-                request = self.request_for(case)
+                request = self.request_for(case, entry)
                 success = expected["status"] == "returned"
                 response = self.invoke("test", request, success)
                 execution = response["result"]["execution"]
@@ -89,7 +111,7 @@ class ExecutionCliAcceptance(unittest.TestCase):
                     self.assertEqual(execution["diagnostics"], [])
                 else:
                     self.assert_code(response, expected["code"])
-                    self.assertEqual(execution["diagnostics"][0]["entity_id"], "main.calculate")
+                    self.assertEqual(execution["diagnostics"][0]["entity_id"], f"{entry}.calculate")
                 repeated = self.invoke("test", request, success)
                 self.assertEqual(repeated, response, "execution or evidence was nondeterministic")
                 stages = response["result"]["stages"]
