@@ -29,7 +29,7 @@ def main(binary: Path) -> int:
         request={"revision":1,"target":"x86_64-unknown-linux-gnu","profile":"release"}; old=subprocess.run([str(binary),"--repository",str(repo),"--store",str(store),"build"],input=json.dumps(request),text=True,capture_output=True)
         if old.returncode: raise RuntimeError(f"initial build failed: {old.stdout} {old.stderr}")
         old_response=json.loads(old.stdout); old_exe=Path(old_response["result"]["native"]["artifacts"]["executable"]["path"]); old_hash=file_digest(old_exe); old_input_hash=digest(canonical(request))
-        parent,child=socket.socketpair(); os.dup2(child.fileno(),198); build=None
+        parent,child=socket.socketpair(); os.set_inheritable(child.fileno(),True); os.dup2(child.fileno(),198); os.set_inheritable(198,True); build=None
         try:
             build=subprocess.Popen([str(binary),"--repository",str(repo),"--store",str(store),"build"],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,pass_fds=(198,)); build.stdin.write(canonical(request)); build.stdin.close(); child.close(); os.close(198); parent.sendall(b"link_runtime\n"); event=wait_line(parent); pid=build.pid; executable_hash=file_digest(binary); os.kill(pid,signal.SIGKILL); build.wait(timeout=20)
         finally:
