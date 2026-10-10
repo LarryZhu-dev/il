@@ -211,6 +211,47 @@ def safe_artifact(root: Path, relative: str) -> Path:
     return path
 
 
+def p10_rust_baseline_source_hashes(root: Path) -> set[str]:
+    baseline = root / "tests/p10/baseline"
+    source = (baseline / "main.rs").read_bytes()
+    route = (baseline / "hello_route.rs.fragment").read_bytes()
+    fixture = read_json(baseline / "type_error.json")
+    valid = fixture["valid"].encode("utf-8")
+    invalid = fixture["invalid"].encode("utf-8")
+    anchor = b"// G4_HELLO_ROUTE"
+    if source.count(anchor) != 1 or source.count(valid) != 1:
+        raise ValidationError("P10 Rust baseline fixtures do not match their source anchors")
+    with_route = source.replace(anchor, route)
+    with_type_error = source.replace(valid, invalid)
+    candidates = {source, with_route, with_type_error, with_route.replace(valid, invalid)}
+    return {hashlib.sha256(candidate).hexdigest() for candidate in candidates}
+
+
+def is_p10_rust_baseline_copy(root: Path, path: Path, baseline_hashes: set[str]) -> bool:
+    relative = path.relative_to(root / "build")
+    if len(relative.parts) != 3 or relative.parts[0] not in {"p10-g4", "p10-smoke-rust"}:
+        return False
+    if not re.fullmatch(r"(?:add_route|fix_type_error|rollback)-[1-3]-rust", relative.parts[1]):
+        return False
+    if relative.name != "main.rs":
+        return False
+    return hashlib.sha256(path.read_bytes()).hexdigest() in baseline_hashes
+
+
+def check_forbidden_generated_sources(root: Path) -> None:
+    suffixes = {".c", ".cc", ".cpp", ".cxx", ".rs", ".js", ".ts", ".py", ".java", ".class"}
+    baseline_hashes = p10_rust_baseline_source_hashes(root)
+    forbidden = []
+    for path in (root / "build").rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in suffixes:
+            continue
+        if path.suffix.lower() == ".rs" and is_p10_rust_baseline_copy(root, path, baseline_hashes):
+            continue
+        forbidden.append(str(path.relative_to(root)))
+    if forbidden:
+        raise ValidationError("forbidden generated target source: " + ", ".join(forbidden[:20]))
+
+
 def check_evidence(root: Path, record, state, lock):
     validate_file(root, record, "evidence")
     if record["revision"] > state["head_revision"]:
@@ -331,10 +372,7 @@ def run_checks(root: Path, pre_commit: bool = False):
                 raise ValidationError("unlocked toolchain version: " + field)
 
     def forbidden_sources():
-        suffixes = {".c", ".cc", ".cpp", ".cxx", ".rs", ".js", ".ts", ".py", ".java", ".class"}
-        forbidden = [str(path.relative_to(root)) for path in (root / "build").rglob("*") if path.is_file() and path.suffix.lower() in suffixes]
-        if forbidden:
-            raise ValidationError("forbidden generated target source: " + ", ".join(forbidden[:20]))
+        check_forbidden_generated_sources(root)
 
     def clean_repository():
         if git(root, "status", "--porcelain", "--untracked-files=all"):

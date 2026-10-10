@@ -21,6 +21,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = Path(__file__).with_name("execution_contract.json")
 TARGET = "x86_64-unknown-linux-gnu"
+G4_BASELINE_DATE = "2000-01-01T00:00:00+00:00"
 MODULES = ("core", "alloc", "io", "time", "net", "json", "http", "test", "tracing")
 ROUTE = {"entity_id": "demo.route.hello", "method": "GET", "path": "/hello/{name}",
          "handler": "demo.hello", "parameters": [{"name": "name", "type_ref": "String",
@@ -50,6 +51,8 @@ def require(condition, message):
 class Trace:
     def __init__(self, directory):
         self.directory = directory
+        self.run_id = str(uuid.uuid4())
+        self.workspace_id = str(uuid.uuid4())
         self.events = []
         self.phase = "setup"
         (directory / "blobs").mkdir(parents=True)
@@ -68,17 +71,19 @@ class Trace:
         self.events.append(event)
         save(self.directory / "trace.json", self.events)
 
-    def process(self, argv, *, cwd=None, stdin=b"", expected=0):
+    def process(self, argv, *, cwd=None, stdin=b"", expected=0, env=None):
         argv = [str(arg) for arg in argv]
         started = time.monotonic_ns()
+        process_env = os.environ.copy()
+        process_env.update(env or {})
         try:
-            result = subprocess.run(argv, cwd=cwd, input=stdin, capture_output=True, timeout=180)
+            result = subprocess.run(argv, cwd=cwd, input=stdin, capture_output=True, timeout=180, env=process_env)
         except subprocess.TimeoutExpired as error:
-            self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin)},
+            self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin), "environment": env or {}},
                         {"timeout": True, "stdout": self.blob(error.stdout or b""),
                          "stderr": self.blob(error.stderr or b"")}, started)
             raise
-        self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin)},
+        self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin), "environment": env or {}},
                     {"exit_code": result.returncode, "stdout": self.blob(result.stdout),
                      "stderr": self.blob(result.stderr)}, started)
         if expected is not None:
@@ -250,37 +255,138 @@ def wire_checks(trace, contract, has_route):
             require(json.loads(body) == row["json"], "unexpected JSON body")
         else:
             require(body == row["body"].encode(), f"unexpected HTTP body: {body!r}")
+    return len(contract["requests"])
 
 
 def test_service(trace, contract, exe, policy, implementation, has_route):
     with service(trace, exe, policy, implementation):
-        wire_checks(trace, contract, has_route)
+        return wire_checks(trace, contract, has_route)
 
 
 def patch_metrics(before, after):
     lines = list(difflib.unified_diff(before.decode().splitlines(True), after.decode().splitlines(True),
                                     fromfile="a/program", tofile="b/program"))
-    return "".join(lines).encode(), {"files_changed": int(before != after),
+    patch = "".join(lines)
+    if before != after:
+        patch = "diff --git a/program b/program\n" + patch
+    return patch.encode(), {"files_changed": int(before != after),
         "insertions": sum(line.startswith("+") and not line.startswith("+++") for line in lines),
         "deletions": sum(line.startswith("-") and not line.startswith("---") for line in lines)}
+
+
+def initialize_rust_repository(trace, directory):
+    def git(*args, expected=0):
+        return trace.process(
+            ["git", "-C", directory, *args],
+            expected=expected,
+            env={"GIT_AUTHOR_DATE": G4_BASELINE_DATE, "GIT_COMMITTER_DATE": G4_BASELINE_DATE},
+        ).stdout
+
+    git("init", "--initial-branch=main")
+    git("config", "user.name", "il G4 baseline")
+    git("config", "user.email", "g4-baseline@invalid.local")
+    git("config", "commit.gpgsign", "false")
+    git("add", "main.rs")
+    git("commit", "-m", "test: pin G4 baseline")
+    return git, git("rev-parse", "HEAD").decode().strip()
+
+
+def graph_has_hello_route(graph):
+    return b'"entity_id": "demo.route.hello"' in graph and b'"/hello/{name}"' in graph
+
+
+def write_g4_record(directory, output_root, trace, *, task, implementation, index,
+                    starting_commit, task_input_sha256, started, finished,
+                    assertions, success, failure_category, patch):
+    trace_events = {
+        "schema_version": "1.0.0",
+        "kind": "g4_trace",
+        "run_id": trace.run_id,
+        "events": [
+            {
+                "sequence": event["sequence"],
+                "kind": "tool_call",
+                "tool": event["kind"],
+                "request_sha256": digest(encoded(event["request"])),
+                "response_sha256": digest(encoded(event["response"])),
+            }
+            for event in trace.events
+        ],
+    }
+    trace_path = directory / "g4_trace.json"
+    save(trace_path, trace_events)
+    patch_path = directory / "patch.diff"
+    patch_path.write_bytes(patch)
+    record = {
+        "schema_version": "1.0.0",
+        "kind": "g4_trial",
+        "task_id": task,
+        "implementation": implementation,
+        "trial_index": index,
+        "run_id": trace.run_id,
+        "workspace_id": trace.workspace_id,
+        "starting_commit": starting_commit,
+        "task_input_sha256": task_input_sha256,
+        "started_monotonic_ns": started,
+        "finished_monotonic_ns": finished,
+        "experiment_exit_code": 0 if success else 1,
+        "failure_category": None if success else failure_category,
+        "assertions": [
+            {"id": identity, "exit_code": 0 if count else None, "count": count}
+            for identity, count in assertions.items()
+        ],
+        "trace": {
+            "role": "trace",
+            "path": trace_path.relative_to(output_root).as_posix(),
+            "sha256": digest(trace_path.read_bytes()),
+        },
+        "patch": {
+            "role": "patch",
+            "path": patch_path.relative_to(output_root).as_posix(),
+            "sha256": digest(patch),
+        },
+    }
+    record_path = directory / "g4_trial.json"
+    save(record_path, record)
+    return {
+        "path": record_path.relative_to(output_root).as_posix(),
+        "sha256": digest(record_path.read_bytes()),
+    }
 
 
 def trial(directory, implementation, task, index, binary, contract):
     directory.mkdir()
     trace = Trace(directory)
+    attempt_started = time.monotonic_ns()
+    task_input_sha256 = digest(encoded({"task": task, "requests": contract["requests"], "failure_categories": contract["failure_categories"]}))
+    source_commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, check=True, text=True).stdout.strip()
+    starting_commit = source_commit
     row = {"implementation": implementation, "task": task, "repetition": index,
-           "directory": str(directory), "success": False, "failure_category": None}
+           "directory": str(directory), "source_commit": source_commit,
+           "starting_commit": starting_commit,
+           "task_input_sha256": task_input_sha256, "success": False, "failure_category": None}
     before = after = b""
     started = None
+    assertions = {identity: 0 for identity in contract["g4"]["tasks"][task]}
+
+    def passed(identity, count=1):
+        assertions[identity] += count
+
     try:
         if implementation == "il":
             app = IlTrial(trace, binary)
+            old = None
             if task == "rollback":
                 app.add()
                 old = app.build(2)
                 before = app.snapshot(2)
             else:
                 before = app.snapshot(1)
+            if task == "fix_type_error":
+                old = app.build(1)
+                old_hash = digest(old.read_bytes())
+                test_service(trace, contract, old, app.policy, implementation, False)
+
             trace.phase = "measured"
             started = time.monotonic_ns()
             app.invoke("inspect", {"entity_id": "demo.server", "revision": 2 if task == "rollback" else 1, "budget": 4096})
@@ -289,22 +395,39 @@ def trial(directory, implementation, task, index, binary, contract):
                 require(rejected["result_revision"] == 1, "failed candidate changed HEAD")
                 diagnostic = rejected["diagnostics"][0]
                 require("TYPE" in diagnostic["code"] or "CONTRACT" in diagnostic["code"], "not a type/contract diagnostic")
+                for field in ("diagnostic_id", "code", "stage", "entity_id"):
+                    require(isinstance(diagnostic.get(field), str) and diagnostic[field], f"diagnostic omitted {field}")
                 app.invoke("explain", {"run_id": rejected["result"]["run_id"], "diagnostic_id": diagnostic["diagnostic_id"], "context_budget": 8192})
+                passed("diagnostic_machine_readable")
+                require(digest(old.read_bytes()) == old_hash, "failed transaction replaced the previous executable")
+                test_service(trace, contract, old, app.policy, implementation, False)
+                app.add()
+                after = app.snapshot(2)
+                require(graph_has_hello_route(after), "repair did not install the hello route")
+                passed("repair_applied")
+                exe = app.build(2)
+                passed("regression_suite", test_service(trace, contract, exe, app.policy, implementation, True))
+            elif task == "add_route":
+                result = app.add()
+                require(result["result_revision"] == 2, "route transaction did not publish the next revision")
+                after = app.snapshot(2)
+                require(graph_has_hello_route(after), "route transaction did not install the hello route")
+                passed("route_present")
+                passed("typecheck")
+                exe = app.build(2)
+                passed("http_blackbox", test_service(trace, contract, exe, app.policy, implementation, True))
             if task == "rollback":
                 restored = app.invoke("restore", {"revision": 1, "reason": "G4 rollback trial"})
                 require(restored["result_revision"] == 3, "restore must create a new revision")
+                passed("rollback_transaction")
                 after = app.snapshot(3)
                 a, b = json.loads(app.snapshot(1)), json.loads(after)
                 a.pop("revision"); b.pop("revision")
                 require(a == b, "restored graph differs from history")
+                passed("restored_graph_matches")
                 exe = app.build(3)
                 test_service(trace, contract, exe, app.policy, implementation, False)
-                test_service(trace, contract, old, app.policy, implementation, True)
-            else:
-                app.add()
-                after = app.snapshot(2)
-                exe = app.build(2)
-                test_service(trace, contract, exe, app.policy, implementation, True)
+                passed("previous_binary_runs", test_service(trace, contract, old, app.policy, implementation, True))
         else:
             baseline = ROOT / "tests/p10/baseline"
             source = directory / "main.rs"
@@ -313,17 +436,34 @@ def trial(directory, implementation, task, index, binary, contract):
             fragment = (baseline / "hello_route.rs.fragment").read_bytes()
             require(initial.count(b"// G4_HELLO_ROUTE") == 1, "missing Rust route anchor")
             installed = initial.replace(b"// G4_HELLO_ROUTE", fragment)
+            git, starting_commit = initialize_rust_repository(trace, directory)
+            row["starting_commit"] = starting_commit
+
             def compile_source(name, expected=0):
                 exe = directory / name
                 result = trace.process(["rustc", "--edition=2021", "-O", "--error-format=json", source, "-o", exe], expected=expected)
                 return exe, result
+
             if task == "rollback":
-                source.write_bytes(installed)
+                trace.edit(source, installed)
+                git("add", "main.rs")
+                git("commit", "-m", "feat: add hello route")
                 old, _ = compile_source("previous")
+                test_service(trace, contract, old, None, implementation, True)
+                before = source.read_bytes()
             elif task == "fix_type_error":
-                require(initial.count(b'fn health_body() -> &\'static str { "ok" }') == 1, "missing Rust health anchor")
-                source.write_bytes(installed.replace(b'fn health_body() -> &\'static str { "ok" }', b"fn health_body() -> &'static str { 42 }"))
-            before = source.read_bytes()
+                fixture = json.loads((baseline / "type_error.json").read_bytes())
+                valid = fixture["valid"].encode()
+                invalid = fixture["invalid"].encode()
+                require(initial.count(valid) == 1, "Rust type-error fixture does not match the baseline")
+                old, _ = compile_source("previous")
+                old_hash = digest(old.read_bytes())
+                test_service(trace, contract, old, None, implementation, False)
+                trace.edit(source, initial.replace(valid, invalid))
+                before = source.read_bytes()
+            else:
+                before = source.read_bytes()
+
             trace.phase = "measured"
             started = time.monotonic_ns()
             trace.read(source)
@@ -331,21 +471,48 @@ def trial(directory, implementation, task, index, binary, contract):
                 _, result = compile_source("rejected", expected=None)
                 require(result.returncode != 0, "Rust type error unexpectedly compiled")
                 diagnostics = [json.loads(line) for line in result.stderr.splitlines() if line]
-                require(any(d.get("code") and d["code"].get("code") == "E0308" for d in diagnostics), "Rust E0308 missing")
-            trace.edit(source, initial if task == "rollback" else installed)
-            after = source.read_bytes()
-            exe, _ = compile_source("program")
-            test_service(trace, contract, exe, None, implementation, task != "rollback")
+                structured = [d for d in diagnostics if d.get("code") and d["code"].get("code") == "E0308"]
+                require(bool(structured), "Rust E0308 missing")
+                require(any(d.get("spans") and d.get("message") for d in structured), "Rust diagnostic omitted machine-readable location or message")
+                passed("diagnostic_machine_readable")
+                require(digest(old.read_bytes()) == old_hash, "failed compile replaced the previous executable")
+                test_service(trace, contract, old, None, implementation, False)
+                trace.edit(source, installed)
+                git("add", "main.rs")
+                git("commit", "-m", "fix: repair health handler and add route")
+                after = source.read_bytes()
+                exe, _ = compile_source("program")
+                passed("repair_applied")
+                passed("regression_suite", test_service(trace, contract, exe, None, implementation, True))
+            elif task == "add_route":
+                trace.edit(source, installed)
+                git("add", "main.rs")
+                git("commit", "-m", "feat: add hello route")
+                after = source.read_bytes()
+                require(b"/hello/{name}" in after, "Rust edit did not add the hello route")
+                passed("route_present")
+                passed("typecheck")
+                exe, _ = compile_source("program")
+                passed("http_blackbox", test_service(trace, contract, exe, None, implementation, True))
             if task == "rollback":
-                require(after == initial, "Rust rollback differs from initial source")
-                test_service(trace, contract, old, None, implementation, True)
+                before_commit = git("rev-parse", "HEAD").decode().strip()
+                git("revert", "--no-edit", "HEAD")
+                after = trace.read(source)
+                require(after == initial, "Rust Git rollback differs from its pinned source")
+                require(git("rev-parse", "HEAD").decode().strip() != before_commit, "Rust rollback did not create a new commit")
+                passed("rollback_transaction")
+                passed("restored_graph_matches")
+                exe, _ = compile_source("program")
+                test_service(trace, contract, exe, None, implementation, False)
+                passed("previous_binary_runs", test_service(trace, contract, old, None, implementation, True))
         row["success"] = True
     except Exception as error:
         row["failure_category"] = "timeout" if isinstance(error, subprocess.TimeoutExpired) else "assertion" if isinstance(error, AssertionError) else "environment" if isinstance(error, OSError) else "other"
         row["error"] = str(error)
         row["traceback"] = traceback.format_exc()
     finally:
-        row["elapsed_ns"] = time.monotonic_ns() - started if started is not None else None
+        finished = time.monotonic_ns()
+        row["elapsed_ns"] = finished - started if started is not None else None
         patch, metrics = patch_metrics(before, after)
         row["changes"] = metrics
         row["before"] = trace.blob(before)
@@ -354,6 +521,24 @@ def trial(directory, implementation, task, index, binary, contract):
         row["tool_calls"] = sum(event["phase"] == "measured" for event in trace.events)
         row["trace"] = trace.blob(encoded(trace.events))
         row["change_representation"] = "canonical_graph" if implementation == "il" else "rust_source"
+        save(directory / "trial.json", row)
+        output_root = directory.parent
+        row["g4_trial"] = write_g4_record(
+            directory,
+            output_root,
+            trace,
+            task=task,
+            implementation=implementation,
+            index=index,
+            starting_commit=row["starting_commit"],
+            task_input_sha256=row["task_input_sha256"],
+            started=started if started is not None else attempt_started,
+            finished=finished,
+            assertions=assertions,
+            success=row["success"],
+            failure_category=row["failure_category"],
+            patch=patch,
+        )
         save(directory / "trial.json", row)
     return row
 
@@ -401,6 +586,7 @@ def main():
                *[ROOT / "packages" / name / "lib.il" for name in MODULES],
                *sorted((ROOT / "tests/p10/baseline").glob("*"))] if p.is_file()}
     report = {"schema_version": "1.0.0", "method": contract["method"], "source_commit": head,
+              "baseline_commit": None,
               "source_dirty": bool(dirty), "source_status": dirty, "input_hashes": inputs,
               "compiler_sha256": digest(binary.read_bytes()), "trials": [], "status": "RUNNING",
               "scope": "Scripted workflow comparison; not an LLM benchmark or full HTTP acceptance"}
@@ -412,6 +598,10 @@ def main():
                 print(f"Running {identity}", flush=True)
                 row = trial(output / identity, impl, task, index, binary, contract)
                 report["trials"].append(row)
+                if impl == "rust":
+                    if report["baseline_commit"] is None:
+                        report["baseline_commit"] = row["starting_commit"]
+                    require(report["baseline_commit"] == row["starting_commit"], "Rust baseline commit changed between trials")
                 save(output / "comparison.json", report)
                 print(json.dumps({"trial": identity, "success": row["success"], "error": row.get("error")}), flush=True)
     report.update(aggregate(report["trials"], contract))

@@ -204,6 +204,55 @@ class BootstrapSchemaTests(unittest.TestCase):
             self.assertIn("dependencies not VERIFIED", dependency["error"])
 
 
+class GeneratedSourceGateTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        baseline = self.root / "tests/p10/baseline"
+        baseline.mkdir(parents=True)
+        for name in ("main.rs", "hello_route.rs.fragment", "type_error.json"):
+            (baseline / name).write_bytes((ROOT / "tests/p10/baseline" / name).read_bytes())
+        (self.root / "build").mkdir()
+
+    def test_all_locked_rust_baseline_variants_are_allowed_only_in_g4_workspaces(self):
+        baseline = self.root / "tests/p10/baseline"
+        source = (baseline / "main.rs").read_bytes()
+        fragment = (baseline / "hello_route.rs.fragment").read_bytes()
+        fixture = CHECK.read_json(baseline / "type_error.json")
+        valid = fixture["valid"].encode("utf-8")
+        invalid = fixture["invalid"].encode("utf-8")
+        with_route = source.replace(b"// G4_HELLO_ROUTE", fragment)
+        variants = (source, with_route, source.replace(valid, invalid), with_route.replace(valid, invalid))
+        locations = (
+            "add_route-1-rust",
+            "fix_type_error-1-rust",
+            "rollback-1-rust",
+            "add_route-2-rust",
+        )
+        for location, content in zip(locations, variants):
+            path = self.root / "build/p10-g4" / location / "main.rs"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(content)
+        smoke = self.root / "build/p10-smoke-rust/add_route-1-rust/main.rs"
+        smoke.parent.mkdir(parents=True)
+        smoke.write_bytes(with_route)
+
+        CHECK.check_forbidden_generated_sources(self.root)
+
+    def test_modified_rust_or_other_high_level_source_is_rejected(self):
+        rust = self.root / "build/p10-g4/add_route-1-rust/main.rs"
+        rust.parent.mkdir(parents=True)
+        rust.write_text("fn main() { println!(\"not the locked baseline\"); }\n", encoding="utf-8")
+        with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
+            CHECK.check_forbidden_generated_sources(self.root)
+
+        rust.unlink()
+        (rust.parent / "generated.c").write_text("int main(void) { return 0; }\n", encoding="utf-8")
+        with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
+            CHECK.check_forbidden_generated_sources(self.root)
+
+
 
 class EvidenceReportTests(unittest.TestCase):
     @classmethod
