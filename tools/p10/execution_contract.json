@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "method": "scripted_workflow_comparison",
+  "repetitions": 3,
+  "implementations": ["rust", "il"],
+  "tasks": ["add_route", "fix_type_error", "rollback"],
+  "requests": [
+    {"method": "GET", "path": "/health", "status": 200, "body": "ok"},
+    {"method": "GET", "path": "/hello/World", "status": 200, "json": {"message": "Hello, World"}},
+    {"method": "GET", "path": "/missing", "status": 404, "body": ""},
+    {"method": "POST", "path": "/health", "status": 405, "body": ""}
+  ],
+  "failure_categories": ["assertion", "compile", "environment", "other", "test", "timeout", "tool"],
+  "limits": {"command_seconds": 180, "socket_seconds": 8, "startup_seconds": 10}
+}

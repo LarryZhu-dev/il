@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://il-lang.dev/schema/p10-bundle-1.0.0.json",
+  "title": "il P10 proposed evidence bundle structure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "source_commit",
+    "target",
+    "toolchain_lock_sha256",
+    "predicates",
+    "artifacts",
+    "comparison"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "p10_acceptance_bundle"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "target": {
+      "const": "x86_64-unknown-linux-gnu"
+    },
+    "toolchain_lock_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "predicates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graph_schema_valid",
+        "type_checker_verified",
+        "ownership_checker_verified",
+        "MIR_verifier_verified",
+        "interpreter_semantic_suite_passed",
+        "native_elf_generated",
+        "clean_environment_runs",
+        "no_high_level_target_source",
+        "reproducible_hash",
+        "inspect_succeeds",
+        "slice_succeeds",
+        "transaction_add_route_succeeds",
+        "stale_transaction_rejected",
+        "failure_preserves_previous_revision",
+        "blackbox_tests_external",
+        "all_artifacts_hashed",
+        "diagnostics_machine_readable",
+        "rollback_verified"
+      ],
+      "patternProperties": {
+        ".+": {
+          "$ref": "#/$defs/recordReference"
+        }
+      },
+      "propertyNames": {
+        "enum": [
+          "graph_schema_valid",
+          "type_checker_verified",
+          "ownership_checker_verified",
+          "MIR_verifier_verified",
+          "interpreter_semantic_suite_passed",
+          "native_elf_generated",
+          "clean_environment_runs",
+          "no_high_level_target_source",
+          "reproducible_hash",
+          "inspect_succeeds",
+          "slice_succeeds",
+          "transaction_add_route_succeeds",
+          "stale_transaction_rejected",
+          "failure_preserves_previous_revision",
+          "blackbox_tests_external",
+          "all_artifacts_hashed",
+          "diagnostics_machine_readable",
+          "rollback_verified"
+        ]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/artifactReference"
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_contract_sha256",
+        "baseline_commit",
+        "trials"
+      ],
+      "properties": {
+        "task_contract_sha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "baseline_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "items": {
+            "$ref": "#/$defs/recordReference"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\/$).+$"
+    },
+    "recordReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "artifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    }
+  },
+  "description": "Structural validation is provisional and does not establish execution provenance or P10 acceptance."
+}

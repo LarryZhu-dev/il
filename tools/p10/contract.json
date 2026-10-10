@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "target": "x86_64-unknown-linux-gnu",
+  "gates": {
+    "G0": [
+      "graph_schema_valid",
+      "type_checker_verified",
+      "ownership_checker_verified",
+      "MIR_verifier_verified",
+      "interpreter_semantic_suite_passed"
+    ],
+    "G1": [
+      "native_elf_generated",
+      "clean_environment_runs",
+      "no_high_level_target_source",
+      "reproducible_hash"
+    ],
+    "G2": [
+      "inspect_succeeds",
+      "slice_succeeds",
+      "transaction_add_route_succeeds",
+      "stale_transaction_rejected",
+      "failure_preserves_previous_revision"
+    ],
+    "G3": [
+      "blackbox_tests_external",
+      "all_artifacts_hashed",
+      "diagnostics_machine_readable",
+      "rollback_verified"
+    ]
+  },
+  "required_artifact_roles": [
+    "graph",
+    "compiler",
+    "runtime",
+    "native_elf",
+    "toolchain_lock"
+  ],
+  "http_cases": [
+    "health",
+    "hello",
+    "not_found",
+    "method_not_allowed",
+    "malformed_percent_encoding",
+    "fragmented_request",
+    "conflicting_content_length",
+    "oversized_request_line",
+    "oversized_headers",
+    "read_timeout",
+    "absolute_deadline",
+    "partial_write",
+    "disconnect_recovery",
+    "path_parameter_limit",
+    "transfer_encoding_rejected"
+  ],
+  "g4": {
+    "trial_count": 3,
+    "implementations": ["rust", "il"],
+    "tasks": {
+      "add_route": ["route_present", "typecheck", "http_blackbox"],
+      "fix_type_error": ["diagnostic_machine_readable", "repair_applied", "regression_suite"],
+      "rollback": ["rollback_transaction", "restored_graph_matches", "previous_binary_runs"]
+    },
+    "failure_categories": [
+      "assertion",
+      "compile",
+      "environment",
+      "other",
+      "test",
+      "timeout",
+      "tool"
+    ]
+  },
+  "limits": {
+    "bundle_bytes": 536870912,
+    "record_bytes": 16777216
+  }
+}

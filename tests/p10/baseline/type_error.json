@@ -1,0 +1,6 @@
+{
+  "schema_version": "1.0.0",
+  "valid": "fn health_body() -> &'static str { \"healthy\" }",
+  "invalid": "fn health_body() -> &'static str { 42 }",
+  "expected_rust_diagnostic": "E0308"
+}

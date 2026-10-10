@@ -269,7 +269,12 @@ class HttpAcceptance(unittest.TestCase):
                                 self.assertLess(time.monotonic(),deadline,'native service did not open a TCP listener')
                                 time.sleep(.02)
                         self.record(identity+':health',wire,elapsed,rules['health']['status'])
-                    stdout,stderr=process.communicate(timeout=30)
+                    # Running the complete captured native request reparses and
+                    # lowers the large HTTP package before executing it. Keep
+                    # this deadline aligned with the other native black-box
+                    # subprocesses so a slow clean build is not misreported as
+                    # a service hang.
+                    stdout,stderr=process.communicate(timeout=180)
                     reply=json.loads(stdout)
                     self.assertEqual(process.returncode,0,stderr)
                     self.assertTrue(reply['ok'],reply)
