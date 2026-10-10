@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "runtime/execution_model", "runtime/startup", "runtime/allocator", "runtime/handles", "compiler/native_ir", "compiler/codegen_x86_64", "runtime/native", "compiler/link_driver", "compiler/object_emitter", "tools/il"]
+members = ["compiler/native_probe", "runtime/probe_runtime", "compiler/graph", "compiler/checker", "compiler/frontend", "compiler/hir", "compiler/mir", "runtime/interpreter", "runtime/execution_model", "runtime/startup", "runtime/allocator", "runtime/handles", "compiler/native_ir", "compiler/codegen_x86_64", "runtime/native", "compiler/link_driver", "compiler/object_emitter", "tools/il", "compiler/e01"]
 
 [workspace.package]
 version = "0.1.0"
