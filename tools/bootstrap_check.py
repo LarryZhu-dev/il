@@ -238,14 +238,20 @@ def is_p10_rust_baseline_copy(root: Path, path: Path, baseline_hashes: set[str])
     return hashlib.sha256(path.read_bytes()).hexdigest() in baseline_hashes
 
 
-def is_p10_docker_evidence(root: Path, path: Path) -> bool:
-    """Identify retained source snapshots from a trusted P10 producer run."""
+def is_p10_docker_evidence(root: Path, path: Path, baseline_hashes: set[str]) -> bool:
+    """Identify the two source forms retained by a trusted P10 producer run."""
     relative = path.relative_to(root / "build")
-    return (
-        len(relative.parts) >= 2
-        and relative.parts[0] == "p10"
-        and re.fullmatch(r"docker-run-\d{8}-\d{6}", relative.parts[1]) is not None
-    )
+    if len(relative.parts) < 4 or relative.parts[0] != "p10":
+        return False
+    if re.fullmatch(r"docker-run-\d{8}-\d{6}", relative.parts[1]) is None:
+        return False
+    if relative.parts[2] == "reproducibility" and len(relative.parts) >= 5:
+        return relative.parts[3] in {"root_a", "root_b"} and relative.parts[4] == "source"
+    if len(relative.parts) == 5 and relative.parts[2] == "g4" and relative.parts[4] == "main.rs":
+        if not re.fullmatch(r"(?:add_route|fix_type_error|rollback)-[1-3]-rust", relative.parts[3]):
+            return False
+        return hashlib.sha256(path.read_bytes()).hexdigest() in baseline_hashes
+    return False
 
 
 def check_forbidden_generated_sources(root: Path) -> None:
@@ -253,7 +259,7 @@ def check_forbidden_generated_sources(root: Path) -> None:
     baseline_hashes = p10_rust_baseline_source_hashes(root)
     forbidden = []
     for path in (root / "build").rglob("*"):
-        if is_p10_docker_evidence(root, path):
+        if is_p10_docker_evidence(root, path, baseline_hashes):
             continue
         if not path.is_file() or path.suffix.lower() not in suffixes:
             continue

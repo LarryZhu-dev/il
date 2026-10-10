@@ -263,6 +263,13 @@ class GeneratedSourceGateTests(unittest.TestCase):
         with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
             CHECK.check_forbidden_generated_sources(self.root)
 
+        unrelated = self.root / "build/p10/docker-run-20261011-070000/other/generated.rs"
+        unrelated.parent.mkdir(parents=True)
+        unrelated.write_text("fn generated_target() {}\n", encoding="utf-8")
+        generated.unlink()
+        with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
+            CHECK.check_forbidden_generated_sources(self.root)
+
 
 
 class EvidenceReportTests(unittest.TestCase):
