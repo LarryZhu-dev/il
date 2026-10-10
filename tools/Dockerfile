@@ -17,3 +17,9 @@ ENV LLVM_CONFIG=/usr/bin/llvm-config-14 \
     TZ=UTC
 
 WORKDIR /workspace
+
+# Prime the locked registry cache while the image build still has network
+# access.  P10 execution deliberately runs this image with --network none;
+# cargo test/build must therefore never need to contact crates.io at runtime.
+COPY . /workspace
+RUN cargo fetch --locked
