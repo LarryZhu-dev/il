@@ -286,11 +286,14 @@ def main() -> int:
                 raise RuntimeError("locked Rust builds require checked-in Cargo.lock")
             run("rust-tests", ["cargo", "test", "--workspace", "--locked", "--", "--nocapture"])
             run("p09-fault-build", ["cargo", "build", "--locked", "-p", "il", "--features", "process-test-barriers"])
+            # The process interruption gates perform a real native build before
+            # killing the linker worker. Materialize the debug runtime archive
+            # first because the compiler resolves it beside its executable.
+            run("full-runtime-debug", ["cargo", "build", "--locked", "-p", "il-native-runtime"])
             run("p09-transaction-process", [sys.executable, "tests/fault_injection/transaction_process.py", "--binary", "target/debug/il"])
             run("p09-build-process", [sys.executable, "tests/fault_injection/build_process.py", "--binary", "target/debug/il"])
             if (ROOT / "tests/execution_cli.py").is_file():
                 run("rust-debug", ["cargo", "build", "--locked", "-p", "il"])
-                run("full-runtime-debug", ["cargo", "build", "--locked", "-p", "il-native-runtime"])
                 run("execution-cli-debug", [sys.executable, "tests/execution_cli.py", "--binary", "target/debug/il", "--report", "build/execution_cli_debug_report.json"])
             run("rust-release", ["cargo", "build", "--workspace", "--release", "--locked"])
             run("full-runtime-release", ["cargo", "build", "--locked", "-p", "il-native-runtime", "--release"])
