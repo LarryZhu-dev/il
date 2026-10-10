@@ -67,9 +67,87 @@ def build_synthetic_bundle(root):
         bundle.ref("artifacts/compiler", "compiler", compiler_data),
         bundle.ref("artifacts/runtime.a", "runtime", runtime_data),
         bundle.ref("artifacts/il-http", "native_elf", elf_data),
+        bundle.ref("artifacts/il-http-debug", "application_debug", elf_data),
+        bundle.ref("artifacts/il-http-release", "application_release", elf_data),
         bundle.ref("artifacts/toolchain.lock", "toolchain_lock", lock_data),
     ]
     artifact_hash = {row["role"]: row["sha256"] for row in top_artifacts}
+    executable_inventory = [
+        {
+            "role": "application_debug",
+            "kind": "application",
+            "profile": "debug",
+            "target": contract["target"],
+            "entry_point": "demo.serve",
+            "graph_revision": 7,
+            "graph_sha256": artifact_hash["graph"],
+            "runtime_profile": "full",
+            "build_invocation_sha256": digest(b"build debug"),
+            "artifact_role": "application_debug",
+        },
+        {
+            "role": "application_release",
+            "kind": "application",
+            "profile": "release",
+            "target": contract["target"],
+            "entry_point": "demo.serve",
+            "graph_revision": 7,
+            "graph_sha256": artifact_hash["graph"],
+            "runtime_profile": "full",
+            "build_invocation_sha256": digest(b"build release"),
+            "artifact_role": "application_release",
+        },
+    ]
+
+    def byte_ref(relative, data):
+        bundle.file(relative, data)
+        return {"path": relative, "sha256": digest(data), "size_bytes": len(data)}
+
+    def http_receipt(case_id, profile):
+        executable_role = "application_" + profile
+        request_data = (case_id + " request").encode()
+        response_data = (case_id + " response").encode()
+        policy_data = json.dumps({"profile": profile, "allow": ["127.0.0.1:8080"]}, sort_keys=True).encode()
+        stdout_data = (profile + " stdout").encode()
+        stderr_data = (profile + " stderr").encode()
+        started = 1000
+        ended = 2000
+        request_ref = byte_ref(f"http/{profile}/{case_id}.request", request_data)
+        response_ref = byte_ref(f"http/{profile}/{case_id}.response", response_data)
+        planned_ref = byte_ref(f"http/{profile}/{case_id}.planned", request_data)
+        stdout_ref = byte_ref(f"http/{profile}/{case_id}.stdout", stdout_data)
+        stderr_ref = byte_ref(f"http/{profile}/{case_id}.stderr", stderr_data)
+        policy_ref = bundle.ref(f"http/{profile}/{case_id}.policy", data=policy_data)
+        exchange = {
+            "schema_version": "1.0.0", "kind": "tcp_exchange", "exchange_id": f"exchange-{profile}-{case_id}",
+            "phase": "case", "peer": ["127.0.0.1", 8080], "started_ns": started, "ended_ns": ended,
+            "elapsed_ns": ended - started, "timeout_seconds": 8, "planned_fragments": [planned_ref],
+            "requested_delays_ns": [0], "request": request_ref, "response": response_ref,
+            "events": [
+                {"direction": "send", "timestamp_ns": 1100, "bytes": request_ref, "fragment_index": 0},
+                {"direction": "receive", "timestamp_ns": 1900, "bytes": response_ref},
+            ],
+            "terminal": "eof", "error": None, "mode": "request_response", "response_read": True,
+            "status": 200, "headers": {"connection": "close"}, "body": response_ref,
+            "assertions": [{"id": "wire_contract", "passed": True}],
+        }
+        process = {
+            "kind": "http_server_process", "argv": ["./demo.elf"], "pid": 1234, "started_ns": 900,
+            "ended_ns": 2100, "sha256": artifact_hash[executable_role], "profile": profile,
+            "policy_sha256": policy_ref["sha256"], "exit_code": -15, "stdout": stdout_ref,
+            "stderr": stderr_ref, "termination_signal": "SIGTERM", "cleanup_intent": "supervisor_terminate",
+            "cleanup_reaped": True,
+        }
+        exchange_ref = bundle.json_ref(f"http/{profile}/{case_id}.exchange.json", exchange)
+        process_ref = bundle.json_ref(f"http/{profile}/{case_id}.process.json", process)
+        receipt = {
+            "schema_version": "1.0.0", "kind": "http_exchange", "case_id": case_id,
+            "client": "external_tcp", "executable_role": executable_role, "profile": profile,
+            "contract_sha256": digest(contract_bytes), "exchange": exchange_ref, "process": process_ref,
+            "policy": policy_ref, "assertions": [{"id": "case_contract", "passed": True}],
+        }
+        return bundle.json_ref(f"http/{profile}/{case_id}.receipt.json", receipt)
+
     predicates = {}
     for group, names in contract["gates"].items():
         for predicate in names:
@@ -95,7 +173,7 @@ def build_synthetic_bundle(root):
                 record["execution"] = {
                     "empty_environment": True,
                     "exit_code": 0,
-                    "executable_sha256": artifact_hash["native_elf"],
+                    "executable_sha256": artifact_hash["application_release"],
                     "stdout_sha256": digest(b"service ready"),
                 }
             elif predicate == "no_high_level_target_source":
@@ -122,25 +200,8 @@ def build_synthetic_bundle(root):
             elif predicate == "blackbox_tests_external":
                 cases = []
                 for case_id in contract["http_cases"]:
-                    receipt = {
-                        "schema_version": "1.0.0",
-                        "kind": "http_exchange",
-                        "case_id": case_id,
-                        "client": "external_tcp",
-                        "server_executable_sha256": artifact_hash["native_elf"],
-                        "request_sha256": digest((case_id + " request").encode()),
-                        "response_sha256": digest((case_id + " response").encode()),
-                        "exit_code": 0,
-                        "elapsed_ns": 1000,
-                    }
-                    cases.append({
-                        "id": case_id,
-                        "exit_code": 0,
-                        "count": 1,
-                        "receipt": bundle.json_ref(
-                            f"http/{case_id}.json", receipt, role=f"http_receipt:{case_id}"
-                        ),
-                    })
+                    for profile in contract["required_http_profiles"]:
+                        cases.append({"id": case_id, "profile": profile, "exit_code": 0, "count": 1, "receipt": http_receipt(case_id, profile)})
                 record["http"] = {"client": "external_tcp", "cases": cases}
             elif predicate == "transaction_add_route_succeeds":
                 record["transaction"] = {
@@ -243,6 +304,7 @@ def build_synthetic_bundle(root):
         "source_commit": SOURCE_COMMIT,
         "target": contract["target"],
         "toolchain_lock_sha256": artifact_hash["toolchain_lock"],
+        "executables": executable_inventory,
         "predicates": predicates,
         "artifacts": top_artifacts,
         "comparison": {
@@ -331,6 +393,66 @@ class P10RunnerTests(unittest.TestCase):
         result = runner.validate_bundle_structure(self.root, expected_source_commit="c" * 40)
         self.assertFalse(result["ok"])
         self.assertIn("differs from current HEAD", result["diagnostics"][0]["message"])
+
+    def test_release_executable_inventory_is_required(self):
+        self.manifest["executables"] = [row for row in self.manifest["executables"] if row["role"] != "application_release"]
+        self.write_manifest()
+        result = runner.validate_bundle_structure(self.root)
+        self.assertFalse(result["ok"])
+        self.assertIn("release executable role is absent", result["diagnostics"][0]["message"])
+
+    def test_http_matrix_requires_debug_and_release_for_each_case(self):
+        gate_ref = self.manifest["predicates"]["blackbox_tests_external"]
+        gate_path = self.root / gate_ref["path"]
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        gate["http"]["cases"] = [case for case in gate["http"]["cases"] if not (case["id"] == "health" and case["profile"] == "debug")]
+        gate_path.write_text(json.dumps(gate, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        gate_ref["sha256"] = digest(gate_path.read_bytes())
+        self.write_manifest()
+        result = runner.validate_bundle_structure(self.root)
+        self.assertFalse(result["ok"])
+        self.assertIn("HTTP blackbox evidence omits cases", result["diagnostics"][0]["message"])
+
+    def test_http_exchange_rejects_tampered_wire_hash(self):
+        gate_ref = self.manifest["predicates"]["blackbox_tests_external"]
+        gate_path = self.root / gate_ref["path"]
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        receipt_ref = next(case["receipt"] for case in gate["http"]["cases"] if case["id"] == "health" and case["profile"] == "debug")
+        receipt_path = self.root / receipt_ref["path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        exchange_path = self.root / receipt["exchange"]["path"]
+        exchange = json.loads(exchange_path.read_text(encoding="utf-8"))
+        exchange["request"]["sha256"] = digest(b"tampered wire")
+        exchange_path.write_text(json.dumps(exchange, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        receipt["exchange"]["sha256"] = digest(exchange_path.read_bytes())
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        receipt_ref["sha256"] = digest(receipt_path.read_bytes())
+        gate_ref["sha256"] = digest(gate_path.read_bytes())
+        self.write_manifest()
+        result = runner.validate_bundle_structure(self.root)
+        self.assertFalse(result["ok"])
+        self.assertIn("hash does not match", result["diagnostics"][0]["message"])
+
+    def test_http_process_rejects_rewritten_signal_exit(self):
+        gate_ref = self.manifest["predicates"]["blackbox_tests_external"]
+        gate_path = self.root / gate_ref["path"]
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+        receipt_ref = next(case["receipt"] for case in gate["http"]["cases"] if case["id"] == "health" and case["profile"] == "release")
+        receipt_path = self.root / receipt_ref["path"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        process_path = self.root / receipt["process"]["path"]
+        process = json.loads(process_path.read_text(encoding="utf-8"))
+        process["exit_code"] = 0
+        process_path.write_text(json.dumps(process, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        receipt["process"]["sha256"] = digest(process_path.read_bytes())
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        receipt_ref["sha256"] = digest(receipt_path.read_bytes())
+        gate_path.write_text(json.dumps(gate, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        gate_ref["sha256"] = digest(gate_path.read_bytes())
+        self.write_manifest()
+        result = runner.validate_bundle_structure(self.root)
+        self.assertFalse(result["ok"])
+        self.assertIn("signal exit", result["diagnostics"][0]["message"])
 
     def test_bundle_and_contract_schemas_are_machine_readable_json(self):
         bundle_schema = json.loads(runner.SCHEMA_PATH.read_text(encoding="utf-8"))

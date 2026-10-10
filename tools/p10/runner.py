@@ -141,7 +141,16 @@ def load_contract() -> tuple[dict[str, Any], bytes]:
     except OSError as error:
         raise EvidenceError(f"P10 contract is unavailable: {error}", path=str(CONTRACT_PATH)) from error
     value = strict_json(data, path="tools/p10/contract.json")
-    exact_fields(value, {"schema_version", "target", "gates", "required_artifact_roles", "http_cases", "g4", "limits"}, path="contract")
+    exact_fields(
+        value,
+        {
+            "schema_version", "target", "gates", "required_artifact_roles", "http_cases",
+            "release_executable_role", "required_http_profiles", "executable_inventory_fields",
+            "http_receipt_fields", "http_case_fields", "http_case_profile_matrix",
+            "http_exchange_record", "http_process_record", "g4", "limits",
+        },
+        path="contract",
+    )
     return value, data
 
 
@@ -162,7 +171,7 @@ def load_bundle(reader: BundleReader) -> dict[str, Any]:
 def validate_manifest(manifest: Any, contract: dict[str, Any], contract_bytes: bytes) -> dict[str, Any]:
     manifest = exact_fields(
         manifest,
-        {"schema_version", "kind", "source_commit", "target", "toolchain_lock_sha256", "predicates", "artifacts", "comparison"},
+        {"schema_version", "kind", "source_commit", "target", "toolchain_lock_sha256", "executables", "predicates", "artifacts", "comparison"},
         path="manifest.json",
     )
     require(manifest["schema_version"] == "1.0.0" and manifest["kind"] == "p10_acceptance_bundle", "unsupported P10 evidence manifest")
@@ -172,11 +181,131 @@ def validate_manifest(manifest: Any, contract: dict[str, Any], contract_bytes: b
     predicate_names = {name for group in contract["gates"].values() for name in group}
     predicates = exact_fields(manifest["predicates"], predicate_names, path="manifest.predicates")
     require(isinstance(manifest["artifacts"], list), "artifacts must be an array", path="manifest.artifacts")
+    require(isinstance(manifest["executables"], list) and manifest["executables"], "executable inventory must be non-empty", path="manifest.executables")
     comparison = exact_fields(manifest["comparison"], {"task_contract_sha256", "baseline_commit", "trials"}, path="manifest.comparison")
     require(comparison["task_contract_sha256"] == sha256(contract_bytes), "G4 task contract hash differs from the locked contract", path="manifest.comparison.task_contract_sha256")
     require(is_commit(comparison["baseline_commit"]), "baseline_commit must be a full lowercase Git commit hash", path="manifest.comparison.baseline_commit")
     require(isinstance(comparison["trials"], list), "comparison.trials must be an array", path="manifest.comparison.trials")
     return manifest
+
+
+def validate_executables(
+    manifest: dict[str, Any],
+    contract: dict[str, Any],
+    artifacts: dict[str, tuple[str, bytes]],
+) -> dict[str, dict[str, Any]]:
+    """Validate executable identity independently from the artifact list."""
+    inventory: dict[str, dict[str, Any]] = {}
+    fields = set(contract["executable_inventory_fields"])
+    for index, entry in enumerate(manifest["executables"]):
+        path = f"manifest.executables[{index}]"
+        entry = exact_fields(entry, fields, path=path)
+        role = nonempty_string(entry["role"], path=f"{path}.role")
+        require(role not in inventory, "duplicate executable role", path=path)
+        require(entry["kind"] in {"application", "captured", "compiler", "runtime"}, "invalid executable kind", path=path)
+        require(entry["profile"] in {"debug", "release", "captured", "tool"}, "invalid executable profile", path=path)
+        require(entry["runtime_profile"] in {"full", "minimal", "none"}, "invalid executable runtime profile", path=path)
+        nonempty_string(entry["entry_point"], path=f"{path}.entry_point")
+        require(entry["target"] == contract["target"], "executable target differs from contract", path=path)
+        require(type(entry["graph_revision"]) is int and entry["graph_revision"] >= 0, "invalid executable graph revision", path=path)
+        for name in ("graph_sha256", "build_invocation_sha256"):
+            require(is_sha256(entry[name]), f"invalid executable {name}", path=f"{path}.{name}")
+        if entry["kind"] in {"application", "captured"}:
+            graph_bytes = next((data for identity, data in artifacts.values() if identity == entry["graph_sha256"]), None)
+            require(graph_bytes is not None, "executable graph bytes are absent from inventory", path=path)
+            graph = strict_json(graph_bytes, path=f"{path}.graph_sha256")
+            require(isinstance(graph, dict) and type(graph.get("revision")) is int and graph["revision"] == entry["graph_revision"], "executable graph revision differs from retained graph", path=path)
+        artifact_role = nonempty_string(entry["artifact_role"], path=f"{path}.artifact_role")
+        require(artifact_role in artifacts, "executable references an absent artifact", path=path)
+        _, artifact_bytes = artifacts[artifact_role]
+        if entry["kind"] in {"application", "captured"}:
+            require_elf_x86_64(artifact_bytes, path=f"{path}.artifact_role")
+        inventory[role] = entry
+    release_role = contract["release_executable_role"]
+    require(release_role in inventory, "release executable role is absent from inventory", path="manifest.executables")
+    release = inventory[release_role]
+    require(release["kind"] == "application" and release["profile"] == "release", "release executable has the wrong kind or profile", path="manifest.executables")
+    return inventory
+
+
+def read_byte_ref(reader: BundleReader, reference: Any, *, path: str) -> tuple[bytes, dict[str, Any]]:
+    reference = exact_fields(reference, {"path", "sha256", "size_bytes"}, path=path)
+    data, normalized = reader.read_ref({"path": reference["path"], "sha256": reference["sha256"]})
+    require(type(reference["size_bytes"]) is int and reference["size_bytes"] == len(data), "byte reference size does not match bytes", path=path)
+    return data, normalized
+
+
+def check_http_exchange(reader: BundleReader, value: Any, *, path: str, contract: dict[str, Any]) -> None:
+    required = set(contract["http_exchange_record"]["required_fields"])
+    value = exact_fields(value, required, path=path)
+    require(value["schema_version"] == "1.0.0" and value["kind"] == "tcp_exchange", "unsupported HTTP exchange record", path=path)
+    nonempty_string(value["exchange_id"], path=f"{path}.exchange_id")
+    require(value["phase"] == "case" and value["peer"] == ["127.0.0.1", 8080], "HTTP acceptance exchange is not a case at the locked peer", path=path)
+    require(type(value["started_ns"]) is int and type(value["ended_ns"]) is int and value["ended_ns"] >= value["started_ns"], "invalid exchange timestamps", path=path)
+    require(type(value["elapsed_ns"]) is int and value["elapsed_ns"] == value["ended_ns"] - value["started_ns"], "exchange duration is not measured", path=path)
+    require(type(value["timeout_seconds"]) in (int, float) and value["timeout_seconds"] > 0, "invalid exchange timeout", path=path)
+    planned = value["planned_fragments"]
+    delays = value["requested_delays_ns"]
+    require(isinstance(planned, list) and planned and isinstance(delays, list) and len(planned) == len(delays), "fragment schedule is incomplete", path=path)
+    planned_bytes = []
+    for index, reference in enumerate(planned):
+        data, _ = read_byte_ref(reader, reference, path=f"{path}.planned_fragments[{index}]")
+        planned_bytes.append(data)
+        require(type(delays[index]) is int and delays[index] >= 0, "invalid requested delay", path=path)
+    request, _ = read_byte_ref(reader, value["request"], path=f"{path}.request")
+    response, _ = read_byte_ref(reader, value["response"], path=f"{path}.response")
+    events = value["events"]
+    require(isinstance(events, list), "exchange events must be an array", path=path)
+    sent: list[bytes] = []
+    received: list[bytes] = []
+    last_timestamp = value["started_ns"]
+    fragment_parts: dict[int, list[bytes]] = {}
+    last_fragment = -1
+    for index, event in enumerate(events):
+        allowed = {"direction", "timestamp_ns", "bytes", "fragment_index"}
+        require(isinstance(event, dict), "exchange event must be an object", path=path)
+        event = exact_fields(event, allowed if "fragment_index" in event else allowed - {"fragment_index"}, path=f"{path}.events[{index}]")
+        require(event["direction"] in {"send", "receive"} and type(event["timestamp_ns"]) is int, "invalid exchange event", path=path)
+        require(value["started_ns"] <= event["timestamp_ns"] <= value["ended_ns"], "exchange event timestamp is outside exchange", path=path)
+        require(event["timestamp_ns"] >= last_timestamp, "exchange events are not in monotonic order", path=path)
+        last_timestamp = event["timestamp_ns"]
+        data, _ = read_byte_ref(reader, event["bytes"], path=f"{path}.events[{index}].bytes")
+        (sent if event["direction"] == "send" else received).append(data)
+        if event["direction"] == "send":
+            require("fragment_index" in event, "send event omits fragment identity", path=path)
+            require(type(event["fragment_index"]) is int and 0 <= event["fragment_index"] < len(planned), "invalid fragment index", path=path)
+            require(event["fragment_index"] >= last_fragment, "send fragments are out of order", path=path)
+            last_fragment = event["fragment_index"]
+            fragment_parts.setdefault(last_fragment, []).append(data)
+        else:
+            require("fragment_index" not in event, "receive event cannot identify a send fragment", path=path)
+    require(b"".join(planned_bytes) == request, "request bytes differ from planned fragments", path=path)
+    require(b"".join(sent) == request and b"".join(received) == response, "exchange events differ from wire bytes", path=path)
+    require(all(b"".join(fragment_parts.get(index, [])) == data for index, data in enumerate(planned_bytes)), "send event bytes differ from fragment identity", path=path)
+    require(value["terminal"] in {"eof", "error", "client_reset", "client_close_without_read", "reset"}, "invalid exchange terminal state", path=path)
+    require(value["mode"] in {"request_response", "reset", "slow_reader"}, "invalid exchange mode", path=path)
+    require(type(value["response_read"]) is bool, "response_read must be boolean", path=path)
+    require(value["response_read"] == (value["mode"] == "request_response"), "response_read differs from exchange mode", path=path)
+    require(value["error"] is None and value["terminal"] != "error", "HTTP acceptance exchange failed", path=path)
+    require(type(value["status"]) is int and 100 <= value["status"] <= 599 and isinstance(value["headers"], dict), "invalid HTTP response metadata", path=path)
+    read_byte_ref(reader, value["body"], path=f"{path}.body")
+    require(isinstance(value["assertions"], list) and value["assertions"], "exchange assertions are empty", path=path)
+    for assertion in value["assertions"]:
+        row = exact_fields(assertion, {"id", "passed"}, path=f"{path}.assertions")
+        require(nonempty_string(row["id"], path=f"{path}.assertions.id") and row["passed"] is True, "HTTP assertion failed", path=path)
+
+
+def check_http_process(reader: BundleReader, value: Any, *, path: str, executable_hash: str) -> None:
+    value = exact_fields(value, {"kind", "argv", "pid", "started_ns", "ended_ns", "sha256", "profile", "policy_sha256", "exit_code", "stdout", "stderr", "termination_signal", "cleanup_intent", "cleanup_reaped"}, path=path)
+    require(value["kind"] == "http_server_process" and isinstance(value["argv"], list) and value["argv"], "invalid HTTP server process record", path=path)
+    require(type(value["pid"]) is int and value["pid"] > 0 and type(value["started_ns"]) is int and type(value["ended_ns"]) is int and value["ended_ns"] >= value["started_ns"], "invalid process identity or timing", path=path)
+    require(value["sha256"] == executable_hash and is_sha256(value["policy_sha256"]), "process does not bind executable and policy", path=path)
+    require(type(value["exit_code"]) is int and type(value["cleanup_intent"]) is str and value["cleanup_intent"] == "supervisor_terminate" and value["cleanup_reaped"] is True, "invalid process cleanup evidence", path=path)
+    require(value["termination_signal"] in {"SIGTERM", "SIGKILL"}, "missing supervisor termination signal", path=path)
+    expected_exit = -15 if value["termination_signal"] == "SIGTERM" else -9
+    require(value["exit_code"] == expected_exit, "process signal exit was changed or is inconsistent", path=path)
+    read_byte_ref(reader, value["stdout"], path=f"{path}.stdout")
+    read_byte_ref(reader, value["stderr"], path=f"{path}.stderr")
 
 
 def read_artifacts(reader: BundleReader, references: Any, contract: dict[str, Any], *, owner: str) -> dict[str, tuple[str, bytes]]:
@@ -211,6 +340,7 @@ def check_gate_record(
     manifest: dict[str, Any],
     contract: dict[str, Any],
     top_artifacts: dict[str, tuple[str, bytes]],
+    executables: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     record, normalized = reader.read_json_ref(reference)
     path = normalized["path"]
@@ -246,10 +376,13 @@ def check_gate_record(
     if predicate == "native_elf_generated":
         require("native_elf" in artifacts, "native ELF gate is missing the executable bytes", path=path)
         require_elf_x86_64(artifacts["native_elf"][1], path=path)
+        release = executables[contract["release_executable_role"]]
+        require(artifacts["native_elf"][0] == top_artifacts[release["artifact_role"]][0], "native ELF gate differs from release executable", path=path)
     elif predicate == "clean_environment_runs":
         execution = exact_fields(record.get("execution"), {"empty_environment", "exit_code", "executable_sha256", "stdout_sha256"}, path=f"{path}.execution")
         require(execution["empty_environment"] is True and execution["exit_code"] == 0, "clean-environment execution was not successful", path=path)
-        require(execution["executable_sha256"] == top_artifacts["native_elf"][0], "executed binary differs from the release ELF", path=path)
+        release_role = contract["release_executable_role"]
+        require(execution["executable_sha256"] == top_artifacts[executables[release_role]["artifact_role"]][0], "executed binary differs from the release ELF", path=path)
         require(is_sha256(execution["stdout_sha256"]), "clean-environment stdout hash is invalid", path=path)
     elif predicate == "no_high_level_target_source":
         require(record.get("target_generated_sources") == [], "high-level target source was emitted", path=path)
@@ -275,23 +408,37 @@ def check_gate_record(
         require(http["client"] == "external_tcp", "HTTP evidence did not use an external TCP client", path=path)
         cases = http["cases"]
         require(isinstance(cases, list), "HTTP cases must be an array", path=path)
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         for case in cases:
-            case = exact_fields(case, {"id", "exit_code", "count", "receipt"}, path=f"{path}.http.cases")
+            case = exact_fields(case, set(contract["http_case_fields"]), path=f"{path}.http.cases")
             identity = nonempty_string(case["id"], path=f"{path}.http.cases.id")
-            require(identity not in seen and case["exit_code"] == 0 and case["count"] == 1, "HTTP case receipt is invalid or failed", path=path)
-            receipt, _ = reader.read_json_ref(case["receipt"], role=f"http_receipt:{identity}")
-            receipt = exact_fields(receipt, {"schema_version", "kind", "case_id", "client", "server_executable_sha256", "request_sha256", "response_sha256", "exit_code", "elapsed_ns"}, path=f"{path}.http.{identity}")
-            require(
-                receipt["schema_version"] == "1.0.0" and receipt["kind"] == "http_exchange" and
-                receipt["case_id"] == identity and receipt["client"] == "external_tcp" and
-                receipt["server_executable_sha256"] == top_artifacts["native_elf"][0] and
-                is_sha256(receipt["request_sha256"]) and is_sha256(receipt["response_sha256"]) and
-                receipt["exit_code"] == 0 and type(receipt["elapsed_ns"]) is int and receipt["elapsed_ns"] > 0,
-                "HTTP exchange receipt does not bind a real successful external request", path=path,
-            )
-            seen.add(identity)
-        missing_cases = sorted(set(contract["http_cases"]) - seen)
+            profile = case["profile"]
+            key = (identity, profile)
+            require(identity in contract["http_cases"] and profile in contract["required_http_profiles"], "unknown HTTP case or profile", path=path)
+            require(key not in seen and case["exit_code"] == 0 and case["count"] == 1, "HTTP case receipt is invalid or failed", path=path)
+            receipt, _ = reader.read_json_ref(case["receipt"])
+            receipt = exact_fields(receipt, set(contract["http_receipt_fields"]), path=f"{path}.http.{identity}.{profile}")
+            require(receipt["schema_version"] == "1.0.0" and receipt["kind"] == "http_exchange" and receipt["case_id"] == identity and receipt["client"] == "external_tcp", "HTTP receipt identity is invalid", path=path)
+            require(receipt["profile"] == profile and is_sha256(receipt["contract_sha256"]), "HTTP receipt profile or contract binding is invalid", path=path)
+            role = nonempty_string(receipt["executable_role"], path=path)
+            require(role in executables, "HTTP receipt references an absent executable role", path=path)
+            executable = executables[role]
+            require(executable["profile"] == profile, "HTTP receipt profile differs from executable inventory", path=path)
+            executable_hash = top_artifacts[executable["artifact_role"]][0]
+            exchange, _ = reader.read_json_ref(receipt["exchange"], role=None)
+            check_http_exchange(reader, exchange, path=f"{path}.http.{identity}.{profile}.exchange", contract=contract)
+            process, _ = reader.read_json_ref(receipt["process"], role=None)
+            check_http_process(reader, process, path=f"{path}.http.{identity}.{profile}.process", executable_hash=executable_hash)
+            _, policy = reader.read_ref(receipt["policy"])
+            require(process["profile"] == profile and process["policy_sha256"] == policy["sha256"], "HTTP process profile or policy differs from receipt", path=path)
+            assertions = receipt["assertions"]
+            require(isinstance(assertions, list) and assertions, "HTTP receipt assertions are empty", path=path)
+            for assertion in assertions:
+                row = exact_fields(assertion, {"id", "passed"}, path=f"{path}.http.{identity}.{profile}.assertions")
+                require(nonempty_string(row["id"], path=path) and row["passed"] is True, "HTTP receipt assertion failed", path=path)
+            seen.add(key)
+        required = {(case, profile) for case in contract["http_cases"] for profile in contract["required_http_profiles"]}
+        missing_cases = sorted(required - seen)
         require(not missing_cases, f"HTTP blackbox evidence omits cases: {missing_cases}", path=path)
     elif predicate == "transaction_add_route_succeeds":
         transaction = exact_fields(record.get("transaction"), {"base_revision", "result_revision", "route_path", "route_sha256"}, path=f"{path}.transaction")
@@ -495,6 +642,7 @@ def validate_bundle_structure(
         require(set(contract["required_artifact_roles"]).issubset(top_artifacts), "bundle omits one or more required P10 artifacts", path="manifest.artifacts")
         require(top_artifacts["toolchain_lock"][0] == manifest["toolchain_lock_sha256"], "toolchain_lock artifact hash differs from the manifest", path="manifest.artifacts")
         require_elf_x86_64(top_artifacts["native_elf"][1], path="manifest.artifacts.native_elf")
+        executables = validate_executables(manifest, contract, top_artifacts)
         used_predicate_paths: set[str] = set()
         checked_records: dict[str, list[str]] = {}
         for group, predicates in contract["gates"].items():
@@ -503,7 +651,7 @@ def validate_bundle_structure(
                 reference = manifest["predicates"][predicate]
                 require(reference["path"] not in used_predicate_paths, "one record cannot attest multiple predicates", path=reference["path"])
                 used_predicate_paths.add(reference["path"])
-                check_gate_record(reader, reference, predicate, manifest, contract, top_artifacts)
+                check_gate_record(reader, reference, predicate, manifest, contract, top_artifacts, executables)
                 checked_records[group].append(predicate)
         comparison = verify_trials(reader, manifest, contract)
         return {
