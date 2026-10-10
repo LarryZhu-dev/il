@@ -8,12 +8,65 @@ import graph_cli, runtime_cli
 import execution_cli
 REPORT=None
 RECORDS=[]
+EXCHANGES=[]
+ACTIVE_BINDING=None
+LAST_EXCHANGE=None
 MODULES=('core','alloc','io','time','net','json','http','test','tracing')
 
 def write_json(path,value):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 def package_source():return '\n'.join((ROOT/'packages'/name/'lib.il').read_text(encoding='utf-8') for name in MODULES)
 def sha(path):return 'sha256:'+hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def artifact_bytes(data):
+    # The P08 AI acceptance suite imports this module as a plain TCP client.
+    # Receipt persistence is opt-in for the P10 report runner.
+    if REPORT is None:return None
+    digest=hashlib.sha256(data).hexdigest()
+    path=REPORT.parent/'http-receipts'/'sha256'/digest
+    path.parent.mkdir(parents=True,exist_ok=True)
+    if path.exists():
+        if path.read_bytes()!=data:raise AssertionError('Content-addressed HTTP artifact was modified: '+str(path))
+    else:
+        with path.open('xb') as stream:stream.write(data)
+    return {'path':str(path),'sha256':'sha256:'+digest,'size_bytes':len(data)}
+
+def artifact_file(path):return artifact_bytes(Path(path).read_bytes())
+
+def save_observations():
+    if REPORT is not None:
+        write_json(REPORT,{'suite':'http_external_blackbox','state':'RUNNING','passed':False,
+                          'contract_sha256':sha(ROOT/'spec/http.yaml'),'cases':RECORDS,'exchanges':EXCHANGES})
+
+def native_binding(executable,policy,profile,kind):
+    return {'kind':kind,'profile':profile,'executable':{'path':str(executable),'sha256':sha(executable)},
+            'policy':{'path':str(policy),'sha256':sha(policy)},'contract_sha256':sha(ROOT/'spec/http.yaml'),
+            'process_receipt':None}
+
+def supervise_cleanup(process,*,unexpected_exit_if_exited=False,timeout=5):
+    running=process.poll() is None
+    receipt={'sigterm_sent':False,'sigkill_sent':False,'reaped':False,
+             'unexpected_exit':bool(unexpected_exit_if_exited and not running)}
+    if running:
+        process.terminate();receipt['sigterm_sent']=True
+    try:process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill();receipt['sigkill_sent']=True;process.wait(timeout=timeout)
+    receipt['reaped']=process.poll() is not None
+    return receipt
+
+def bind_captured(receipts,retained,policy,profile):
+    native=retained['native'];executable=Path(native['argv'][0])
+    if native['profile']!=profile:raise AssertionError('Captured executable profile mismatch')
+    binding=native_binding(executable,policy,profile,'captured')
+    if native['artifacts']['executable']['sha256']!=binding['executable']['sha256']:
+        raise AssertionError('Captured executable differs from build evidence')
+    if retained['execution_input']['policy_hash']!=runtime_cli.policy_hash(json.loads(Path(policy).read_text(encoding='utf-8'))):
+        raise AssertionError('Captured policy differs from execution evidence')
+    binding['native_result']=artifact_bytes(json.dumps(retained,sort_keys=True,separators=(',',':')).encode())
+    for item in receipts:item['binding']=binding
+    save_observations()
+    return binding
 def locked():
     from contract import read_contract
     return read_contract(ROOT/'spec/http.yaml')
@@ -51,22 +104,67 @@ def request(target,method='GET',headers=None):
     entries=[('Host','localhost')]+([] if headers is None else headers)
     return (f'{method} {target} HTTP/1.1\r\n'+''.join(f'{name}: {value}\r\n' for name,value in entries)+'\r\n').encode()
 
-def exchange(raw,*,fragments=None,delays=None,timeout=8):
+def exchange(raw,*,fragments=None,delays=None,timeout=8,phase='case',mode='request_response',observe=None):
+    global LAST_EXCHANGE
     started=time.monotonic_ns()
-    with socket.create_connection(('127.0.0.1',8080),timeout=timeout) as client:
-        client.settimeout(timeout);chunks=[raw] if fragments is None else fragments
-        for index,chunk in enumerate(chunks):
-            if delays is not None and delays[index]:time.sleep(delays[index])
-            client.sendall(chunk)
-        data=bytearray()
-        while True:
-            try:chunk=client.recv(65536)
-            except ConnectionResetError:
-                if data:break
-                raise
-            if not chunk:break
-            data.extend(chunk)
-    return bytes(data),time.monotonic_ns()-started
+    chunks=[raw] if fragments is None else fragments
+    data=bytearray();sent=bytearray();events=[];error=None;terminal='eof'
+    try:
+        if mode=='slow_reader':
+            connection=socket.socket()
+            try:
+                connection.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF,1024)
+                connection.settimeout(timeout);connection.connect(('127.0.0.1',8080))
+            except BaseException:
+                connection.close();raise
+        else:connection=socket.create_connection(('127.0.0.1',8080),timeout=timeout)
+        with connection as client:
+            client.settimeout(timeout)
+            for index,chunk in enumerate(chunks):
+                delay=0 if delays is None else delays[index]
+                delay_started=time.monotonic_ns()
+                if delay:time.sleep(delay)
+                delay_ended=time.monotonic_ns()
+                offset=0
+                # send() exposes the bytes actually accepted by the socket even
+                # when a later write fails; sendall() cannot supply that receipt.
+                while offset<len(chunk):
+                    send_started=time.monotonic_ns();count=client.send(chunk[offset:])
+                    if count==0:raise ConnectionError('Socket send returned zero bytes')
+                    transferred=chunk[offset:offset+count];sent.extend(transferred)
+                    events.append({'direction':'send','fragment_index':index,'requested_delay_seconds':delay,
+                                   'delay_started_ns':delay_started,'delay_ended_ns':delay_ended,
+                                   'started_ns':send_started,'ended_ns':time.monotonic_ns(),'bytes':artifact_bytes(transferred)})
+                    offset+=count
+            if mode=='reset':
+                client.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('ii',1,0));terminal='client_reset'
+            elif mode=='slow_reader':
+                observe(client);terminal='client_close_without_read'
+            elif mode!='request_response':raise ValueError('Unknown TCP exchange mode')
+            while mode=='request_response':
+                receive_started=time.monotonic_ns()
+                try:chunk=client.recv(65536)
+                except ConnectionResetError:
+                    terminal='reset'
+                    if data:break
+                    raise
+                if not chunk:break
+                data.extend(chunk)
+                events.append({'direction':'receive','started_ns':receive_started,'ended_ns':time.monotonic_ns(),'bytes':artifact_bytes(chunk)})
+    except BaseException as failure:
+        terminal='error';error={'type':type(failure).__name__,'message':str(failure)}
+        raise
+    finally:
+        ended=time.monotonic_ns()
+        LAST_EXCHANGE={'id':'exchange-'+str(len(EXCHANGES)),'phase':phase,'peer':['127.0.0.1',8080],
+                       'started_ns':started,'ended_ns':ended,'elapsed_ns':ended-started,'timeout_seconds':timeout,
+                       'planned_fragments':[artifact_bytes(chunk) for chunk in chunks],
+                       'requested_delays_seconds':[0]*len(chunks) if delays is None else list(delays),
+                       'request':artifact_bytes(bytes(sent)),'response':artifact_bytes(bytes(data)),
+                       'events':events,'terminal':terminal,'error':error,'binding':ACTIVE_BINDING,
+                       'mode':mode,'response_read':mode=='request_response'}
+        EXCHANGES.append(LAST_EXCHANGE);save_observations()
+    return bytes(data),ended-started
 
 def response(wire):
     head,sep,body=wire.partition(b'\r\n\r\n')
@@ -88,7 +186,8 @@ def response(wire):
     return status,headers,body
 
 @contextlib.contextmanager
-def server(executable,policy,directory):
+def server(executable,policy,directory,profile=None):
+    global ACTIVE_BINDING
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     probe=socket.socket()
     # Match the listener's bind rules: TIME_WAIT is reusable, a live listener is not.
@@ -100,13 +199,16 @@ def server(executable,policy,directory):
     source_fd=fcntl.fcntl(policy_file.fileno(),fcntl.F_DUPFD_CLOEXEC,10)
     stderr=(directory/'stderr.log').open('wb');stdout=(directory/'stdout.log').open('wb')
     def descriptors():os.dup2(source_fd,4);os.set_inheritable(4,True)
+    started=time.monotonic_ns()
     process=subprocess.Popen([str(executable)],stdin=subprocess.DEVNULL,stdout=stdout,stderr=stderr,env={},close_fds=False,preexec_fn=descriptors)
+    previous_binding=ACTIVE_BINDING
+    binding=native_binding(executable,policy,profile,'standalone');ACTIVE_BINDING=binding
     try:
         deadline=time.monotonic()+10
         while True:
             if process.poll() is not None:raise AssertionError(f'Application exited before listen: {process.returncode}')
             try:
-                wire,_=exchange(request('/health'));status,_,body=response(wire)
+                wire,_=exchange(request('/health'),phase='startup');status,_,body=response(wire)
                 health=locked()['responses']['health']
                 if status!=health['status'] or body!=health['body'].encode():raise AssertionError('Startup health contract failed')
                 break
@@ -115,11 +217,24 @@ def server(executable,policy,directory):
                 time.sleep(.02)
         yield process
     finally:
-        if process.poll() is None:process.terminate()
-        try:process.wait(timeout=5)
-        except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
+        cleanup=supervise_cleanup(process,unexpected_exit_if_exited=True)
         stdout.close();stderr.close();policy_file.close();os.close(source_fd)
-        write_json(directory/'process.json',{'argv':[str(executable)],'sha256':sha(executable),'exit_code':process.returncode,'stdout_sha256':sha(directory/'stdout.log'),'stderr_sha256':sha(directory/'stderr.log')})
+        write_json(directory/'process.json',{'argv':[str(executable)],'pid':process.pid,'started_ns':started,'ended_ns':time.monotonic_ns(),
+            'sha256':sha(executable),'profile':profile,'policy_sha256':sha(policy),'exit_code':process.returncode,
+            'stdout':artifact_file(directory/'stdout.log'),'stderr':artifact_file(directory/'stderr.log'),
+            'supervisor_cleanup':cleanup})
+        binding['process_receipt']=artifact_file(directory/'process.json');ACTIVE_BINDING=previous_binding;save_observations()
+
+def captured_process_receipt(process,command,started,stdout,stderr,directory,receipts,binding=None,cleanup=None):
+    value={'kind':'compiler_test_wrapper','argv':command,'pid':process.pid,'started_ns':started,'ended_ns':time.monotonic_ns(),
+           'exit_code':process.returncode,'stdout':artifact_bytes(stdout.encode('utf-8')),'stderr':artifact_bytes(stderr.encode('utf-8')),
+           'supervisor_cleanup':cleanup or {'sigterm_sent':False,'sigkill_sent':False,'reaped':process.poll() is not None,'unexpected_exit':False}}
+    write_json(directory/'process.json',value);artifact=artifact_file(directory/'process.json')
+    if binding is not None:binding['process_receipt']=artifact
+    for item in receipts:
+        item['wrapper_process_receipt']=artifact
+        if item['binding'] is not None:item['binding']['process_receipt']=artifact
+    save_observations()
 
 class HttpAcceptance(unittest.TestCase):
     def test_external_client_has_no_internal_http_imports(self):
@@ -134,8 +249,12 @@ class HttpAcceptance(unittest.TestCase):
         return fixture,directory
     def record(self,identity,wire,elapsed,expected):
         status,headers,body=response(wire);self.assertEqual(status,expected)
-        row={'id':identity,'status':status,'headers':headers,'body':list(body),'elapsed_ns':elapsed,'wire_sha256':'sha256:'+hashlib.sha256(wire).hexdigest()};RECORDS.append(row)
-        write_json(REPORT,{'state':'RUNNING','passed':False,'cases':RECORDS});return headers,body
+        if LAST_EXCHANGE is None or LAST_EXCHANGE['response']['sha256']!='sha256:'+hashlib.sha256(wire).hexdigest():
+            raise AssertionError('Response has no matching TCP receipt')
+        row={'id':identity,'status':status,'headers':headers,'body':list(body),'elapsed_ns':elapsed,
+             'wire_sha256':'sha256:'+hashlib.sha256(wire).hexdigest(),'exchange_id':LAST_EXCHANGE['id'],
+             'validation':'observed_pending_suite'};RECORDS.append(row)
+        save_observations();return headers,body
     def test_native_external_tcp_contracts(self):
         rules=locked();source=fixture_source();errors=rules['responses']['errors'];health=rules['responses']['health'];hello=rules['responses']['hello'];limits=rules['limits'];read_seconds=limits['read_deadline_ms']/1000;write_seconds=limits['write_deadline_ms']/1000;empty_body=rules['responses']['error_body'];assert empty_body=='empty'
         for profile in ('debug','release'):
@@ -143,7 +262,7 @@ class HttpAcceptance(unittest.TestCase):
                 fixture,directory=self.fixture(profile,source)
                 native=fixture.validate_build(fixture.invoke('build',fixture.build_request('full',profile)),'full',profile)
                 executable=native['artifacts']['executable']['path']
-                with server(executable,fixture.policy_path,directory) as process:
+                with server(executable,fixture.policy_path,directory,profile) as process:
                     happy=[('/health',health['status'])]+[(path,hello['status']) for path in ['/hello/Larry','/hello/%E4%B8%AD','/hello/%22%5C%0A','/hello/%2541']]+[(path,errors['unknown_path']) for path in ['/unknown','/health/','/hello/','/hello/a/b']]+[('/failure',errors['handler_error'])]
                     for target,expected in happy:
                         wire,elapsed=exchange(request(target));headers,body=self.record(profile+target,wire,elapsed,expected)
@@ -189,14 +308,14 @@ class HttpAcceptance(unittest.TestCase):
                     raw=request('/hello/fragmented');wire,elapsed=exchange(raw,fragments=[raw[i:i+1] for i in range(len(raw))]);self.record(profile+':fragmented',wire,elapsed,hello['status'])
                     wire,elapsed=exchange(b'GET /health HTTP/1.1\r\nHost:');self.record(profile+':read_timeout',wire,elapsed,errors['read_timeout']);self.assertGreaterEqual(elapsed,int((read_seconds-.5)*1e9));self.assertLess(elapsed,int((read_seconds+3)*1e9))
                     wire,elapsed=exchange(b'',fragments=[b'GET /health HTTP/1.1\r\n',b'Host:',b' x'],delays=[0,read_seconds*.4,read_seconds*.4]);self.record(profile+':absolute_deadline',wire,elapsed,errors['read_timeout']);self.assertLess(elapsed,int((read_seconds+1.5)*1e9))
-                    with socket.create_connection(('127.0.0.1',8080)) as peer:peer.sendall(b'GET /health');peer.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('ii',1,0))
+                    exchange(b'GET /health',mode='reset')
                     wire,elapsed=exchange(request('/health'));self.record(profile+':after_disconnect',wire,elapsed,health['status'])
                     before=(directory/'stderr.log').stat().st_size;started=time.monotonic()
-                    with socket.socket() as slow:
-                        slow.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF,1024);slow.connect(('127.0.0.1',8080));slow.sendall(request('/large'))
+                    def wait_for_write_timeout(slow):
                         while b'E_HTTP_WRITE_TIMEOUT' not in (directory/'stderr.log').read_bytes()[before:]:
                             self.assertIsNone(process.poll());self.assertLess(time.monotonic()-started,write_seconds+4);time.sleep(.05)
                         self.assertGreater(time.monotonic()-started,write_seconds-.5)
+                    exchange(request('/large'),mode='slow_reader',observe=wait_for_write_timeout)
                     wire,elapsed=exchange(request('/health'));self.record(profile+':after_write_timeout',wire,elapsed,health['status'])
                     logs=(directory/'stderr.log').read_text();self.assertIn('E_HTTP_REQUEST_FAILED',logs);self.assertIn('E_HTTP_WRITE_TIMEOUT',logs)
                     for line in logs.splitlines():self.assertIn('code',json.loads(line))
@@ -207,15 +326,17 @@ class HttpAcceptance(unittest.TestCase):
             fixture,directory=self.fixture(profile+'-partial',source,faults=faults)
             request_data=fixture.execute_request(isolation='native_'+profile);request_data['suite']['entry']='demo.serve_once';request_data['suite']['limits']['max_steps']=1_000_000;request_data['suite']['limits']['max_output_bytes']=1_048_576
             command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
+            first_exchange=len(EXCHANGES);started=time.monotonic_ns();stdout=stderr=''
             process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
                 process.stdin.write(json.dumps(request_data));process.stdin.close();process.stdin=None
                 end=time.monotonic()+240
                 while True:
-                    if process.poll() is not None:raise AssertionError('Captured server exited before accept: '+process.stdout.read()[:2000])
+                    if process.poll() is not None:
+                        stdout,stderr=process.communicate(timeout=5)
+                        raise AssertionError('Captured server exited before accept: '+stdout[:2000])
                     try:wire,elapsed=exchange(request('/health'));break
                     except ConnectionRefusedError:self.assertLess(time.monotonic(),end);time.sleep(.05)
-                self.record(profile+':partial_tcp',wire,elapsed,locked()['responses']['health']['status'])
                 stdout,stderr=process.communicate(timeout=15);reply=json.loads(stdout)
                 if reply['ok']:
                     self.assertEqual(process.returncode,0);retained=reply['result']
@@ -225,10 +346,14 @@ class HttpAcceptance(unittest.TestCase):
                     retained_path=max(candidates,key=lambda path:path.stat().st_mtime_ns)
                     retained=json.loads(retained_path.read_text(encoding='utf-8'))
                     self.assertEqual(retained['native']['profile'],profile)
+                bind_captured(EXCHANGES[first_exchange:],retained,fixture.policy_path,profile)
+                self.record(profile+':partial_tcp',wire,elapsed,locked()['responses']['health']['status'])
                 execution=retained['execution'];self.assertEqual(execution['status'],'returned');self.assertEqual(execution['live_handles'],0);self.assertEqual(execution['live_allocations'],0)
                 self.assertGreaterEqual(len(execution['handle_events']),4);write_json(directory/(profile+'-execution.json'),retained)
             finally:
-                if process.poll() is None:process.kill();process.wait(timeout=5)
+                cleanup=supervise_cleanup(process)
+                if not stdout:stdout,stderr=process.communicate(timeout=5)
+                captured_process_receipt(process,command,started,stdout,stderr,directory,EXCHANGES[first_exchange:],cleanup=cleanup)
 
     def test_captured_accept_failure_is_external_diagnostic_and_cleans_up(self):
         """Exercise accept faults through the compiled captured service boundary.
@@ -251,6 +376,7 @@ class HttpAcceptance(unittest.TestCase):
                 request_data['suite']['limits']['max_steps']=1_000_000
                 request_data['suite']['limits']['max_output_bytes']=1_048_576
                 command=[str(graph_cli.BINARY),'--repository',str(fixture.repository),'--store',str(fixture.store),'--host-policy',str(fixture.policy_path),'test']
+                first_exchange=len(EXCHANGES);stdout=stderr='';captured_binding=None
                 process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 started=time.monotonic_ns()
                 try:
@@ -268,7 +394,6 @@ class HttpAcceptance(unittest.TestCase):
                             except (ConnectionRefusedError,ConnectionResetError,socket.timeout,TimeoutError):
                                 self.assertLess(time.monotonic(),deadline,'native service did not open a TCP listener')
                                 time.sleep(.02)
-                        self.record(identity+':health',wire,elapsed,rules['health']['status'])
                     # Running the complete captured native request reparses and
                     # lowers the large HTTP package before executing it. Keep
                     # this deadline aligned with the other native black-box
@@ -279,6 +404,8 @@ class HttpAcceptance(unittest.TestCase):
                     self.assertEqual(process.returncode,0,stderr)
                     self.assertTrue(reply['ok'],reply)
                     retained=reply['result'];execution=retained['execution']
+                    captured_binding=bind_captured(EXCHANGES[first_exchange:],retained,fixture.policy_path,profile)
+                    if wire is not None:self.record(identity+':health',wire,elapsed,rules['health']['status'])
                     execution_cli.SCHEMA_CHECK.validate_file(ROOT,execution,'execution')
                     self.assertEqual(execution['status'],'returned')
                     self.assertEqual(execution['value']['data'],{'kind':'integer','value':'1'})
@@ -306,11 +433,13 @@ class HttpAcceptance(unittest.TestCase):
                         'execution':execution})
                     RECORDS.append({'id':identity+':fault','threshold':threshold,'status':'returned','diagnostic':diagnostic_code,
                                     'execution_schema':'execution.schema.json','executable_sha256':executable_sha,'policy_sha256':policy_sha,
-                                    'report_sha256':sha(evidence),'process_pid':process.pid,'exit_code':process.returncode})
-                    write_json(REPORT,{'suite':'http_external_blackbox','state':'RUNNING','passed':False,'cases':RECORDS})
+                                    'report_sha256':sha(evidence),'report':artifact_file(evidence),'binding':captured_binding,
+                                    'process_pid':process.pid,'exit_code':process.returncode,'validation':'observed_pending_suite'})
+                    save_observations()
                 finally:
-                    if process.poll() is None:
-                        process.kill();process.wait(timeout=5)
+                    cleanup=supervise_cleanup(process)
+                    if not stdout:stdout,stderr=process.communicate(timeout=5)
+                    captured_process_receipt(process,command,started,stdout,stderr,directory,EXCHANGES[first_exchange:],captured_binding,cleanup)
                 # A returned accept failure must release its listener.  This
                 # also ensures threshold zero never leaves a hidden blocker.
                 with socket.socket() as probe:
@@ -322,5 +451,6 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--report',type=Path,required=True);args=parser.parse_args();REPORT=args.report.resolve();graph_cli.BINARY=args.binary.resolve()
     report={'suite':'http_external_blackbox','state':'RUNNING','passed':False,'contract_sha256':sha(ROOT/'spec/http.yaml'),'cases':[]};write_json(REPORT,report)
     result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(HttpAcceptance))
-    report.update(state='PASSED' if result.wasSuccessful() else 'FAILED',passed=result.wasSuccessful(),count=result.testsRun,cases=RECORDS,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=[{'test':str(t),'traceback':s} for t,s in result.errors]);write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k!='cases'}));return 0 if result.wasSuccessful() else 1
+    for row in RECORDS:row['validation']='suite_passed' if result.wasSuccessful() else 'suite_failed'
+    report.update(state='PASSED' if result.wasSuccessful() else 'FAILED',passed=result.wasSuccessful(),count=result.testsRun,cases=RECORDS,exchanges=EXCHANGES,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=[{'test':str(t),'traceback':s} for t,s in result.errors]);write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k not in ('cases','exchanges')}));return 0 if result.wasSuccessful() else 1
 if __name__=='__main__':raise SystemExit(main())
