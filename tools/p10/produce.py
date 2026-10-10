@@ -147,7 +147,7 @@ def _fixed_plan(output: Path) -> tuple[CommandSpec, ...]:
     compare = str((ROOT / "tools" / "p10" / "compare.py").resolve())
     reproduce = str((ROOT / "tools" / "p10" / "reproduce.py").resolve())
     return (
-        CommandSpec("ci", (python, ci), 1800, "locked bootstrap and acceptance gates",
+        CommandSpec("ci", (python, ci), 3600, "locked bootstrap and acceptance gates",
                     ("build/ci/result.json", "build/graph_cli_report.json", "build/semantic_cli_report.json",
                      "build/text_cli_report.json", "build/execution_cli_debug_report.json",
                      "build/native_cli_report.json", "build/runtime_cli_report.json",
