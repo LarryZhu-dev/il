@@ -36,6 +36,57 @@
     "native_elf",
     "toolchain_lock"
   ],
+  "release_executable_role": "application_release",
+  "required_http_profiles": ["debug", "release"],
+  "executable_inventory_fields": [
+    "role",
+    "kind",
+    "profile",
+    "target",
+    "entry_point",
+    "graph_revision",
+    "graph_sha256",
+    "runtime_profile",
+    "build_invocation_sha256",
+    "artifact_role"
+  ],
+  "http_receipt_fields": [
+    "schema_version",
+    "kind",
+    "case_id",
+    "client",
+    "executable_role",
+    "profile",
+    "contract_sha256",
+    "exchange",
+    "process",
+    "policy",
+    "assertions"
+  ],
+  "http_case_fields": ["id", "profile", "exit_code", "count", "receipt"],
+  "http_case_profile_matrix": "every_http_case_once_per_required_profile",
+  "http_exchange_record": {
+    "kind": "tcp_exchange",
+    "required_fields": [
+      "schema_version", "kind", "exchange_id", "phase", "peer", "started_ns", "ended_ns",
+      "elapsed_ns", "timeout_seconds", "planned_fragments", "requested_delays_ns", "request",
+      "response", "events", "terminal", "error", "mode", "response_read", "status", "headers",
+      "body", "assertions"
+    ],
+    "byte_reference_fields": ["planned_fragments[*].bytes", "request", "response", "events[*].bytes"],
+    "required_event_fields": ["direction", "timestamp_ns", "bytes"],
+    "optional_event_fields": ["fragment_index"],
+    "required_assertion_fields": ["id", "passed"]
+  },
+  "http_process_record": {
+    "kind": "http_server_process",
+    "required_fields": [
+      "argv", "pid", "started_ns", "ended_ns", "sha256", "profile", "policy_sha256", "exit_code",
+      "stdout", "stderr", "termination_signal", "cleanup_intent", "cleanup_reaped"
+    ],
+    "byte_reference_fields": ["stdout", "stderr"],
+    "sha256_field_binds": "server_executable_bytes"
+  },
   "http_cases": [
     "health",
     "hello",

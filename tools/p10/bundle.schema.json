@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://il-lang.dev/schema/p10-bundle-1.0.0.json",
-  "title": "il P10 proposed evidence bundle structure",
+  "title": "il P10 execution evidence bundle structure",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "source_commit",
     "target",
     "toolchain_lock_sha256",
+    "executables",
     "predicates",
     "artifacts",
     "comparison"
@@ -30,6 +31,11 @@
     },
     "toolchain_lock_sha256": {
       "$ref": "#/$defs/hash"
+    },
+    "executables": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/executable" }
     },
     "predicates": {
       "type": "object",
@@ -162,7 +168,82 @@
           "$ref": "#/$defs/hash"
         }
       }
+    },
+    "byteReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "executable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role", "kind", "profile", "target", "entry_point", "graph_revision",
+        "graph_sha256", "runtime_profile", "build_invocation_sha256", "artifact_role"
+      ],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["application", "captured", "compiler", "runtime"] },
+        "profile": { "enum": ["debug", "release", "captured", "tool"] },
+        "target": { "const": "x86_64-unknown-linux-gnu" },
+        "entry_point": { "type": "string", "minLength": 1 },
+        "graph_revision": { "type": "integer", "minimum": 0 },
+        "graph_sha256": { "$ref": "#/$defs/hash" },
+        "runtime_profile": { "enum": ["full", "minimal", "none"] },
+        "build_invocation_sha256": { "$ref": "#/$defs/hash" },
+        "artifact_role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "httpReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "case_id", "client", "executable_role", "profile",
+        "contract_sha256", "exchange", "process", "policy", "assertions"
+      ],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "kind": { "const": "http_exchange" },
+        "case_id": { "type": "string", "minLength": 1 },
+        "client": { "const": "external_tcp" },
+        "executable_role": { "type": "string", "minLength": 1 },
+        "profile": { "enum": ["debug", "release"] },
+        "contract_sha256": { "$ref": "#/$defs/hash" },
+        "exchange": { "$ref": "#/$defs/recordReference" },
+        "process": { "$ref": "#/$defs/recordReference" },
+        "policy": { "$ref": "#/$defs/recordReference" },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "passed"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "passed": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    "httpCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "profile", "exit_code", "count", "receipt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "profile": { "enum": ["debug", "release"] },
+        "exit_code": { "const": 0 },
+        "count": { "const": 1 },
+        "receipt": { "$ref": "#/$defs/recordReference" }
+      }
     }
   },
-  "description": "Structural validation is provisional and does not establish execution provenance or P10 acceptance."
+  "description": "Structural validation is provisional and does not establish execution provenance or P10 acceptance. HTTP and process record references are separately checked against the locked P10 contract."
 }
