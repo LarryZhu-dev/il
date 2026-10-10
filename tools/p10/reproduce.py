@@ -134,6 +134,30 @@ def fixture_repository(root: Path, directory: Path) -> tuple[Path, Path, Path]:
     return repository, directory / "application-store", policy
 
 
+def locked_cargo_environment() -> tuple[list[str], dict[str, str]]:
+    """Select the installed locked toolchain without invoking the rustup shim."""
+    rust_toolchain = ROOT / "rust-toolchain.toml"
+    channel = "1.90.0"
+    if rust_toolchain.is_file():
+        for line in rust_toolchain.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("channel") and "=" in line:
+                channel = line.split("=", 1)[1].strip().strip('"')
+                break
+    host = "x86_64-unknown-linux-gnu"
+    candidates = [
+        Path("/usr/local/rustup/toolchains") / f"{channel}-{host}" / "bin",
+        Path("/root/.rustup/toolchains") / f"{channel}-{host}" / "bin",
+    ]
+    toolchain_bin = next((path for path in candidates if (path / "cargo").is_file()), None)
+    if toolchain_bin is None:
+        raise ReproductionError(f"locked Rust toolchain is not installed: {channel}-{host}")
+    environment = {
+        "RUSTUP_TOOLCHAIN": f"{channel}-{host}",
+        "RUSTUP_HOME": "/usr/local/rustup" if candidates[0].is_dir() else "/root/.rustup",
+    }
+    return [str(toolchain_bin / "cargo")], environment
+
+
 def build_application(root: Path, compiler: Path, directory: Path, log: Path) -> dict[str, Any]:
     repository, store, policy = fixture_repository(root, directory)
     source = fixture_source(root)
@@ -188,11 +212,14 @@ def main(argv: list[str] | None = None) -> int:
             materialized = materialize(ROOT, source)
             target = root / "target"
             cargo_home = os.environ.get("CARGO_HOME")
-            environment = {"PATH": os.environ.get("PATH", ""), "CARGO_TARGET_DIR": str(target), "CARGO_NET_OFFLINE": "true", "LC_ALL": "C", "LANG": "C", "SOURCE_DATE_EPOCH": "946684800"}
+            cargo_command, toolchain_environment = locked_cargo_environment()
+            environment = {"PATH": os.environ.get("PATH", ""), "CARGO_TARGET_DIR": str(target), "CARGO_NET_OFFLINE": "true", "LC_ALL": "C", "LANG": "C", "SOURCE_DATE_EPOCH": "946684800", **toolchain_environment}
+            toolchain_bin = str(Path(cargo_command[0]).parent)
+            environment["PATH"] = toolchain_bin + os.pathsep + environment["PATH"]
             if cargo_home:
                 environment["CARGO_HOME"] = cargo_home
             build_log = root / "cargo-build.log"
-            command = run_command(["cargo", "build", "--workspace", "--release", "--locked"], source, environment, build_log, 1800)
+            command = run_command(cargo_command + ["build", "--workspace", "--release", "--locked"], source, environment, build_log, 1800)
             row: dict[str, Any] = {"label": label, "materialized": materialized, "build": command, "artifacts": {}}
             if command["exit_code"] != 0:
                 raise ReproductionError(f"{label} bootstrap build failed")
