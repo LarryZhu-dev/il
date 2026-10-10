@@ -45,15 +45,15 @@ def native_binding(executable,policy,profile,kind):
 
 def supervise_cleanup(process,*,unexpected_exit_if_exited=False,timeout=5):
     running=process.poll() is None
-    receipt={'sigterm_sent':False,'sigkill_sent':False,'reaped':False,
-             'unexpected_exit':bool(unexpected_exit_if_exited and not running)}
+    signal_name=None
     if running:
-        process.terminate();receipt['sigterm_sent']=True
+        process.terminate();signal_name='SIGTERM'
     try:process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        process.kill();receipt['sigkill_sent']=True;process.wait(timeout=timeout)
-    receipt['reaped']=process.poll() is not None
-    return receipt
+        process.kill();signal_name='SIGKILL';process.wait(timeout=timeout)
+    return {'termination_signal':signal_name,
+            'cleanup_intent':'supervisor_terminate',
+            'cleanup_reaped':process.poll() is not None}
 
 def bind_captured(receipts,retained,policy,profile):
     native=retained['native'];executable=Path(native['argv'][0])
@@ -132,9 +132,8 @@ def exchange(raw,*,fragments=None,delays=None,timeout=8,phase='case',mode='reque
                     send_started=time.monotonic_ns();count=client.send(chunk[offset:])
                     if count==0:raise ConnectionError('Socket send returned zero bytes')
                     transferred=chunk[offset:offset+count];sent.extend(transferred)
-                    events.append({'direction':'send','fragment_index':index,'requested_delay_seconds':delay,
-                                   'delay_started_ns':delay_started,'delay_ended_ns':delay_ended,
-                                   'started_ns':send_started,'ended_ns':time.monotonic_ns(),'bytes':artifact_bytes(transferred)})
+                    events.append({'direction':'send','fragment_index':index,
+                                   'timestamp_ns':time.monotonic_ns(),'bytes':artifact_bytes(transferred)})
                     offset+=count
             if mode=='reset':
                 client.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('ii',1,0));terminal='client_reset'
@@ -142,7 +141,6 @@ def exchange(raw,*,fragments=None,delays=None,timeout=8,phase='case',mode='reque
                 observe(client);terminal='client_close_without_read'
             elif mode!='request_response':raise ValueError('Unknown TCP exchange mode')
             while mode=='request_response':
-                receive_started=time.monotonic_ns()
                 try:chunk=client.recv(65536)
                 except ConnectionResetError:
                     terminal='reset'
@@ -150,7 +148,7 @@ def exchange(raw,*,fragments=None,delays=None,timeout=8,phase='case',mode='reque
                     raise
                 if not chunk:break
                 data.extend(chunk)
-                events.append({'direction':'receive','started_ns':receive_started,'ended_ns':time.monotonic_ns(),'bytes':artifact_bytes(chunk)})
+                events.append({'direction':'receive','timestamp_ns':time.monotonic_ns(),'bytes':artifact_bytes(chunk)})
     except BaseException as failure:
         terminal='error';error={'type':type(failure).__name__,'message':str(failure)}
         raise
@@ -159,10 +157,12 @@ def exchange(raw,*,fragments=None,delays=None,timeout=8,phase='case',mode='reque
         LAST_EXCHANGE={'id':'exchange-'+str(len(EXCHANGES)),'phase':phase,'peer':['127.0.0.1',8080],
                        'started_ns':started,'ended_ns':ended,'elapsed_ns':ended-started,'timeout_seconds':timeout,
                        'planned_fragments':[artifact_bytes(chunk) for chunk in chunks],
-                       'requested_delays_seconds':[0]*len(chunks) if delays is None else list(delays),
+                       'requested_delays_ns':[0]*len(chunks) if delays is None else [int(round(delay*1_000_000_000)) for delay in delays],
                        'request':artifact_bytes(bytes(sent)),'response':artifact_bytes(bytes(data)),
                        'events':events,'terminal':terminal,'error':error,'binding':ACTIVE_BINDING,
-                       'mode':mode,'response_read':mode=='request_response'}
+                       'mode':mode,'response_read':mode=='request_response',
+                       'status':None,'headers':{},'body':artifact_bytes(bytes(data)),
+                       'assertions':[]}
         EXCHANGES.append(LAST_EXCHANGE);save_observations()
     return bytes(data),ended-started
 
@@ -183,6 +183,18 @@ def response(wire):
         if name.lower() not in headers:raise AssertionError('Missing mandatory header: '+name)
     if headers.get('connection')!=rules['connection']:raise AssertionError('Missing close contract')
     if int(headers.get('content-length','-1'))!=len(body):raise AssertionError('Content-Length differs from actual bytes')
+    return status,headers,body
+
+def annotate_exchange(wire, *, assertions=None):
+    """Attach parsed HTTP metadata to the already retained wire exchange."""
+    if LAST_EXCHANGE is None:
+        raise AssertionError('HTTP response has no retained exchange')
+    status,headers,body=response(wire)
+    LAST_EXCHANGE['status']=status
+    LAST_EXCHANGE['headers']=headers
+    LAST_EXCHANGE['body']=artifact_bytes(body)
+    LAST_EXCHANGE['assertions']=list(assertions or [{'id':'wire_contract','passed':True}])
+    save_observations()
     return status,headers,body
 
 @contextlib.contextmanager
@@ -219,16 +231,20 @@ def server(executable,policy,directory,profile=None):
     finally:
         cleanup=supervise_cleanup(process,unexpected_exit_if_exited=True)
         stdout.close();stderr.close();policy_file.close();os.close(source_fd)
-        write_json(directory/'process.json',{'argv':[str(executable)],'pid':process.pid,'started_ns':started,'ended_ns':time.monotonic_ns(),
+        write_json(directory/'process.json',{'kind':'http_server_process','argv':[str(executable)],'pid':process.pid,'started_ns':started,'ended_ns':time.monotonic_ns(),
             'sha256':sha(executable),'profile':profile,'policy_sha256':sha(policy),'exit_code':process.returncode,
             'stdout':artifact_file(directory/'stdout.log'),'stderr':artifact_file(directory/'stderr.log'),
-            'supervisor_cleanup':cleanup})
+            'termination_signal':cleanup['termination_signal'],'cleanup_intent':cleanup['cleanup_intent'],
+            'cleanup_reaped':cleanup['cleanup_reaped']})
         binding['process_receipt']=artifact_file(directory/'process.json');ACTIVE_BINDING=previous_binding;save_observations()
 
 def captured_process_receipt(process,command,started,stdout,stderr,directory,receipts,binding=None,cleanup=None):
+    cleanup=cleanup or {'termination_signal':None,'cleanup_intent':'supervisor_terminate',
+                        'cleanup_reaped':process.poll() is not None}
     value={'kind':'compiler_test_wrapper','argv':command,'pid':process.pid,'started_ns':started,'ended_ns':time.monotonic_ns(),
            'exit_code':process.returncode,'stdout':artifact_bytes(stdout.encode('utf-8')),'stderr':artifact_bytes(stderr.encode('utf-8')),
-           'supervisor_cleanup':cleanup or {'sigterm_sent':False,'sigkill_sent':False,'reaped':process.poll() is not None,'unexpected_exit':False}}
+           'termination_signal':cleanup['termination_signal'],'cleanup_intent':cleanup['cleanup_intent'],
+           'cleanup_reaped':cleanup['cleanup_reaped']}
     write_json(directory/'process.json',value);artifact=artifact_file(directory/'process.json')
     if binding is not None:binding['process_receipt']=artifact
     for item in receipts:
@@ -248,7 +264,12 @@ class HttpAcceptance(unittest.TestCase):
         fixture.publish(source)
         return fixture,directory
     def record(self,identity,wire,elapsed,expected):
-        status,headers,body=response(wire);self.assertEqual(status,expected)
+        status,headers,body=response(wire)
+        status,headers,body=annotate_exchange(wire, assertions=[
+            {'id':'expected_status','passed':status == expected},
+            {'id':'response_headers','passed':bool(headers)},
+            {'id':'content_length','passed':headers.get('content-length') == str(len(body))},
+        ]);self.assertEqual(status,expected)
         if LAST_EXCHANGE is None or LAST_EXCHANGE['response']['sha256']!='sha256:'+hashlib.sha256(wire).hexdigest():
             raise AssertionError('Response has no matching TCP receipt')
         row={'id':identity,'status':status,'headers':headers,'body':list(body),'elapsed_ns':elapsed,

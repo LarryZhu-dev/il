@@ -56,11 +56,10 @@ class HttpReceiptTests(unittest.TestCase):
         self.assertEqual(bytes(peer.sent),b'GET /health\xff')
         self.assertEqual(self.read_artifact(record['response']),wire)
         self.assertEqual(elapsed,record['ended_ns']-record['started_ns'])
-        self.assertEqual(record['requested_delays_seconds'],[0,.001])
+        self.assertEqual(record['requested_delays_ns'],[0,1_000_000])
         for event in record['events']:
-            self.assertGreaterEqual(event['started_ns'],record['started_ns'])
-            self.assertLessEqual(event['ended_ns'],record['ended_ns'])
-            self.assertGreaterEqual(event['ended_ns'],event['started_ns'])
+            self.assertGreaterEqual(event['timestamp_ns'],record['started_ns'])
+            self.assertLessEqual(event['timestamp_ns'],record['ended_ns'])
         self.assertEqual(b''.join(self.read_artifact(e['bytes']) for e in record['events'] if e['direction']=='send'),bytes(peer.sent))
         self.assertEqual(b''.join(self.read_artifact(e['bytes']) for e in record['events'] if e['direction']=='receive'),wire)
 
@@ -106,8 +105,9 @@ class HttpReceiptTests(unittest.TestCase):
         self.assertEqual(self.read_artifact(retained['stdout']),stdout.encode())
         self.assertEqual(self.read_artifact(retained['stderr']),stderr.encode())
         self.assertEqual(receipt['wrapper_process_receipt'],binding['process_receipt'])
-        self.assertEqual(retained['supervisor_cleanup'],
-                         {'sigterm_sent':False,'sigkill_sent':False,'reaped':True,'unexpected_exit':False})
+        self.assertEqual(retained['termination_signal'],None)
+        self.assertEqual(retained['cleanup_intent'],'supervisor_terminate')
+        self.assertTrue(retained['cleanup_reaped'])
 
     def test_shared_wire_client_works_without_report_recorder(self):
         """P08 imports this module only for TCP I/O, without P10 recording."""
@@ -119,10 +119,9 @@ class HttpReceiptTests(unittest.TestCase):
     def test_supervisor_cleanup_records_signal_and_reap(self):
         process=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'])
         cleanup=CLI.supervise_cleanup(process,timeout=3)
-        self.assertTrue(cleanup['sigterm_sent'])
-        self.assertFalse(cleanup['sigkill_sent'])
-        self.assertTrue(cleanup['reaped'])
-        self.assertFalse(cleanup['unexpected_exit'])
+        self.assertEqual(cleanup['termination_signal'],'SIGTERM')
+        self.assertEqual(cleanup['cleanup_intent'],'supervisor_terminate')
+        self.assertTrue(cleanup['cleanup_reaped'])
 
     def test_content_addressed_artifact_tampering_is_rejected(self):
         artifact=CLI.artifact_bytes(b'original')
