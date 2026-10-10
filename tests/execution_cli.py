@@ -1,6 +1,7 @@
 """Independent P04 numeric and execution protocol acceptance through il test."""
 from __future__ import annotations
 import argparse
+import concurrent.futures
 import hashlib
 import importlib.util
 import json
@@ -25,7 +26,12 @@ def operation(identity, opcode, inputs, outputs, attributes):
 
 
 def numeric_graph(case, function_name="main"):
-    parameters = [{"entity_id": f"{function_name}.arg{i}", "name": f"arg{i}", "type": case["type"]}
+    prefix = "" if function_name == "main" else f"{function_name}."
+    entry_id = "main.entry" if function_name == "main" else f"{function_name}.entry"
+    calculate_id = "main.calculate" if function_name == "main" else f"{function_name}.calculate"
+    value_id = "value" if function_name == "main" else f"{function_name}.value"
+    return_id = "main.return" if function_name == "main" else f"{function_name}.return"
+    parameters = [{"entity_id": f"{prefix}arg{i}", "name": f"arg{i}", "type": case["type"]}
                   for i in range(len(case["operands"]))]
     result_type = case.get("result_type", case["type"])
     attributes = {"target_type": result_type} if case["opcode"] == "cast" else {}
@@ -35,31 +41,11 @@ def numeric_graph(case, function_name="main"):
              "types": [], "functions": [], "capabilities": [], "packages": [], "contracts": []}
     graph["functions"] = [{"entity_id": function_name, "name": function_name, "parameters": parameters,
         "result": result_type, "effects": [], "capabilities": [], "contracts": [],
-        "blocks": [{"entity_id": f"{function_name}.entry", "arguments": [],
-            "operations": [operation(f"{function_name}.calculate", case["opcode"],
+        "blocks": [{"entity_id": entry_id, "arguments": [],
+            "operations": [operation(calculate_id, case["opcode"],
                 [p["entity_id"] for p in parameters],
-                [{"entity_id": f"{function_name}.value", "type": result_type}], attributes)],
-            "terminator": operation(f"{function_name}.return", "return", [f"{function_name}.value"], [], {})}]}]
-    return graph
-
-
-def numeric_matrix_graph(cases):
-    """Put the full numeric contract in one published graph.
-
-    Each case still gets two independent CLI test requests below, while one
-    transaction avoids paying the graph publication and Git fixture cost 180
-    times during the acceptance gate.
-    """
-    functions = []
-    declarations = []
-    for index, case in enumerate(cases):
-        function_name = f"numeric_{index}"
-        fixture = numeric_graph(case, function_name)
-        declarations.append(function_name)
-        functions.extend(fixture["functions"])
-    graph = numeric_graph(cases[0], "numeric_0")
-    graph["modules"][0]["declarations"] = declarations
-    graph["functions"] = functions
+                [{"entity_id": value_id, "type": result_type}], attributes)],
+            "terminator": operation(return_id, "return", [value_id], [], {})}]}]
     return graph
 
 
@@ -87,15 +73,28 @@ class ExecutionCliAcceptance(unittest.TestCase):
 
     def test_locked_numeric_execution_matrix(self):
         cases = json.loads(CONTRACT.read_text(encoding="utf-8"))["cases"]
-        self.store = self.root / "numeric-matrix"
-        self.publish(numeric_matrix_graph(cases))
-        for index, case in enumerate(cases):
+        def execute(index, case):
+            fixture = graph_cli.GraphCliAcceptance()
+            fixture.setUp()
+            try:
+                fixture.invoke("transact", {"task_id": "P04-execution", "base_revision": 0,
+                    "scope": ["program"], "operations": [{"op": "replace_program", "graph": numeric_graph(case)}],
+                    "required_checks": []})
+                request = {"revision": 1, "isolation": "captured", "suite": {"entry": "main",
+                    "arguments": [integer(case["type"], v) for v in case["operands"]], "limits": dict(LIMITS)}}
+                success = case["expected"]["status"] == "returned"
+                response = fixture.invoke("test", request, success)
+                repeated = fixture.invoke("test", request, success)
+                return index, case, response, repeated
+            finally:
+                fixture.doCleanups()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda item: execute(*item), enumerate(cases)))
+        for index, case, response, repeated in results:
             with self.subTest(case=case["id"]):
-                entry = f"numeric_{index}"
                 expected = case["expected"]
-                request = self.request_for(case, entry)
                 success = expected["status"] == "returned"
-                response = self.invoke("test", request, success)
                 execution = response["result"]["execution"]
                 SCHEMA_CHECK.validate_file(ROOT, execution, "execution")
                 self.assertEqual(execution["status"], expected["status"])
@@ -111,8 +110,7 @@ class ExecutionCliAcceptance(unittest.TestCase):
                     self.assertEqual(execution["diagnostics"], [])
                 else:
                     self.assert_code(response, expected["code"])
-                    self.assertEqual(execution["diagnostics"][0]["entity_id"], f"{entry}.calculate")
-                repeated = self.invoke("test", request, success)
+                    self.assertEqual(execution["diagnostics"][0]["entity_id"], "main.calculate")
                 self.assertEqual(repeated, response, "execution or evidence was nondeterministic")
                 stages = response["result"]["stages"]
                 self.assertEqual([s["stage"] for s in stages],
