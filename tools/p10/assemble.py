@@ -135,25 +135,34 @@ def read_journal(path: Path) -> tuple[Path, dict[str, Any], bytes]:
     return run, journal, raw
 
 
-def find_report(run: Path) -> Path:
-    """Find the acceptance report emitted by the reviewed CI command.
-
-    The producer never accepts a caller supplied bundle/manifest.  A report is
-    an ordinary command output and is only eligible when it is below the
-    command output directory (``ci``), keeping the trust boundary explicit.
-    """
-    candidates: list[Path] = []
-    for root in (run / "ci", run / "build" / "ci"):
-        if root.is_dir():
-            candidates.extend(sorted(root.glob("**/manifest.json")))
-            candidates.extend(sorted(root.glob("**/p10_manifest.json")))
-    for candidate in candidates:
-        if candidate.is_symlink() or not candidate.is_file():
+def _output_paths(run: Path, command_id: str) -> list[Path]:
+    """Return files captured by one successful command observation."""
+    observation = run / "commands" / f"{command_id}.json"
+    value, _ = load_json(regular_file(run, observation, "command observation"))
+    rows = value.get("outputs") if isinstance(value, dict) else None
+    if not isinstance(rows, list):
+        raise AssembleError(f"command {command_id} has no captured output inventory")
+    result: list[Path] = []
+    for row in rows:
+        if not isinstance(row, dict) or row.get("present") is not True:
             continue
-        value, _ = load_json(candidate)
-        if isinstance(value, dict) and value.get("kind") == "p10_acceptance_bundle":
-            return candidate.resolve()
-    raise AssembleError("trusted CI output contains no p10 acceptance report")
+        path = row.get("path")
+        canonical_relative(path, f"{command_id} output path")
+        candidate = regular_file(run, run / Path(*path.split("/")), f"{command_id} output")
+        if digest(candidate.read_bytes()) != row.get("sha256"):
+            raise AssembleError(f"{command_id} output hash mismatch: {path}")
+        result.append(candidate)
+    return result
+
+
+def _find_json(run: Path, command_id: str, *names: str) -> Path:
+    candidates = []
+    for path in _output_paths(run, command_id):
+        if path.name in names:
+            candidates.append(path)
+    if len(candidates) != 1:
+        raise AssembleError(f"trusted {command_id} output must contain exactly one of {', '.join(names)}")
+    return candidates[0]
 
 
 def validate_seed(manifest: Any, journal: dict[str, Any]) -> dict[str, Any]:
@@ -171,6 +180,69 @@ def validate_seed(manifest: Any, journal: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(comparison, dict) or len(comparison.get("trials", [])) != 18:
         raise AssembleError("P10 manifest must contain exactly 18 G4 trial references")
     return manifest
+
+
+def build_manifest(run: Path, journal: dict[str, Any], rebasing: "Rebasing") -> tuple[dict[str, Any], Path]:
+    """Build the bundle manifest from command-produced raw reports.
+
+    Raw reports are evidence, not claims supplied to this function.  The CI
+    report must expose the complete manifest fields (or a nested ``manifest``
+    object); the other three command reports are required and are checked for
+    their locked matrix before their references are copied into the bundle.
+    """
+    ci_path = _find_json(run, "ci", "result.json", "manifest.json", "p10_manifest.json")
+    ci, _ = load_json(ci_path)
+    if isinstance(ci, dict) and ci.get("kind") == "p10_acceptance_bundle":
+        # A complete CI manifest is accepted only as an output of the fixed
+        # CI command.  The normal producer emits raw reports and therefore
+        # follows the branch below.
+        seed = validate_seed(ci, journal)
+    else:
+        if not isinstance(ci, dict) or ci.get("status") not in {"PASSED", "COMPLETE"}:
+            raise AssembleError("trusted CI output is not a passed report")
+        seed = ci.get("manifest") if isinstance(ci.get("manifest"), dict) else ci
+        if not isinstance(seed, dict):
+            raise AssembleError("trusted CI output has no acceptance manifest fields")
+        # Raw CI reports use the same locked fields but a different kind.
+        if seed.get("kind") != "p10_acceptance_bundle":
+            seed = dict(seed)
+            seed["kind"] = "p10_acceptance_bundle"
+        validate_seed(seed, journal)
+
+    http_path = _find_json(run, "http", "http_report.json")
+    g4_path = _find_json(run, "g4", "comparison.json")
+    repro_path = _find_json(run, "reproducibility", "reproduction.json")
+    http, _ = load_json(http_path)
+    g4, _ = load_json(g4_path)
+    repro, _ = load_json(repro_path)
+    if not isinstance(http, dict) or http.get("state", http.get("status")) != "PASSED":
+        raise AssembleError("trusted HTTP report is not passed")
+    if not isinstance(g4, dict) or g4.get("status") not in {"COMPLETE", "PASSED"}:
+        raise AssembleError("trusted G4 report is not complete")
+    trials = g4.get("trials")
+    if not isinstance(trials, list) or len(trials) != 18:
+        raise AssembleError("trusted G4 report must contain exactly 18 trials")
+    trial_refs = []
+    seen_trials: set[tuple[Any, Any, Any]] = set()
+    for row in trials:
+        if not isinstance(row, dict):
+            raise AssembleError("malformed G4 trial row")
+        reference = row.get("g4_trial")
+        if not isinstance(reference, dict):
+            raise AssembleError("G4 trial row has no g4_trial reference")
+        trial, _ = rebasing.read_reference_json(reference, g4_path.parent)
+        key = (trial.get("task_id"), trial.get("implementation"), trial.get("trial_index"))
+        if key in seen_trials:
+            raise AssembleError("duplicate G4 task/implementation/trial")
+        seen_trials.add(key)
+        trial_refs.append(reference)
+    if not isinstance(repro, dict) or repro.get("status") != "PASSED":
+        raise AssembleError("trusted reproducibility report is not passed")
+    comparison = dict(seed["comparison"])
+    comparison["trials"] = trial_refs
+    result = dict(seed)
+    result["comparison"] = comparison
+    return result, ci_path
 
 
 class Rebasing:
@@ -201,6 +273,18 @@ class Rebasing:
         if source not in self.mapping:
             raise AssembleError(f"referenced evidence was not archived: {text}")
         return source
+
+    def read_reference_json(self, reference: Any, base: Path) -> tuple[dict[str, Any], Path]:
+        if not isinstance(reference, dict) or not isinstance(reference.get("path"), str) or not is_hash(reference.get("sha256")):
+            raise AssembleError("invalid evidence reference")
+        source = self.resolve_reference(base, reference["path"])
+        original = source.read_bytes()
+        if digest(original) != reference["sha256"]:
+            raise AssembleError(f"referenced evidence hash mismatch: {reference['path']}")
+        value, _ = load_json(source)
+        if not isinstance(value, dict):
+            raise AssembleError(f"referenced evidence is not a JSON object: {reference['path']}")
+        return value, source
 
     def write_source(self, source: Path) -> bytes:
         source = regular_file(self.run, source, "evidence file")
@@ -245,14 +329,18 @@ def assemble(journal: str | Path, output: str | Path) -> dict[str, Any]:
             value, _ = load_json(destination / "manifest.json")
             return value
         raise AssembleError(f"refusing to overwrite existing bundle: {destination}")
-    report = find_report(run)
-    report_value, _ = load_json(report)
-    validate_seed(report_value, journal_value)
     destination.mkdir(parents=True)
     try:
-        rebasing = Rebasing(run, destination, report)
+        # The report path is used only to place the generated manifest at the
+        # bundle root; every referenced raw file is copied below records/.
+        rebasing = Rebasing(run, destination, run / "ci" / "result.json")
+        seed, report = build_manifest(run, journal_value, rebasing)
         rebasing.write_source(report)
-        final, _ = load_json(destination / "manifest.json")
+        final = rebasing.rewrite(seed, report.parent)
+        if not isinstance(final, dict):
+            raise AssembleError("assembled manifest is not an object")
+        data = (json.dumps(final, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        atomic_write(destination / "manifest.json", data)
         atomic_write(destination / ".assemble-source", (marker + "\n").encode("ascii"))
         return final
     except BaseException:

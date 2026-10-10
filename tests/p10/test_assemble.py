@@ -63,7 +63,7 @@ class RunFactory:
         self.root = root
         self.root.mkdir(parents=True)
         self._make_commands()
-        self.manifest_path = self.root / "ci" / "manifest.json"
+        self.manifest_path = self.root / "ci" / "result.json"
         self._make_manifest()
         self._make_journal()
 
@@ -102,7 +102,13 @@ class RunFactory:
             {"role": role, **self._ref(f"artifacts/{role}.bin", role.encode())}
             for role in ("graph", "compiler", "runtime", "native_elf", "toolchain_lock")
         ]
-        trials = [self._ref("g4/trial-01.json") for _ in range(18)]
+        trials = []
+        for index in range(18):
+            trials.append(self._ref(f"g4/trial-{index + 1:02d}.json", json.dumps({
+                "task_id": ("add_route", "fix_type_error", "rollback")[index // 6],
+                "implementation": "rust" if index % 2 == 0 else "il",
+                "trial_index": index % 3 + 1,
+            }, sort_keys=True).encode() + b"\n"))
         manifest = {
             "schema_version": "1.0.0",
             "kind": "p10_acceptance_bundle",
@@ -116,6 +122,38 @@ class RunFactory:
         }
         # This is a command-produced report, not an already assembled bundle.
         write_json(self.manifest_path, manifest)
+        http_report = write_json(self.root / "http" / "http_report.json", {
+            "suite": "http_external_blackbox", "state": "PASSED", "passed": True,
+            "cases": [],
+        })
+        g4_report = write_json(self.root / "g4" / "comparison.json", {
+            "status": "COMPLETE", "trials": [{"g4_trial": trial} for trial in trials],
+        })
+        repro_report = write_json(self.root / "reproducibility" / "reproduction.json", {
+            "status": "PASSED",
+        })
+        output_paths = {
+            "ci": [("ci/result.json", self.manifest_path.read_bytes())],
+            "http": [("http/http_report.json", http_report)],
+            "g4": [("g4/comparison.json", g4_report)] + [
+                (f"g4/trial-{index + 1:02d}.json", (self.root / f"g4/trial-{index + 1:02d}.json").read_bytes())
+                for index in range(18)
+            ],
+            "reproducibility": [("reproducibility/reproduction.json", repro_report)],
+        }
+        for command_id, outputs in output_paths.items():
+            path = self.root / "commands" / f"{command_id}.json"
+            observation = json.loads(path.read_text(encoding="utf-8"))
+            observation["outputs"] = [
+                {"path": relative, "present": True, "sha256": digest(data), "size_bytes": len(data)}
+                for relative, data in outputs
+            ]
+            write_json(path, observation)
+        self.command_refs = [
+            {"command_id": command_id, "path": f"commands/{command_id}.json",
+             "sha256": digest((self.root / "commands" / f"{command_id}.json").read_bytes())}
+            for command_id in ("ci", "http", "g4", "reproducibility")
+        ]
 
     def _make_journal(self) -> None:
         journal = {
@@ -144,7 +182,22 @@ class AssembleTests(unittest.TestCase):
         return json.loads(self.factory.manifest_path.read_text(encoding="utf-8"))
 
     def _write_manifest(self, value: dict) -> None:
-        write_json(self.factory.manifest_path, value)
+        data = write_json(self.factory.manifest_path, value)
+        path = self.run / "commands" / "ci.json"
+        observation = json.loads(path.read_text(encoding="utf-8"))
+        for output in observation["outputs"]:
+            if output["path"] == "ci/result.json":
+                output["sha256"] = digest(data)
+                output["size_bytes"] = len(data)
+        write_json(path, observation)
+        self.factory.command_refs = [
+            {"command_id": command_id, "path": f"commands/{command_id}.json",
+             "sha256": digest((self.run / "commands" / f"{command_id}.json").read_bytes())}
+            for command_id in ("ci", "http", "g4", "reproducibility")
+        ]
+        journal = json.loads(self.factory.journal_path.read_text(encoding="utf-8"))
+        journal["commands"] = self.factory.command_refs
+        write_json(self.factory.journal_path, journal)
 
     def test_successful_assembly_rebases_outputs_and_hashes(self) -> None:
         result = assemble.assemble(self.factory.journal_path, self.output)
