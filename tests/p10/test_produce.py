@@ -15,6 +15,46 @@ import produce  # noqa: E402
 
 
 class ProducerTests(unittest.TestCase):
+    def test_fixed_plan_captures_real_ci_outputs_and_run_local_reports(self):
+        plan = produce._fixed_plan(Path("p10-run"))
+        self.assertEqual({item.command_id for item in plan}, {"ci", "http", "g4", "reproducibility"})
+        ci = next(item for item in plan if item.command_id == "ci")
+        self.assertIn("build/ci/result.json", ci.output_paths)
+        self.assertIn("build/ci/*.log", ci.output_paths)
+        self.assertIn("build/ci/*_report.json", ci.output_paths)
+        self.assertNotIn("build/ci/manifest.json", ci.output_paths)
+        self.assertEqual(next(item for item in plan if item.command_id == "http").run_output_paths,
+                         ("http/http_report.json", "http/**"))
+        self.assertEqual(next(item for item in plan if item.command_id == "g4").run_output_paths,
+                         ("g4/comparison.json", "g4/**"))
+        self.assertEqual(next(item for item in plan if item.command_id == "reproducibility").run_output_paths,
+                         ("reproducibility/reproduction.json", "reproducibility/**"))
+
+    def test_output_capture_binds_checkout_and_run_local_files(self):
+        with tempfile.TemporaryDirectory(prefix="il-p10-output-capture-") as name:
+            root = Path(name)
+            checkout = root / "checkout"
+            run = root / "run"
+            (checkout / "build" / "ci").mkdir(parents=True)
+            (checkout / "build" / "ci" / "result.json").write_bytes(b"ci result")
+            (checkout / "build" / "ci" / "gate.log").write_bytes(b"gate log")
+            (run / "http" / "http-receipts").mkdir(parents=True)
+            (run / "http" / "http_report.json").write_bytes(b"http report")
+            (run / "http" / "http-receipts" / "request").write_bytes(b"request bytes")
+            with mock.patch.object(produce, "ROOT", checkout):
+                checkout_outputs = produce._capture_checkout_paths(
+                    run, ("build/ci/result.json", "build/ci/*.log"))
+            run_outputs = produce._capture_run_paths(run, ("http/**",))
+
+            self.assertEqual({row["path"] for row in checkout_outputs if row["present"]},
+                             {"build/ci/result.json", "build/ci/gate.log"})
+            self.assertEqual({row["path"] for row in run_outputs if row["present"]},
+                             {"http/http_report.json", "http/http-receipts/request"})
+            for row in checkout_outputs + run_outputs:
+                if row["present"]:
+                    path = run / row["path"]
+                    self.assertEqual(row["sha256"], produce.digest_file(path))
+
     def test_cli_accepts_only_output_and_rejects_caller_command(self):
         with tempfile.TemporaryDirectory(prefix="il-p10-cli-") as name:
             with self.assertRaises(SystemExit) as raised:

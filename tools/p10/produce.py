@@ -44,6 +44,7 @@ class CommandSpec:
     timeout_seconds: int
     purpose: str
     output_paths: tuple[str, ...] = ()
+    run_output_paths: tuple[str, ...] = ()
 
 
 def digest_bytes(data: bytes) -> str:
@@ -152,14 +153,16 @@ def _fixed_plan(output: Path) -> tuple[CommandSpec, ...]:
                      "build/native_cli_report.json", "build/runtime_cli_report.json",
                      "build/network_cli_report.json", "build/bytes_cli_report.json",
                      "build/http_cli_report.json", "build/ai_protocol_cli_report.json",
-                     "build/interpreter_profile_parity_report.json", "build/ci/manifest.json")),
+                     "build/interpreter_profile_parity_report.json",
+                     "build/ci/*.log", "build/ci/*_report.json")),
         CommandSpec("http", (python, http, "--binary", str((ROOT / "target" / "release" / "il").resolve()),
                               "--report", str((output / "http" / "http_report.json").resolve())), 1200,
-                    "locked external HTTP acceptance", ()),
+                    "locked external HTTP acceptance", (), ("http/http_report.json", "http/**")),
         CommandSpec("g4", (python, compare, "--output", str((output / "g4").resolve())), 900,
-                    "locked 18-trial comparison", ()),
+                    "locked 18-trial comparison", (), ("g4/comparison.json", "g4/**")),
         CommandSpec("reproducibility", (python, reproduce, "--output", str((output / "reproducibility").resolve())),
-                    2400, "two independent locked compiler/runtime/application rebuilds", ()),
+                    2400, "two independent locked compiler/runtime/application rebuilds", (),
+                    ("reproducibility/reproduction.json", "reproducibility/**")),
     )
 
 
@@ -176,6 +179,7 @@ def _plan_identity(plan: tuple[CommandSpec, ...]) -> dict[str, Any]:
             "timeout_seconds": spec.timeout_seconds,
             "purpose": spec.purpose,
             "output_paths": list(spec.output_paths),
+            "run_output_paths": list(spec.run_output_paths),
             "script": {"path": str(script), "sha256": digest_file(script)},
         })
     # Contract hashes are part of the plan identity. A run cannot silently
@@ -325,43 +329,114 @@ def _write_command(run_root: Path, command: dict[str, Any]) -> dict[str, Any]:
     return {"command_id": command_id, "path": destination.relative_to(run_root).as_posix(), "sha256": digest_file(destination)}
 
 
-def _capture_paths(run_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
-    """Retain selected command-produced files as content-addressed evidence."""
+def _fixed_relative(value: str) -> Path:
+    """Validate a reviewed relative path or glob before touching the filesystem."""
+    if not isinstance(value, str) or not value or "\\" in value or ":" in value:
+        raise ProducerError(f"fixed output path is not a relative POSIX path: {value!r}")
+    relative = Path(value.replace("/", os.sep))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ProducerError(f"fixed output path is not relative: {value}")
+    return relative
+
+
+def _expand_paths(root: Path, paths: Iterable[str]) -> list[tuple[str, Path]]:
+    """Expand only fixed relative paths/globs and return regular files in order."""
+    expanded: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for pattern in paths:
+        relative = _fixed_relative(pattern)
+        text = relative.as_posix()
+        has_glob = any(marker in text for marker in ("*", "?", "["))
+        candidates = sorted(root.glob(text)) if has_glob else [root / relative]
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            if candidate.is_symlink():
+                raise ProducerError(f"fixed output path is a symbolic link: {text}")
+            if not candidate.is_file():
+                continue
+            relative_candidate = candidate.relative_to(root)
+            cursor = root
+            for part in relative_candidate.parts:
+                cursor /= part
+                if cursor.is_symlink():
+                    raise ProducerError(f"fixed output path contains a symbolic link: {text}")
+            resolved = candidate.resolve()
+            try:
+                resolved.relative_to(root.resolve())
+            except ValueError as exc:
+                raise ProducerError(f"fixed output path escapes its root: {text}") from exc
+            actual = candidate.relative_to(root).as_posix()
+            if actual not in seen:
+                expanded.append((actual, candidate))
+                seen.add(actual)
+    return expanded
+
+
+def _capture_checkout_paths(run_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
+    """Copy reviewed checkout outputs into the run and bind their hashes."""
     captured: list[dict[str, Any]] = []
-    for relative in paths:
-        path = (ROOT / relative).resolve()
-        try:
-            path.relative_to(ROOT.resolve())
-        except ValueError as exc:
-            raise ProducerError(f"fixed output path escapes source checkout: {relative}") from exc
-        if not path.is_file():
-            captured.append({"path": relative.replace("\\", "/"), "present": False})
+    for pattern in tuple(paths):
+        normalized = _fixed_relative(pattern).as_posix()
+        matches = _expand_paths(ROOT, (normalized,))
+        if not matches:
+            captured.append({"path": normalized, "present": False})
             continue
-        data = path.read_bytes()
-        # Preserve the reviewed output at its checkout-relative location so a
-        # later assembler can consume reports without reaching back into the
-        # mutable checkout.  The content-addressed blob remains the identity
-        # used by command observations.
-        relative_path = Path(relative.replace("/", os.sep))
-        if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise ProducerError(f"fixed output path is not relative: {relative}")
-        retained = run_root / relative_path
-        retained.parent.mkdir(parents=True, exist_ok=True)
-        if retained.exists() and retained.read_bytes() != data:
-            raise ProducerError(f"captured output collision: {relative}")
-        if not retained.exists():
-            pending = retained.with_name(f".{retained.name}.pending")
-            with pending.open("wb") as stream:
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(pending, retained)
-        captured.append({
-            "path": relative.replace("\\", "/"),
-            "present": True,
-            "bytes": _blob(run_root, data),
-        })
+        for relative, path in matches:
+            data = path.read_bytes()
+            # Preserve the reviewed output at its checkout-relative location so
+            # a later assembler can consume reports without reaching back into
+            # the mutable checkout. The content-addressed blob remains the
+            # identity used by command observations.
+            relative_path = Path(relative.replace("/", os.sep))
+            retained = run_root / relative_path
+            retained.parent.mkdir(parents=True, exist_ok=True)
+            if retained.exists() and retained.read_bytes() != data:
+                raise ProducerError(f"captured output collision: {relative}")
+            if not retained.exists():
+                pending = retained.with_name(f".{retained.name}.pending")
+                with pending.open("wb") as stream:
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(pending, retained)
+            captured.append({
+                "path": relative,
+                "present": True,
+                "sha256": digest_bytes(data),
+                "size_bytes": len(data),
+                "bytes": _blob(run_root, data),
+            })
     return captured
+
+
+def _capture_run_paths(run_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
+    """Bind files emitted below the command's supervisor-owned run directory."""
+    captured: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for pattern in paths:
+        normalized = _fixed_relative(pattern).as_posix()
+        matches = _expand_paths(run_root, (normalized,))
+        if not matches:
+            captured.append({"path": normalized, "present": False})
+            continue
+        for relative, path in matches:
+            if relative in seen:
+                continue
+            seen.add(relative)
+            data = path.read_bytes()
+            captured.append({
+                "path": relative,
+                "present": True,
+                "sha256": digest_bytes(data),
+                "size_bytes": len(data),
+            })
+    return captured
+
+
+def _capture_paths(run_root: Path, paths: Iterable[str]) -> list[dict[str, Any]]:
+    """Capture reviewed checkout outputs using the canonical checkout path."""
+    return _capture_checkout_paths(run_root, paths)
 
 
 def _toolchain_identity() -> dict[str, Any]:
@@ -459,7 +534,10 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
             environment = _permitted_environment(destination)
             for spec in plan:
                 observation = _observation(destination, spec, environment, source)
-                observation["outputs"] = _capture_paths(destination, spec.output_paths)
+                observation["outputs"] = (
+                    _capture_checkout_paths(destination, spec.output_paths)
+                    + _capture_run_paths(destination, spec.run_output_paths)
+                )
                 reference = _write_command(destination, observation)
                 state["commands"].append(reference)
                 state["active_command"] = spec.command_id
