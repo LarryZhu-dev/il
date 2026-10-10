@@ -406,7 +406,12 @@ class HttpAcceptance(unittest.TestCase):
                     if threshold==1:
                         # The first accepted stream is driven by an independent
                         # TCP client; after it closes the second accept fails.
-                        deadline=time.monotonic()+30
+                        # Captured native execution includes a clean compile
+                        # for each optimization profile. Keep the startup
+                        # window aligned with the subprocess completion limit
+                        # below so slow release linking is not mistaken for
+                        # an accept/listener failure.
+                        deadline=time.monotonic()+180
                         while True:
                             self.assertIsNone(process.poll(),'native service exited before external accept')
                             try:
