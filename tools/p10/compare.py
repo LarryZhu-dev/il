@@ -20,6 +20,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = Path(__file__).with_name("execution_contract.json")
+ACCEPTANCE_CONTRACT_PATH = Path(__file__).with_name("contract.json")
 TARGET = "x86_64-unknown-linux-gnu"
 G4_BASELINE_DATE = "2000-01-01T00:00:00+00:00"
 MODULES = ("core", "alloc", "io", "time", "net", "json", "http", "test", "tracing")
@@ -82,6 +83,10 @@ class Trace:
             self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin), "environment": env or {}},
                         {"timeout": True, "stdout": self.blob(error.stdout or b""),
                          "stderr": self.blob(error.stderr or b"")}, started)
+            raise
+        except OSError as error:
+            self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin), "environment": env or {}},
+                        {"error": str(error), "errno": error.errno}, started)
             raise
         self.record("process", {"argv": argv, "cwd": str(cwd), "stdin": self.blob(stdin), "environment": env or {}},
                     {"exit_code": result.returncode, "stdout": self.blob(result.stdout),
@@ -304,13 +309,14 @@ def write_g4_record(directory, output_root, trace, *, task, implementation, inde
         "run_id": trace.run_id,
         "events": [
             {
-                "sequence": event["sequence"],
+                "sequence": sequence,
                 "kind": "tool_call",
                 "tool": event["kind"],
                 "request_sha256": digest(encoded(event["request"])),
                 "response_sha256": digest(encoded(event["response"])),
             }
-            for event in trace.events
+            for sequence, event in enumerate(
+                (event for event in trace.events if event["phase"] == "measured"), 1)
         ],
     }
     trace_path = directory / "g4_trace.json"
@@ -354,11 +360,12 @@ def write_g4_record(directory, output_root, trace, *, task, implementation, inde
     }
 
 
-def trial(directory, implementation, task, index, binary, contract):
+def trial(directory, implementation, task, index, binary, contract, acceptance_contract):
     directory.mkdir()
     trace = Trace(directory)
     attempt_started = time.monotonic_ns()
-    task_input_sha256 = digest(encoded({"task": task, "requests": contract["requests"], "failure_categories": contract["failure_categories"]}))
+    task_input_sha256 = digest(encoded({"task": task,
+        "execution_contract": contract, "acceptance_contract": acceptance_contract}))
     source_commit = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, check=True, text=True).stdout.strip()
     starting_commit = source_commit
     row = {"implementation": implementation, "task": task, "repetition": index,
@@ -367,7 +374,7 @@ def trial(directory, implementation, task, index, binary, contract):
            "task_input_sha256": task_input_sha256, "success": False, "failure_category": None}
     before = after = b""
     started = None
-    assertions = {identity: 0 for identity in contract["g4"]["tasks"][task]}
+    assertions = {identity: 0 for identity in acceptance_contract["g4"]["tasks"][task]}
 
     def passed(identity, count=1):
         assertions[identity] += count
@@ -489,10 +496,10 @@ def trial(directory, implementation, task, index, binary, contract):
                 git("add", "main.rs")
                 git("commit", "-m", "feat: add hello route")
                 after = source.read_bytes()
-                require(b"/hello/{name}" in after, "Rust edit did not add the hello route")
+                require(after == installed and fragment in after, "Rust edit did not install the locked hello route")
                 passed("route_present")
-                passed("typecheck")
                 exe, _ = compile_source("program")
+                passed("typecheck")
                 passed("http_blackbox", test_service(trace, contract, exe, None, implementation, True))
             if task == "rollback":
                 before_commit = git("rev-parse", "HEAD").decode().strip()
@@ -505,6 +512,7 @@ def trial(directory, implementation, task, index, binary, contract):
                 exe, _ = compile_source("program")
                 test_service(trace, contract, exe, None, implementation, False)
                 passed("previous_binary_runs", test_service(trace, contract, old, None, implementation, True))
+        require(all(count > 0 for count in assertions.values()), "required trial assertion was not executed")
         row["success"] = True
     except Exception as error:
         row["failure_category"] = "timeout" if isinstance(error, subprocess.TimeoutExpired) else "assertion" if isinstance(error, AssertionError) else "environment" if isinstance(error, OSError) else "other"
@@ -543,7 +551,7 @@ def trial(directory, implementation, task, index, binary, contract):
     return row
 
 
-def aggregate(rows, contract):
+def aggregate(rows, contract, *, source_dirty):
     expected = {(impl, task, i) for impl in contract["implementations"]
                 for task in contract["tasks"] for i in range(1, 4)}
     actual = [(r["implementation"], r["task"], r["repetition"]) for r in rows]
@@ -558,7 +566,20 @@ def aggregate(rows, contract):
                 "success_rate": sum(r["success"] for r in selected) / len(selected) if selected else None,
                 "median_elapsed_ns": statistics.median(durations) if durations else None,
                 "failure_distribution": {cat: sum(r["failure_category"] == cat for r in selected) for cat in contract["failure_categories"]}})
-    return {"matrix_complete": complete, "all_trials_succeeded": complete and all(r["success"] for r in rows), "summaries": summaries}
+    succeeded = complete and all(r["success"] for r in rows)
+    return {"matrix_complete": complete, "all_trials_succeeded": succeeded,
+            "release_eligible": succeeded and not source_dirty, "summaries": summaries}
+
+
+def load_contracts():
+    execution = json.loads(CONTRACT_PATH.read_bytes())
+    acceptance = json.loads(ACCEPTANCE_CONTRACT_PATH.read_bytes())
+    g4 = acceptance["g4"]
+    require(set(execution["tasks"]) == set(g4["tasks"]), "G4 task contracts differ")
+    require(set(execution["implementations"]) == set(g4["implementations"]), "G4 implementation contracts differ")
+    require(execution["repetitions"] == g4["trial_count"], "G4 repetition contracts differ")
+    require(set(execution["failure_categories"]) == set(g4["failure_categories"]), "G4 failure category contracts differ")
+    return execution, acceptance
 
 
 def main():
@@ -570,7 +591,7 @@ def main():
     parser.add_argument("--repetitions", type=int, choices=(1, 3), default=3)
     args = parser.parse_args()
     require(sys.platform == "linux", "real G4 execution requires locked Linux toolchain")
-    contract = json.loads(CONTRACT_PATH.read_bytes())
+    contract, acceptance_contract = load_contracts()
     require(json.loads((ROOT / "eval/tasks/P09.json").read_bytes())["status"] == "VERIFIED", "P09 dependency not verified")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -582,7 +603,7 @@ def main():
     head = metadata.process(["git", "-C", ROOT, "rev-parse", "HEAD"]).stdout.decode().strip()
     dirty = metadata.process(["git", "-C", ROOT, "status", "--porcelain"]).stdout.decode()
     inputs = {str(p.relative_to(ROOT)): digest(p.read_bytes()) for p in
-              [CONTRACT_PATH, Path(__file__), ROOT / "toolchain.lock", ROOT / "examples/http_demo/main.il",
+              [CONTRACT_PATH, ACCEPTANCE_CONTRACT_PATH, Path(__file__), ROOT / "toolchain.lock", ROOT / "examples/http_demo/main.il",
                *[ROOT / "packages" / name / "lib.il" for name in MODULES],
                *sorted((ROOT / "tests/p10/baseline").glob("*"))] if p.is_file()}
     report = {"schema_version": "1.0.0", "method": contract["method"], "source_commit": head,
@@ -596,7 +617,7 @@ def main():
             for impl in ([args.implementation] if args.implementation else contract["implementations"]):
                 identity = f"{task}-{index}-{impl}"
                 print(f"Running {identity}", flush=True)
-                row = trial(output / identity, impl, task, index, binary, contract)
+                row = trial(output / identity, impl, task, index, binary, contract, acceptance_contract)
                 report["trials"].append(row)
                 if impl == "rust":
                     if report["baseline_commit"] is None:
@@ -604,9 +625,8 @@ def main():
                     require(report["baseline_commit"] == row["starting_commit"], "Rust baseline commit changed between trials")
                 save(output / "comparison.json", report)
                 print(json.dumps({"trial": identity, "success": row["success"], "error": row.get("error")}), flush=True)
-    report.update(aggregate(report["trials"], contract))
+    report.update(aggregate(report["trials"], contract, source_dirty=report["source_dirty"]))
     report["status"] = "COMPLETE" if report["matrix_complete"] else "PARTIAL"
-    report["release_eligible"] = report["matrix_complete"] and not report["source_dirty"]
     save(output / "comparison.json", report)
     return 0 if all(r["success"] for r in report["trials"]) else 1
 
