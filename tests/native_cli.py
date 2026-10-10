@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import copy
 from contextlib import contextmanager
 import hashlib
@@ -14,6 +15,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 
 import execution_cli
@@ -25,6 +27,7 @@ PROFILES = ("debug", "release")
 ARTIFACTS = {"native_ir", "llvm_ir", "object", "executable"}
 FAILURE_ARTIFACTS: Path | None = None
 PROGRESS_REPORT: Path | None = None
+PROGRESS_LOCK = threading.RLock()
 
 
 def digest(path):
@@ -49,9 +52,10 @@ class NativeCliAcceptance(unittest.TestCase):
 
     def save_progress(self):
         if PROGRESS_REPORT is not None:
-            graph_cli.write_json(PROGRESS_REPORT, {"suite": "native_cli_blackbox", "state": "RUNNING",
-                "passed": False, "cases": self.records, "numeric_contract_sha256": digest(execution_cli.CONTRACT),
-                "abi_contract_sha256": digest(ABI_CONTRACT)})
+            with PROGRESS_LOCK:
+                graph_cli.write_json(PROGRESS_REPORT, {"suite": "native_cli_blackbox", "state": "RUNNING",
+                    "passed": False, "cases": self.records, "numeric_contract_sha256": digest(execution_cli.CONTRACT),
+                    "abi_contract_sha256": digest(ABI_CONTRACT)})
 
     @contextmanager
     def isolated_case(self, identity):
@@ -240,7 +244,8 @@ class NativeCliAcceptance(unittest.TestCase):
 
     def compare_case(self, case_id, suite, expected, numeric_type=None):
         record = {"id": case_id, "passed": False, "profiles": {}}
-        self.records.append(record)
+        with PROGRESS_LOCK:
+            self.records.append(record)
         self.save_progress()
         success = expected["status"] == "returned"
         interpreted = self.invoke("test", self.execution_request(suite, "captured"), success)["result"]["execution"]
@@ -277,23 +282,43 @@ class NativeCliAcceptance(unittest.TestCase):
             self.assertEqual(observables(execution), observables(direct), "CLI and direct ELF disagree")
             self.assertEqual(observables(execution), observables(interpreted), "native and MIR semantics disagree")
             self.assert_expected(direct, expected, numeric_type)
-            profiles[profile] = {"artifacts": {name: artifact["sha256"] for name, artifact in native["artifacts"].items()},
-                                 "exit_code": native["exit_code"], "observables": observables(direct)}
+            with PROGRESS_LOCK:
+                profiles[profile] = {"artifacts": {name: artifact["sha256"] for name, artifact in native["artifacts"].items()},
+                                     "exit_code": native["exit_code"], "observables": observables(direct)}
             self.save_progress()
-        record["passed"] = True
+        with PROGRESS_LOCK:
+            record["passed"] = True
         self.save_progress()
 
     def test_locked_numeric_execution_matrix(self):
         cases = json.loads(execution_cli.CONTRACT.read_text(encoding="utf-8"))["cases"]
         self.assertEqual(len(cases), 180)
-        for case in cases:
-            with self.subTest(case=case["id"]), self.isolated_case(case["id"]):
-                self.publish(graph=execution_cli.numeric_graph(case))
-                arguments = [execution_cli.integer(case["type"], value) for value in case["operands"]]
-                expected = dict(case["expected"])
-                if expected["status"] == "trapped":
-                    expected["entity_id"] = "main.calculate"
-                self.compare_case(case["id"], self.suite(arguments), expected, case.get("result_type", case["type"]))
+
+        def execute(index, case):
+            fixture = type(self)()
+            fixture.setUp()
+            try:
+                with fixture.isolated_case(case["id"]):
+                    fixture.publish(graph=execution_cli.numeric_graph(case))
+                    arguments = [execution_cli.integer(case["type"], value)
+                                 for value in case["operands"]]
+                    expected = dict(case["expected"])
+                    if expected["status"] == "trapped":
+                        expected["entity_id"] = "main.calculate"
+                    fixture.compare_case(case["id"], fixture.suite(arguments), expected,
+                                         case.get("result_type", case["type"]))
+                return index
+            finally:
+                fixture.doCleanups()
+
+        # Native compilation is independent per case and each fixture owns its
+        # repository/store. Run several cases concurrently while preserving all
+        # profile builds, direct ELF runs, and deterministic hash assertions.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(execute, index, case) for index, case in enumerate(cases)]
+            for index, (case, future) in enumerate(zip(cases, futures)):
+                with self.subTest(case=case["id"]):
+                    self.assertEqual(future.result(), index)
 
     def test_locked_structured_and_abi_contract(self):
         cases = json.loads(ABI_CONTRACT.read_text(encoding="utf-8"))["cases"]
