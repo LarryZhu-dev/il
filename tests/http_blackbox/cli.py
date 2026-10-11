@@ -421,6 +421,21 @@ class HttpAcceptance(unittest.TestCase):
                         {'id':'slow_reader_closed_without_response_read','passed':LAST_EXCHANGE['response_read'] is False},
                         {'id':'server_write_timeout_observed','passed':b'E_HTTP_WRITE_TIMEOUT' in (directory/'stderr.log').read_bytes()[before:]},
                     ]
+                    # The slow-reader case intentionally has no response to
+                    # parse, so it cannot use ``record``.  Retain an explicit
+                    # case row bound to the observed TCP exchange so the P10
+                    # receipt matrix can reference the real partial-write
+                    # evidence instead of inferring it from suite counts.
+                    RECORDS.append({
+                        'id': profile+':partial_write',
+                        'status': None,
+                        'headers': {},
+                        'body': [],
+                        'elapsed_ns': LAST_EXCHANGE['elapsed_ns'],
+                        'wire_sha256': None,
+                        'exchange_id': LAST_EXCHANGE['id'],
+                        'validation': 'observed_pending_suite',
+                    })
                     save_observations()
                     wire,elapsed=exchange(request('/health'));self.record(profile+':after_write_timeout',wire,elapsed,health['status'])
                     logs=(directory/'stderr.log').read_text();self.assertIn('E_HTTP_REQUEST_FAILED',logs);self.assertIn('E_HTTP_WRITE_TIMEOUT',logs)
