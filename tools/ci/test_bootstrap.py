@@ -262,15 +262,21 @@ class GeneratedSourceGateTests(unittest.TestCase):
         generated.write_text("fn generated_target() {}\n", encoding="utf-8")
         with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
             CHECK.check_forbidden_generated_sources(self.root)
-
+        generated.unlink()
         unrelated = self.root / "build/p10/docker-run-20261011-070000/other/generated.rs"
         unrelated.parent.mkdir(parents=True)
         unrelated.write_text("fn generated_target() {}\n", encoding="utf-8")
-        generated.unlink()
         with self.assertRaisesRegex(CHECK.ValidationError, "forbidden generated target source"):
             CHECK.check_forbidden_generated_sources(self.root)
 
-
+    def test_preserved_p10_reproduction_sources_and_targets_are_evidence(self):
+        evidence = self.root / "build/p10/reproduction-20261011-082700-normalized/root_b/source/tests/cli.py"
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text("print('preserved')\n", encoding="utf-8")
+        target = self.root / "build/p10/reproduction-20261011-082700-normalized/root_b/target/release/build/pkg/out/generated.rs"
+        target.parent.mkdir(parents=True)
+        target.write_text("fn preserved() {}\n", encoding="utf-8")
+        CHECK.check_forbidden_generated_sources(self.root)
 
 class EvidenceReportTests(unittest.TestCase):
     @classmethod

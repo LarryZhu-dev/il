@@ -239,14 +239,23 @@ def is_p10_rust_baseline_copy(root: Path, path: Path, baseline_hashes: set[str])
 
 
 def is_p10_docker_evidence(root: Path, path: Path, baseline_hashes: set[str]) -> bool:
-    """Identify the two source forms retained by a trusted P10 producer run."""
+    """Identify files retained by a trusted P10 producer/reproduction run."""
     relative = path.relative_to(root / "build")
     if len(relative.parts) < 4 or relative.parts[0] != "p10":
         return False
-    if re.fullmatch(r"docker-run-\d{8}-\d{6}", relative.parts[1]) is None:
+    # Trusted producer outputs may carry a descriptive, lowercase suffix
+    # (for example ``-retry`` or ``-rustc-bound``).  These directories are
+    # still immutable evidence snapshots; reject anything outside the fixed
+    # timestamp-plus-token shape so arbitrary generated sources are not
+    # silently exempted from the target-language gate.
+    if re.fullmatch(r"(?:docker-run|reproduction)-\d{8}-\d{6}(?:-[a-z0-9]+)*", relative.parts[1]) is None:
         return False
-    if relative.parts[2] == "reproducibility" and len(relative.parts) >= 5:
-        return relative.parts[3] in {"root_a", "root_b"} and relative.parts[4] == "source"
+    # Reproduction snapshots preserve both source and target trees as
+    # immutable evidence; all files below root_a/root_b are evidence bytes.
+    if relative.parts[1].startswith("reproduction-") and relative.parts[2] in {"root_a", "root_b"}:
+        return True
+    if relative.parts[2] == "reproducibility" and len(relative.parts) >= 4:
+        return relative.parts[3] in {"root_a", "root_b"}
     if len(relative.parts) == 5 and relative.parts[2] == "g4" and relative.parts[4] == "main.rs":
         if not re.fullmatch(r"(?:add_route|fix_type_error|rollback)-[1-3]-rust", relative.parts[3]):
             return False
