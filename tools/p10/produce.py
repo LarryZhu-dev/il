@@ -348,6 +348,17 @@ def _expand_paths(root: Path, paths: Iterable[str]) -> list[tuple[str, Path]]:
         text = relative.as_posix()
         has_glob = any(marker in text for marker in ("*", "?", "["))
         candidates = sorted(root.glob(text)) if has_glob else [root / relative]
+        # pathlib treats a terminal ``/**`` as the directory itself.  The
+        # reviewed P10 plan uses this form to bind every file below a command
+        # output directory, so expand that directory to its regular files.
+        if has_glob and text.endswith("/**"):
+            expanded_files: list[Path] = []
+            for candidate in candidates:
+                if candidate.is_dir():
+                    expanded_files.extend(item for item in candidate.rglob("*") if item.is_file())
+                else:
+                    expanded_files.append(candidate)
+            candidates = sorted(expanded_files)
         for candidate in candidates:
             if not candidate.exists():
                 continue

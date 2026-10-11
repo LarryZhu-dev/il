@@ -50,6 +50,7 @@ class ProducerTests(unittest.TestCase):
                              {"build/ci/result.json", "build/ci/gate.log"})
             self.assertEqual({row["path"] for row in run_outputs if row["present"]},
                              {"http/http_report.json", "http/http-receipts/request"})
+            self.assertFalse(any(row["path"] == "http/**" and not row["present"] for row in run_outputs))
             for row in checkout_outputs + run_outputs:
                 if row["present"]:
                     path = run / row["path"]
