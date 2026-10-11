@@ -74,7 +74,7 @@ def _sha256(data: bytes) -> str:
 
 def _validate_gate_reference(
     reference: Any, *, predicate: str, base: Path
-) -> None:
+) -> dict[str, Any]:
     if not isinstance(reference, dict) or set(reference) != {"path", "sha256"}:
         raise ReductionError(f"P10 predicate {predicate} is not a record reference")
     path_value = reference["path"]
@@ -87,14 +87,29 @@ def _validate_gate_reference(
     candidate = Path(path_value)
     if not candidate.is_absolute():
         candidate = base / candidate
+    # Check the path as named before resolve() follows links.  Checking only
+    # the resolved destination would silently accept an in-tree symlink and
+    # would make the reference change meaning if the link were retargeted.
+    absolute = Path(candidate.absolute())
     try:
-        candidate = candidate.resolve(strict=True)
-        candidate.relative_to(base.resolve(strict=True))
+        lexical_relative = absolute.relative_to(base.absolute())
+    except ValueError as exc:
+        raise ReductionError(f"P10 predicate {predicate} reference is outside the trusted report") from exc
+    cursor = base.absolute()
+    if cursor.is_symlink():
+        raise ReductionError("trusted report directory is a symbolic link")
+    for part in lexical_relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ReductionError(f"P10 predicate {predicate} reference traverses a symbolic link")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(base.resolve(strict=True))
     except (OSError, ValueError) as exc:
         raise ReductionError(f"P10 predicate {predicate} reference is outside the trusted report") from exc
-    if not candidate.is_file() or candidate.is_symlink():
+    if not resolved.is_file():
         raise ReductionError(f"P10 predicate {predicate} reference is not a regular file")
-    raw = candidate.read_bytes()
+    raw = resolved.read_bytes()
     if _sha256(raw) != digest:
         raise ReductionError(f"P10 predicate {predicate} record hash mismatch")
     try:
@@ -104,6 +119,7 @@ def _validate_gate_reference(
     if (not isinstance(record, dict) or record.get("kind") != "p10_gate_record"
             or record.get("predicate") != predicate):
         raise ReductionError(f"P10 predicate {predicate} record is not a matching p10_gate_record")
+    return record
 
 
 def reduce_report(
@@ -124,6 +140,17 @@ def reduce_report(
         raise ReductionError(f"P10 manifest fields are incomplete (missing={missing}, extra={extra})")
     if manifest.get("schema_version") != "1.0.0" or manifest.get("kind") != "p10_acceptance_bundle":
         raise ReductionError("trusted CI manifest is not a p10_acceptance_bundle")
+    if manifest.get("target") != contract.get("target"):
+        raise ReductionError("P10 manifest target differs from the locked contract")
+    source_commit = manifest.get("source_commit")
+    toolchain_hash = manifest.get("toolchain_lock_sha256")
+    if (not isinstance(source_commit, str) or len(source_commit) != 40
+            or any(char not in "0123456789abcdef" for char in source_commit)):
+        raise ReductionError("P10 manifest source commit is invalid")
+    if (not isinstance(toolchain_hash, str) or len(toolchain_hash) != 71
+            or not toolchain_hash.startswith("sha256:")
+            or any(char not in "0123456789abcdef" for char in toolchain_hash[7:])):
+        raise ReductionError("P10 manifest toolchain lock hash is invalid")
     predicates = manifest.get("predicates")
     names = set(required_predicates(contract))
     if not isinstance(predicates, dict):
@@ -137,16 +164,81 @@ def reduce_report(
     for predicate, reference in predicates.items():
         if not isinstance(reference, dict) or set(reference) != {"path", "sha256"}:
             raise ReductionError(f"P10 predicate {predicate} is not a record reference")
-        _validate_gate_reference(reference, predicate=predicate, base=base or Path.cwd())
+        record = _validate_gate_reference(reference, predicate=predicate, base=base or Path.cwd())
+        if (record.get("schema_version") != "1.0.0" or record.get("status") != "PASSED"
+                or record.get("source_commit") != source_commit
+                or record.get("target") != manifest["target"]
+                or record.get("toolchain_lock_sha256") != toolchain_hash):
+            raise ReductionError(f"P10 predicate {predicate} record provenance or status differs from manifest")
     if not isinstance(manifest.get("executables"), list) or not manifest["executables"]:
         raise ReductionError("P10 manifest executable inventory is incomplete")
     if not isinstance(manifest.get("artifacts"), list) or not manifest["artifacts"]:
         raise ReductionError("P10 manifest artifact inventory is incomplete")
     comparison = manifest.get("comparison")
-    if (not isinstance(comparison, dict) or not isinstance(comparison.get("trials"), list)
-            or len(comparison["trials"]) != 18):
+    if not isinstance(comparison, dict) or not isinstance(comparison.get("trials"), list):
         raise ReductionError("P10 manifest G4 trial inventory is incomplete")
+    g4_contract = contract.get("g4", {})
+    tasks = g4_contract.get("tasks", {})
+    implementations = g4_contract.get("implementations", [])
+    trial_count = g4_contract.get("trial_count")
+    expected = {
+        (task, implementation, index)
+        for task in tasks
+        for implementation in implementations
+        for index in range(1, trial_count + 1)
+    }
+    observed: set[tuple[str, str, int]] = set()
+    for index, reference in enumerate(comparison["trials"]):
+        if not isinstance(reference, dict) or set(reference) != {"path", "sha256"}:
+            raise ReductionError(f"P10 G4 trial {index} is not a hashed record reference")
+        trial_path = _validate_json_reference(reference, base=base or Path.cwd(), label=f"G4 trial {index}")
+        record = _read_json(trial_path)
+        if (not isinstance(record, dict) or record.get("schema_version") != "1.0.0"
+                or record.get("kind") != "g4_trial"):
+            raise ReductionError(f"P10 G4 trial {index} is not a g4_trial record")
+        key = (record.get("task_id"), record.get("implementation"), record.get("trial_index"))
+        if key not in expected or key in observed:
+            raise ReductionError(f"P10 G4 trial {index} has an unknown or duplicate identity")
+        observed.add(key)
+    if observed != expected:
+        raise ReductionError("P10 manifest G4 trial matrix is incomplete")
     return manifest
+
+
+def _validate_json_reference(reference: dict[str, Any], *, base: Path, label: str) -> Path:
+    path_value = reference.get("path")
+    digest = reference.get("sha256")
+    if (not isinstance(path_value, str) or not path_value
+            or not isinstance(digest, str) or len(digest) != 71
+            or not digest.startswith("sha256:")
+            or any(char not in "0123456789abcdef" for char in digest[7:])):
+        raise ReductionError(f"P10 {label} reference is malformed")
+    candidate = Path(path_value)
+    if not candidate.is_absolute():
+        candidate = base / candidate
+    absolute = Path(candidate.absolute())
+    try:
+        lexical_relative = absolute.relative_to(base.absolute())
+    except ValueError as exc:
+        raise ReductionError(f"P10 {label} reference is outside the trusted report") from exc
+    cursor = base.absolute()
+    if cursor.is_symlink():
+        raise ReductionError("trusted report directory is a symbolic link")
+    for part in lexical_relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ReductionError(f"P10 {label} reference traverses a symbolic link")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(base.resolve(strict=True))
+    except (OSError, ValueError) as exc:
+        raise ReductionError(f"P10 {label} reference is outside the trusted report") from exc
+    if not resolved.is_file():
+        raise ReductionError(f"P10 {label} reference is not a regular file")
+    raw = resolved.read_bytes()
+    if _sha256(raw) != digest:
+        raise ReductionError(f"P10 {label} reference hash mismatch")
+    return resolved
 
 
 def reduce_file(report_path: Path, output_path: Path) -> dict[str, Any]:
