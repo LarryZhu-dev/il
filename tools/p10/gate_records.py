@@ -79,7 +79,9 @@ def _valid_record(record: Any, predicate: str) -> bool:
         return False
     if record.get("status") != "PASSED" or record.get("exit_code") != 0:
         return False
-    if not isinstance(record.get("source_commit"), str) or len(record["source_commit"]) != 40:
+    commit = record.get("source_commit")
+    if (not isinstance(commit, str) or len(commit) != 40
+            or any(c not in "0123456789abcdef" for c in commit)):
         return False
     return (_is_digest(record.get("toolchain_lock_sha256"))
             and _is_digest(record.get("argv_sha256")))

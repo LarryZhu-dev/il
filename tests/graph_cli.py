@@ -7,7 +7,9 @@ Git source repository and a separate application-store directory.
 from __future__ import annotations
 
 import argparse
+import base64
 import concurrent.futures
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -18,6 +20,7 @@ import unittest
 
 TARGET = "x86_64-unknown-linux-gnu"
 BINARY: Path
+RAW_OBSERVATIONS: list[dict] = []
 ENVELOPE = {
     "ok", "tool", "tool_version", "base_revision", "result_revision",
     "diagnostics", "artifacts", "evidence_id", "result",
@@ -27,6 +30,21 @@ DIAGNOSTIC = {
     "related_entities", "expected", "actual", "cause",
     "suggested_operations", "retryable", "base_revision",
 }
+
+
+def digest(data: bytes) -> str:
+    """Return the content identity used by the il evidence protocol."""
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def retained_bytes(data: bytes) -> dict:
+    """Keep the exact bytes while making JSON reports inspectable by humans."""
+    value = {"sha256": digest(data), "size_bytes": len(data)}
+    try:
+        value.update({"encoding": "utf-8", "data": data.decode("utf-8")})
+    except UnicodeDecodeError:
+        value.update({"encoding": "base64", "data": base64.b64encode(data).decode("ascii")})
+    return value
 
 
 def write_json(path: Path, value):
@@ -94,6 +112,14 @@ class GraphCliAcceptance(unittest.TestCase):
                 "tree_hash": self.git("rev-parse", "HEAD^{tree}"),
             }],
         })
+        # The fixture identity is captured once and attached to every raw
+        # observation.  This keeps P10 graph evidence separate from the
+        # compiler checkout identity and makes each temporary store auditable.
+        self.fixture_identity = {
+            "repository_commit": self.git("rev-parse", "HEAD"),
+            "repository_tree": self.git("rev-parse", "HEAD^{tree}"),
+            "seed_graph": retained_bytes((self.repository / "examples/bootstrap/graph.json").read_bytes()),
+        }
 
     def git(self, *arguments):
         completed = subprocess.run(
@@ -129,6 +155,7 @@ class GraphCliAcceptance(unittest.TestCase):
             response = json.loads(completed.stdout)
         except ValueError as error:
             self.fail(f"CLI emitted non-JSON stdout: {completed.stdout!r}; stderr={completed.stderr!r}: {error}")
+        self._record_raw_observation(command, request_text, completed, response, expect_ok)
         self.assertEqual(set(response), ENVELOPE)
         self.assertEqual(response["tool"], command)
         self.assertIs(response["ok"], expect_ok, response)
@@ -142,6 +169,82 @@ class GraphCliAcceptance(unittest.TestCase):
         if not expect_ok:
             self.assertTrue(response["diagnostics"], "failure must provide a structured diagnostic")
         return response
+
+    def _store_snapshot_records(self):
+        """Capture graph, candidate, and receipt bytes before fixture cleanup."""
+        records = []
+        if not self.store.exists():
+            return records
+        for path in sorted(self.store.rglob("*")):
+            if not path.is_file() or path.is_symlink():
+                continue
+            relative = path.relative_to(self.store).as_posix()
+            # Graph snapshots and retained experiments are the G2/G3 evidence
+            # closure.  Tool receipts are retained independently below.
+            if not ("graph.json" in relative or "/experiments/" in relative
+                    or relative.startswith(".il/experiments/")
+                    or relative.startswith(".il-tools/runs/")):
+                continue
+            data = path.read_bytes()
+            records.append({"path": relative, "bytes": retained_bytes(data)})
+        return records
+
+    def _record_raw_observation(self, command, request_text, completed, response, expect_ok):
+        request_bytes = request_text.encode("utf-8")
+        response_bytes = completed.stdout.encode("utf-8")
+        result = response.get("result") if isinstance(response, dict) else None
+        result = result if isinstance(result, dict) else {}
+        diagnostics = response.get("diagnostics", []) if isinstance(response, dict) else []
+        codes = [row.get("code") for row in diagnostics if isinstance(row, dict)]
+        tags = []
+        if command == "inspect" and response.get("ok") is True:
+            tags.append("inspect_succeeds")
+        if command == "slice" and response.get("ok") is True:
+            tags.append("slice_succeeds")
+        if command == "transact":
+            if response.get("ok") is True:
+                tags.append("transaction_published_revision")
+            if "E_STALE_REVISION" in codes:
+                tags.append("stale_transaction_rejected")
+            if response.get("ok") is False and result.get("candidate"):
+                tags.append("failure_preserves_previous_revision")
+        if diagnostics:
+            tags.append("diagnostics_machine_readable")
+        if command == "restore" and response.get("ok") is True:
+            tags.append("rollback_new_revision")
+        run_id = result.get("run_id")
+        receipt = None
+        if isinstance(run_id, str) and run_id.startswith("run_"):
+            receipt_path = self.store / ".il-tools" / "runs" / f"{run_id}.json"
+            if receipt_path.is_file() and not receipt_path.is_symlink():
+                receipt = {"path": receipt_path.relative_to(self.store).as_posix(),
+                           "bytes": retained_bytes(receipt_path.read_bytes())}
+        RAW_OBSERVATIONS.append({
+            "schema_version": "1.0.0",
+            "kind": "il_graph_cli_observation",
+            "test_case": self.id(),
+            "tags": tags,
+            "expect_ok": expect_ok,
+            "fixture": self.fixture_identity,
+            "request": retained_bytes(request_bytes),
+            "response": retained_bytes(response_bytes),
+            "process": {
+                "argv": [str(BINARY), "--repository", str(self.repository), "--store", str(self.store), command],
+                "exit_code": completed.returncode,
+                "stderr": retained_bytes(completed.stderr.encode("utf-8")),
+            },
+            "binding": {
+                "base_revision": response.get("base_revision"),
+                "result_revision": response.get("result_revision"),
+                "graph_hash": result.get("graph_hash"),
+                "candidate": result.get("candidate"),
+                "candidate_hash": ((json.loads(receipt["bytes"]["data"])
+                                    .get("binding", {}).get("candidate_hash")
+                                    if receipt and receipt["bytes"].get("encoding") == "utf-8" else None)),
+            },
+            "snapshots": self._store_snapshot_records(),
+            "receipt": receipt,
+        })
 
     def invoke(self, command, arguments, expect_ok=True):
         return self.invoke_raw(command, json.dumps(arguments), expect_ok)
@@ -177,6 +280,29 @@ class GraphCliAcceptance(unittest.TestCase):
         self.invoke("transact", transaction())
         rejected = self.invoke("transact", transaction(entity_id="other", path="other"), False)
         self.assert_code(rejected, "E_STALE_REVISION")
+        self.assertEqual(self.head_revision(), 1)
+
+    def test_rejected_candidate_and_diagnostic_explanation_are_retained(self):
+        """G2/G3 retain the failed candidate and a replayable explanation."""
+        self.invoke("transact", transaction())
+        request = transaction(1, "other", "second")
+        request["operations"][0]["module"]["imports"] = ["missing"]
+        rejected = self.invoke("transact", request, False)
+        self.assert_code(rejected, "E_NAME_NOT_FOUND")
+        self.assertEqual(rejected["base_revision"], 1)
+        self.assertEqual(rejected["result_revision"], 1)
+        candidate = rejected["result"].get("candidate")
+        self.assertIsInstance(candidate, str)
+        self.assertTrue((self.store / candidate / "request.json").is_file())
+        self.assertTrue((self.store / candidate / "graph.json").is_file())
+        diagnostic_id = rejected["diagnostics"][0]["diagnostic_id"]
+        explanation = self.invoke("explain", {
+            "run_id": rejected["result"]["run_id"],
+            "diagnostic_id": diagnostic_id,
+            "context_budget": 4096,
+        })
+        self.assertEqual(explanation["result"]["subject_run_id"], rejected["result"]["run_id"])
+        self.assertEqual(explanation["result"]["diagnostic"]["diagnostic_id"], diagnostic_id)
         self.assertEqual(self.head_revision(), 1)
 
     def test_validate_and_slice_use_structural_contract(self):
@@ -458,6 +584,7 @@ def main():
         "count": result.testsRun,
         "failures": [{"test": str(test), "traceback": trace} for test, trace in result.failures],
         "errors": [{"test": str(test), "traceback": trace} for test, trace in result.errors],
+        "raw_observations": RAW_OBSERVATIONS,
     }
     if arguments.report:
         write_json(arguments.report, report)
