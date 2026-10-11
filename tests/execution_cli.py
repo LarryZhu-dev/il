@@ -58,6 +58,8 @@ class ExecutionCliAcceptance(unittest.TestCase):
     git = graph_cli.GraphCliAcceptance.git
     invoke_raw = graph_cli.GraphCliAcceptance.invoke_raw
     invoke = graph_cli.GraphCliAcceptance.invoke
+    _store_snapshot_records = graph_cli.GraphCliAcceptance._store_snapshot_records
+    _record_raw_observation = graph_cli.GraphCliAcceptance._record_raw_observation
     assert_code = graph_cli.GraphCliAcceptance.assert_code
     head_revision = graph_cli.GraphCliAcceptance.head_revision
     records = []

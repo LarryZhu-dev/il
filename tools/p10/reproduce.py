@@ -14,7 +14,9 @@ import json
 import os
 from pathlib import Path
 import platform
+import socket
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -194,6 +196,112 @@ def build_application(root: Path, compiler: Path, directory: Path, log: Path) ->
     return result
 
 
+def execute_application(executable: Path, policy: Path, directory: Path, timeout: float = 10.0) -> dict[str, Any]:
+    """Run the native HTTP application with only its explicitly granted capability."""
+    import fcntl
+
+    directory.mkdir(parents=True)
+    stdout_path = directory / "stdout.bin"
+    stderr_path = directory / "stderr.bin"
+    request = b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    started = time.monotonic_ns()
+    descriptor = None
+    process = None
+    response = b""
+    startup_error = None
+    argv = [str(executable)]
+    child_env: dict[str, str] = {}
+    try:
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            probe.bind(("127.0.0.1", 8080))
+        with policy.open("rb") as policy_stream:
+            descriptor = fcntl.fcntl(policy_stream.fileno(), fcntl.F_DUPFD_CLOEXEC, 10)
+
+        def install_policy_fd() -> None:
+            os.dup2(descriptor, 4)
+            os.set_inheritable(4, True)
+
+        with stdout_path.open("wb") as stdout_stream, stderr_path.open("wb") as stderr_stream:
+            process = subprocess.Popen(
+                argv,
+                cwd=directory,
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_stream,
+                stderr=stderr_stream,
+                close_fds=True,
+                pass_fds=(descriptor,),
+                preexec_fn=install_policy_fd,
+            )
+            deadline = time.monotonic() + timeout
+            while True:
+                if process.poll() is not None:
+                    startup_error = f"application exited before listening: {process.returncode}"
+                    break
+                try:
+                    with socket.create_connection(("127.0.0.1", 8080), timeout=min(0.2, max(0.01, deadline - time.monotonic()))) as client:
+                        client.settimeout(max(0.01, deadline - time.monotonic()))
+                        client.sendall(request)
+                        chunks = []
+                        while True:
+                            chunk = client.recv(65536)
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                            if sum(map(len, chunks)) > 65536:
+                                startup_error = "health response exceeded 65536 bytes"
+                                break
+                        response = b"".join(chunks)
+                        break
+                except (ConnectionRefusedError, TimeoutError, socket.timeout):
+                    if time.monotonic() >= deadline:
+                        startup_error = f"application did not answer health probe within {timeout}s"
+                        break
+                    time.sleep(0.02)
+            if process.poll() is None:
+                process.send_signal(signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+                startup_error = startup_error or "application required SIGKILL during cleanup"
+        exit_code = process.returncode
+    except OSError as error:
+        startup_error = str(error)
+        exit_code = process.returncode if process is not None else None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+    stdout = stdout_path.read_bytes() if stdout_path.is_file() else b""
+    stderr = stderr_path.read_bytes() if stderr_path.is_file() else b""
+    elapsed = time.monotonic_ns() - started
+    status_line = response.partition(b"\r\n")[0]
+    passed = status_line.startswith(b"HTTP/1.1 200") or status_line.startswith(b"HTTP/1.0 200")
+    if not passed and startup_error is None:
+        startup_error = f"health endpoint returned unexpected status: {status_line!r}"
+    return {
+        "argv": argv,
+        "cwd": str(directory),
+        "env": child_env,
+        "clean_environment": True,
+        "started_monotonic_ns": started,
+        "elapsed_ns": elapsed,
+        "exit_code": exit_code,
+        "termination_signal": f"SIG{-exit_code}" if isinstance(exit_code, int) and exit_code < 0 else None,
+        "stdout_sha256": sha_bytes(stdout),
+        "stderr_sha256": sha_bytes(stderr),
+        "executable_sha256": sha_file(executable),
+        "health_request_sha256": sha_bytes(request),
+        "health_response_sha256": sha_bytes(response),
+        "health_status_line": status_line.decode("ascii", errors="replace"),
+        "health_check_passed": passed,
+        "error": startup_error,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--output", required=True, type=Path)
@@ -244,9 +352,13 @@ def main(argv: list[str] | None = None) -> int:
                     raise ReproductionError(f"{label} missing required artifact: {path}")
                 row["artifacts"][name] = {"path": str(path), "sha256": sha_file(path), "size_bytes": path.stat().st_size}
             app = build_application(source, compiler, root / "app", root / "application.log")
+            execution = execute_application(Path(app["artifacts"]["executable"]["path"]), root / "app" / "policy.json", root / "execution")
+            app["execution"] = execution
             row["application"] = app
             report["roots"].append(row)
             write_json(output / "reproduction.json", report)
+            if not execution["health_check_passed"] or execution["error"] is not None:
+                raise ReproductionError(f"{label} application execution failed: {execution['error'] or execution['health_status_line']}")
         first, second = report["roots"]
         comparable = {"compiler", "runtime"}
         comparable.update(first["application"]["artifacts"])
