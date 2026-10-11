@@ -398,11 +398,22 @@ def check_gate_record(
         hash_sets = []
         for index, build in enumerate(rebuilds):
             build_path = f"{path}.clean_rebuilds[{index}]"
-            build = exact_fields(build, {"store_id", "clean", "empty_environment", "exit_code", "execution_exit_code", "artifacts"}, path=build_path)
+            build = exact_fields(build, {
+                "store_id", "clean", "empty_environment", "exit_code", "execution_exit_code",
+                "execution_termination_signal", "execution_cleanup_intent", "execution_cleanup_reaped",
+                "artifacts",
+            }, path=build_path)
             store_id = nonempty_string(build["store_id"], path=f"{build_path}.store_id")
             require(store_id not in identities, "clean builds did not use separate stores", path=build_path)
             identities.add(store_id)
-            require(build["clean"] is True and build["empty_environment"] is True and build["exit_code"] == 0 and build["execution_exit_code"] == 0, "clean rebuild or execution failed", path=build_path)
+            require(build["clean"] is True and build["empty_environment"] is True and build["exit_code"] == 0,
+                    "clean rebuild failed", path=build_path)
+            require(build["execution_exit_code"] == -15
+                    and build["execution_termination_signal"] == "SIGTERM"
+                    and build["execution_cleanup_intent"] == "SIGTERM_after_health"
+                    and build["execution_cleanup_reaped"] is True,
+                    "clean-environment service execution lacks successful health-probe cleanup evidence",
+                    path=build_path)
             built = read_artifacts(reader, build["artifacts"], contract, owner=f"{build_path}.artifacts")
             require("native_elf" in built, "clean build omitted its ELF artifact", path=build_path)
             require_elf_x86_64(built["native_elf"][1], path=build_path)

@@ -185,7 +185,10 @@ def build_synthetic_bundle(root):
                         "clean": True,
                         "empty_environment": True,
                         "exit_code": 0,
-                        "execution_exit_code": 0,
+                        "execution_exit_code": -15,
+                        "execution_termination_signal": "SIGTERM",
+                        "execution_cleanup_intent": "SIGTERM_after_health",
+                        "execution_cleanup_reaped": True,
                         "artifacts": [top_artifacts[3]],
                     },
                     {
@@ -193,7 +196,10 @@ def build_synthetic_bundle(root):
                         "clean": True,
                         "empty_environment": True,
                         "exit_code": 0,
-                        "execution_exit_code": 0,
+                        "execution_exit_code": -15,
+                        "execution_termination_signal": "SIGTERM",
+                        "execution_cleanup_intent": "SIGTERM_after_health",
+                        "execution_cleanup_reaped": True,
                         "artifacts": [top_artifacts[3]],
                     },
                 ]

@@ -161,7 +161,10 @@ def _root_record(root: Path, report_root: Path, row: Any, label: str, expected_t
     if execution.get("executable_sha256") != hashes.get("native_elf"):
         raise ReproductionRecordError(f"{label} health execution hash differs from retained native ELF bytes")
     return ({"store_id": label, "clean": True, "empty_environment": True,
-             "exit_code": 0, "execution_exit_code": 0,
+             "exit_code": 0, "execution_exit_code": execution["exit_code"],
+             "execution_termination_signal": execution["termination_signal"],
+             "execution_cleanup_intent": execution["cleanup_intent"],
+             "execution_cleanup_reaped": execution["cleanup_reaped"],
              "artifacts": list(refs.values())}, hashes, _build_seconds(build, label))
 
 
