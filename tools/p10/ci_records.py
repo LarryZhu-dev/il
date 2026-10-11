@@ -49,7 +49,7 @@ def _gate(ci: dict[str, Any], name: str, base: Path) -> tuple[dict[str, Any], st
         raw = path.read_bytes()
     except (OSError, ValueError) as error:
         raise CiRecordError(f"CI gate {name} raw log is unavailable or outside report root") from error
-    if digest(raw) != expected_hash:
+    if hashlib.sha256(raw).hexdigest() != expected_hash:
         raise CiRecordError(f"CI gate {name} raw log hash mismatch")
     return row, raw.decode("utf-8", errors="strict")
 
@@ -224,7 +224,7 @@ def derive_graph_transactions(graph_report: str | Path, *, provenance: dict[str,
                               ci_report: str | Path | None = None,
                               output: str | Path | None = None) -> dict[str, Any]:
     """Derive G2 transaction predicates from the graph suite's raw observations."""
-    from derive_records import derive_records
+    from tools.p10.derive_records import derive_records
 
     result = derive_records(graph_report, provenance, graph_artifact=graph_artifact,
                             ai_report=ai_report, ci_report=ci_report, output=output)

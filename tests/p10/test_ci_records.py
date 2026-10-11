@@ -55,7 +55,7 @@ class CiRecordTests(unittest.TestCase):
             raw = (root / "build" / "ci" / log_name).read_bytes()
             gates.append({"name": name, "status": "PASSED", "exit_code": 0,
                           "elapsed_seconds": 1.5, "command": command,
-                          "log": f"build/ci/{log_name}", "log_sha256": _sha(raw)})
+                          "log": f"build/ci/{log_name}", "log_sha256": hashlib.sha256(raw).hexdigest()})
         path = root / "build" / "ci" / "result.json"
         path.write_text(json.dumps({"status": "PASSED", "gates": gates}), encoding="utf-8")
         return path
