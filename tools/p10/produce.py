@@ -29,6 +29,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_VERSION = "1.0.0"
 HASH_PREFIX = "sha256:"
+TARGET = "x86_64-unknown-linux-gnu"
 
 
 class ProducerError(RuntimeError):
@@ -604,6 +605,11 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                         "status": "BLOCKED", "blocked_predicates": ["graph_observations_missing"]}
             except (OSError, ValueError, KeyError, TypeError) as error:
                 state["predicate_records"] = {"status": "BLOCKED", "error": str(error)}
+            # Derive the two suites with independent byte-level evidence in
+            # their own adapters.  The gate exporter below sees only the
+            # resulting explicit records; it never promotes the CI summary.
+            state["ci_records"] = _derive_ci_records(destination, state)
+            state["http_records"] = _derive_http_records(destination, state)
             atomic_json(destination / "journal.json", state)
             # Export only explicit predicate records emitted by the trusted
             # commands.  This is an observational sidecar: a missing record
@@ -700,6 +706,59 @@ def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
         return base
     # Preserve the reducer's exact manifest.  No fields are added or inferred.
     return manifest
+
+
+def _derive_ci_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Capture only G0 records supported by named, hashed CI observations."""
+    source = journal.get("source", {})
+    lock = journal.get("toolchain", {}).get("lock", {})
+    try:
+        from ci_records import derive_g0
+        result = derive_g0(
+            run / "build" / "ci" / "result.json",
+            provenance={
+                "source_commit": source.get("commit"),
+                "target": TARGET,
+                "toolchain_lock_sha256": lock.get("sha256"),
+            },
+            output=run / "evidence" / "gates",
+        )
+        return {"status": result["status"], "blocked_predicates": result["blocked_predicates"]}
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return {"status": "BLOCKED", "blocked_predicates": {"G0": str(error)}}
+
+
+def _derive_http_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Bind the measured HTTP command to its complete external TCP receipt matrix."""
+    source = journal.get("source", {})
+    lock = journal.get("toolchain", {}).get("lock", {})
+    observation_path = run / "commands" / "http.json"
+    try:
+        observation = json.loads(observation_path.read_text(encoding="utf-8"))
+        from http_records import derive_http_gate
+        derived = derive_http_gate(
+            run / "http" / "http_report.json",
+            run_root=run,
+            provenance={
+                "source_commit": source.get("commit"),
+                "target": TARGET,
+                "toolchain_lock_sha256": lock.get("sha256"),
+            },
+            command={
+                "command_id": observation.get("command_id"),
+                "argv": observation.get("argv"),
+                "exit_code": observation.get("exit_code"),
+                "duration_ns": observation.get("elapsed_ns"),
+            },
+        )
+        if derived["status"] == "COMPLETE":
+            directory = run / "evidence" / "gates"
+            directory.mkdir(parents=True, exist_ok=True)
+            atomic_json(directory / "blackbox_tests_external.json", derived["records"]["blackbox_tests_external"])
+            return {"status": "COMPLETE", "blocked_reasons": []}
+        return {"status": "BLOCKED", "blocked_reasons": derived["blocked_reasons"]}
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, KeyError, TypeError) as error:
+        return {"status": "BLOCKED", "blocked_reasons": [str(error)]}
 
 
 def publish_release(run_root: str | Path, release_root: str | Path) -> dict[str, Any]:
