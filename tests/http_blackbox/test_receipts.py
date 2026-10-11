@@ -10,6 +10,8 @@ import tempfile
 import threading
 import time
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 from unittest.mock import patch
 
 HERE=Path(__file__).resolve().parent
@@ -34,6 +36,18 @@ class Peer:
 
 
 class HttpReceiptTests(unittest.TestCase):
+    def test_final_report_persists_receipt_matrix_from_emitter(self):
+        CLI.RECORDS.clear();CLI.EXCHANGES.clear()
+        report={"errors":[]}
+        result=SimpleNamespace(wasSuccessful=lambda: True, testsRun=1, failures=[], errors=[])
+        def emit(target, path):
+            target["receipt_refs"]=[{"path":"receipt.json","sha256":"sha256:"+"a"*64}]
+            target["http"]={"client":"external_tcp","cases":[{"id":"health","profile":"debug"}]}
+        with mock.patch.object(CLI,"emit_http_receipts",side_effect=emit):
+            self.assertTrue(CLI.finalize_report(report,self.root/"http.json",result))
+        self.assertEqual(report["receipt_refs"][0]["path"],"receipt.json")
+        self.assertEqual(report["http"]["cases"][0]["id"],"health")
+
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory();self.addCleanup(self.temporary.cleanup)
         self.root=Path(self.temporary.name)

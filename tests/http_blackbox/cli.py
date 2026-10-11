@@ -572,17 +572,23 @@ class HttpAcceptance(unittest.TestCase):
                     probe.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
                     probe.bind(('127.0.0.1',8080))
 
+def finalize_report(report, report_path, result):
+    passed=result.wasSuccessful()
+    for row in RECORDS:row['validation']='suite_passed' if passed else 'suite_failed'
+    report.update(state='PASSED' if passed else 'FAILED',passed=passed,count=result.testsRun,cases=RECORDS,exchanges=EXCHANGES,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=report.get('errors',[])+[{'test':str(t),'traceback':s} for t,s in result.errors])
+    if passed:
+        try:emit_http_receipts(report,report_path)
+        except (AssertionError,KeyError,TypeError,ValueError,OSError) as error:
+            passed=False;report.update(state='FAILED',passed=False)
+            report.setdefault('errors',[]).append({'test':'emit_http_receipts','traceback':str(error)})
+            for row in RECORDS:row['validation']='suite_failed'
+    return passed
+
 def main():
     global REPORT
     parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--report',type=Path,required=True);args=parser.parse_args();REPORT=args.report.resolve();graph_cli.BINARY=args.binary.resolve()
     report={'suite':'http_external_blackbox','state':'RUNNING','passed':False,'contract_sha256':sha(ROOT/'spec/http.yaml'),'cases':[]};write_json(REPORT,report)
     result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(HttpAcceptance))
-    receipt_error=None
-    if result.wasSuccessful():
-        try:emit_http_receipts(REPORT)
-        except (AssertionError,KeyError,TypeError,ValueError,OSError) as error:receipt_error=str(error)
-    for row in RECORDS:row['validation']='suite_passed' if result.wasSuccessful() and receipt_error is None else 'suite_failed'
-    if receipt_error:report.setdefault('errors',[]).append({'test':'emit_http_receipts','traceback':receipt_error})
-    passed=result.wasSuccessful() and receipt_error is None
-    report.update(state='PASSED' if passed else 'FAILED',passed=passed,count=result.testsRun,cases=RECORDS,exchanges=EXCHANGES,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=report.get('errors',[])+[{'test':str(t),'traceback':s} for t,s in result.errors]);write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k not in ('cases','exchanges')}));return 0 if passed else 1
+    passed=finalize_report(report,REPORT,result)
+    write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k not in ('cases','exchanges')}));return 0 if passed else 1
 if __name__=='__main__':raise SystemExit(main())

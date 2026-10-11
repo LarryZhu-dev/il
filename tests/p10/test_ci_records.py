@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "p10"))
@@ -21,6 +22,15 @@ def _sha(data: bytes) -> str:
 
 
 class CiRecordTests(unittest.TestCase):
+    def test_graph_transaction_adapter_imports_as_package(self):
+        from tools.p10 import ci_records as package_ci_records
+        expected = {"records": {"inspect_succeeds": {}}, "blocked_predicates": {}}
+        with mock.patch("tools.p10.derive_records.derive_records", return_value=expected) as derive:
+            result = package_ci_records.derive_graph_transactions("unused.json", provenance=PROVENANCE)
+        derive.assert_called_once()
+        self.assertEqual(result["records"], {"inspect_succeeds": {}})
+        self.assertEqual(result["status"], "COMPLETE")
+
     def _fixture(self, root: Path, *, omit: str | None = None, tamper_log: bool = False) -> Path:
         (root / "build" / "ci").mkdir(parents=True)
         test_names = set().union(*ci_records.G0_RUST_TESTS.values())

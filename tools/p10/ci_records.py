@@ -224,7 +224,10 @@ def derive_graph_transactions(graph_report: str | Path, *, provenance: dict[str,
                               ci_report: str | Path | None = None,
                               output: str | Path | None = None) -> dict[str, Any]:
     """Derive G2 transaction predicates from the graph suite's raw observations."""
-    from tools.p10.derive_records import derive_records
+    if __package__:
+        from .derive_records import derive_records
+    else:
+        from derive_records import derive_records
 
     result = derive_records(graph_report, provenance, graph_artifact=graph_artifact,
                             ai_report=ai_report, ci_report=ci_report, output=output)
