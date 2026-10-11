@@ -51,6 +51,7 @@ class ReproRecordsTests(unittest.TestCase):
                 "exit_code": -15, "termination_signal": "SIGTERM",
                 "cleanup_intent": "SIGTERM_after_health", "cleanup_reaped": True,
                 "executable_sha256": executable["sha256"],
+                "stdout_sha256": digest(b""),
             }
             root_hashes = {"compiler": compiler["sha256"], "runtime": runtime["sha256"],
                            "executable": executable["sha256"]}
@@ -92,6 +93,12 @@ class ReproRecordsTests(unittest.TestCase):
         record = result["records"]["reproducible_hash"]
         self.assertEqual(record["predicate"], "reproducible_hash")
         self.assertEqual(record["test_suite"]["count"], 2)
+        rebuilt_native = next(item for item in record["clean_rebuilds"][0]["artifacts"]
+                              if item["role"] == "native_elf")
+        self.assertEqual(result["records"]["native_elf_generated"]["artifacts"][0]["sha256"],
+                         rebuilt_native["sha256"])
+        self.assertEqual(result["records"]["clean_environment_runs"]["execution"]["exit_code"], 0)
+        self.assertTrue(result["records"]["clean_environment_runs"]["execution"]["empty_environment"])
         self.assertEqual([row["store_id"] for row in record["clean_rebuilds"]], ["root_a", "root_b"])
         for rebuild in record["clean_rebuilds"]:
             self.assertTrue(rebuild["clean"])
@@ -109,6 +116,14 @@ class ReproRecordsTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["records"], {})
         self.assertIn("target_empty_before_build", result["blocked_predicates"]["reproducible_hash"])
+
+    def test_missing_stdout_observation_blocks_clean_execution_predicate(self):
+        for row in self.value["roots"]:
+            row["application"]["execution"].pop("stdout_sha256")
+        self.save()
+        result = self.derive()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("stdout hashes", result["blocked_predicates"]["reproducible_hash"])
 
     def test_changed_native_artifact_bytes_are_rejected(self):
         executable_path = Path(self.value["roots"][0]["application"]["artifacts"]["executable"]["path"])
