@@ -16,6 +16,7 @@ from typing import Any
 HASH_PREFIX = "sha256:"
 TARGET = "x86_64-unknown-linux-gnu"
 REQUIRED_COMMANDS = {"ci", "http", "g4", "reproducibility"}
+MAX_BUNDLE_BYTES = 536_870_912
 
 
 class AssembleError(RuntimeError):
@@ -246,20 +247,30 @@ def build_manifest(run: Path, journal: dict[str, Any], rebasing: "Rebasing") -> 
 
 
 class Rebasing:
-    """Maintain one authoritative mapping from run files to bundle files."""
+    """Maintain a lazy mapping from referenced run files to bundle files.
+
+    Trusted runs retain command working directories and temporary binaries.  A
+    full recursive copy can therefore be gigabytes even when the acceptance
+    manifest references only a small evidence closure.  Mapping is allocated
+    when a reference is actually read, so unreferenced files never enter the
+    published bundle.
+    """
 
     def __init__(self, run: Path, destination: Path, report: Path):
         self.run = run
         self.destination = destination
+        self.report = report.resolve()
         self.mapping: dict[Path, Path] = {}
         self.cache: dict[Path, bytes] = {}
-        for item in run.rglob("*"):
-            if item.is_symlink():
-                raise AssembleError(f"trusted output contains a symbolic link: {item.relative_to(run)}")
-            if item.is_file():
-                source = item.resolve()
-                target = destination / ("manifest.json" if source == report else "records" / source.relative_to(run))
-                self.mapping[source] = target
+        self.copied_bytes = 0
+
+    def _register(self, source: Path) -> Path:
+        source = regular_file(self.run, source, "evidence file")
+        target = self.mapping.get(source)
+        if target is None:
+            target = self.destination / ("manifest.json" if source == self.report else "records" / source.relative_to(self.run))
+            self.mapping[source] = target
+        return target
 
     def resolve_reference(self, base: Path, text: str) -> Path:
         if os.path.isabs(text):
@@ -270,8 +281,7 @@ class Rebasing:
             if not candidate.exists():
                 candidate = self.run / Path(*text.split("/"))
         source = regular_file(self.run, candidate, "evidence reference")
-        if source not in self.mapping:
-            raise AssembleError(f"referenced evidence was not archived: {text}")
+        self._register(source)
         return source
 
     def read_reference_json(self, reference: Any, base: Path) -> tuple[dict[str, Any], Path]:
@@ -288,15 +298,21 @@ class Rebasing:
 
     def write_source(self, source: Path) -> bytes:
         source = regular_file(self.run, source, "evidence file")
+        target = self._register(source)
         if source in self.cache:
             return self.cache[source]
-        target = self.mapping[source]
         if source.suffix.lower() == ".json":
             value, _ = load_json(source)
             value = self.rewrite(value, source.parent)
             data = (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
         else:
             data = source.read_bytes()
+        projected = self.copied_bytes + len(data)
+        if projected > MAX_BUNDLE_BYTES:
+            raise AssembleError(
+                f"assembled evidence exceeds {MAX_BUNDLE_BYTES} byte budget"
+            )
+        self.copied_bytes = projected
         self.cache[source] = data
         atomic_write(target, data)
         return data
@@ -313,7 +329,7 @@ class Rebasing:
             if digest(original) != value["sha256"]:
                 raise AssembleError(f"referenced evidence hash mismatch: {value['path']}")
             data = self.write_source(source)
-            result["path"] = self.mapping[source].relative_to(self.destination).as_posix()
+            result["path"] = self._register(source).relative_to(self.destination).as_posix()
             result["sha256"] = digest(data)
         return result
 
@@ -331,15 +347,17 @@ def assemble(journal: str | Path, output: str | Path) -> dict[str, Any]:
         raise AssembleError(f"refusing to overwrite existing bundle: {destination}")
     destination.mkdir(parents=True)
     try:
-        # The report path is used only to place the generated manifest at the
-        # bundle root; every referenced raw file is copied below records/.
+        # Only the evidence closure is copied below records/.  The raw CI
+        # report is an input to assembly and is replaced by the canonical
+        # manifest, so it is not retained as a second copy.
         rebasing = Rebasing(run, destination, run / "ci" / "result.json")
         seed, report = build_manifest(run, journal_value, rebasing)
-        rebasing.write_source(report)
         final = rebasing.rewrite(seed, report.parent)
         if not isinstance(final, dict):
             raise AssembleError("assembled manifest is not an object")
         data = (json.dumps(final, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        if rebasing.copied_bytes + len(data) > MAX_BUNDLE_BYTES:
+            raise AssembleError(f"assembled evidence exceeds {MAX_BUNDLE_BYTES} byte budget")
         atomic_write(destination / "manifest.json", data)
         atomic_write(destination / ".assemble-source", (marker + "\n").encode("ascii"))
         return final

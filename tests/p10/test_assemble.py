@@ -209,6 +209,16 @@ class AssembleTests(unittest.TestCase):
         self.assertFalse(Path(artifact["path"]).is_absolute())
         self.assertEqual(digest((self.output / artifact["path"]).read_bytes()), artifact["sha256"])
 
+    def test_unreferenced_large_run_file_is_not_archived(self) -> None:
+        large = self.run / "http" / "temporary" / "compiler-cache.bin"
+        large.parent.mkdir(parents=True)
+        with large.open("wb") as stream:
+            stream.truncate(assemble.MAX_BUNDLE_BYTES + 1)
+
+        assemble.assemble(self.factory.journal_path, self.output)
+
+        self.assertFalse((self.output / "records" / "http" / "temporary" / "compiler-cache.bin").exists())
+
     def test_failed_journal_is_rejected(self) -> None:
         journal = json.loads(self.factory.journal_path.read_text(encoding="utf-8"))
         journal["status"] = "FAILED"
