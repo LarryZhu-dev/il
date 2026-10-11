@@ -443,9 +443,26 @@ def _toolchain_identity() -> dict[str, Any]:
     lock = ROOT / "toolchain.lock"
     if not lock.is_file():
         raise ProducerError("toolchain.lock is missing")
+    try:
+        lock_data = json.loads(lock.read_text(encoding="utf-8"))
+        rust_version = lock_data["rust"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        raise ProducerError("toolchain.lock has no valid rust version")
     tools: dict[str, Any] = {"rustc": None, "llvm_config": None}
-    for key, executable, args in (("rustc", "rustc", ("--version",)), ("llvm_config", "llvm-config-14", ("--version",))):
-        path = Path(resolve_tool(executable))
+    target = lock_data.get("target")
+    rustup_home = os.environ.get("RUSTUP_HOME")
+    rustc_path = None
+    if isinstance(target, str) and rustup_home:
+        candidate = Path(rustup_home) / "toolchains" / f"{rust_version}-{target}" / "bin" / "rustc"
+        if candidate.is_file():
+            rustc_path = candidate.resolve()
+    if rustc_path is None:
+        candidate = Path(resolve_tool("rustc"))
+        if candidate.name == "rustup" or candidate.name == "rustc" and candidate.is_symlink():
+            raise ProducerError("locked rustc binary is unavailable without a rustup shim")
+        rustc_path = candidate
+    probes = (("rustc", rustc_path, ("--version",)), ("llvm_config", Path(resolve_tool("llvm-config-14")), ("--version",)))
+    for key, path, args in probes:
         probe = subprocess.run(
             [str(path), *args],
             cwd=ROOT,
@@ -461,7 +478,9 @@ def _toolchain_identity() -> dict[str, Any]:
             )
         version = probe.stdout.decode(errors="replace").strip()
         if not version:
-            raise ProducerError(f"reviewed tool probe returned no version: {executable}")
+            raise ProducerError(f"reviewed tool probe returned no version: {key}")
+        if key == "rustc" and not version.startswith(f"rustc {rust_version} "):
+            raise ProducerError(f"rustc version does not match toolchain.lock: {version}")
         tools[key] = {
             "path": str(path),
             "sha256": digest_file(path),
