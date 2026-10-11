@@ -211,7 +211,8 @@ impl Store {
         let relative = format!(".il/experiments/{}", &hash_bytes(&identity)[7..]);
         let directory = self.root.join(&relative);
         fs::create_dir_all(&directory)?;
-        for (name, bytes) in [("graph.json", graph.canonical_bytes()?), ("transaction.json", canonical_bytes(transaction)?), ("diagnostics.json", canonical_bytes(&diagnostics)?)] {
+        let transaction_bytes = canonical_bytes(transaction)?;
+        for (name, bytes) in [("graph.json", graph.canonical_bytes()?), ("transaction.json", transaction_bytes.clone()), ("request.json", transaction_bytes), ("diagnostics.json", canonical_bytes(&diagnostics)?)] {
             let path = directory.join(name);
             if path.exists() {
                 if fs::read(&path)? != bytes { return Err(StoreError::new("E_STATE_INCONSISTENT", "retained candidate content differs from its identity")); }
