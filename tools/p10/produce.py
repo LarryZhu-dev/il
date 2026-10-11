@@ -611,6 +611,7 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
             # resulting explicit records; it never promotes the CI summary.
             state["ci_records"] = _derive_ci_records(destination, state)
             state["http_records"] = _derive_http_records(destination, state)
+            state["reproducibility_records"] = _derive_reproducibility_records(destination, state)
             atomic_json(destination / "journal.json", state)
             # Export only explicit predicate records emitted by the trusted
             # commands.  This is an observational sidecar: a missing record
@@ -760,6 +761,26 @@ def _derive_http_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
         return {"status": "BLOCKED", "blocked_reasons": derived["blocked_reasons"]}
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError, KeyError, TypeError) as error:
         return {"status": "BLOCKED", "blocked_reasons": [str(error)]}
+
+
+def _derive_reproducibility_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Promote only the independent rebuild adapter's hash-bound observation."""
+    source = journal.get("source", {})
+    lock = journal.get("toolchain", {}).get("lock", {})
+    try:
+        from repro_records import derive_reproducible_hash
+        derived = derive_reproducible_hash(
+            run / "reproducibility" / "reproduction.json",
+            provenance={
+                "source_commit": source.get("commit"),
+                "target": TARGET,
+                "toolchain_lock_sha256": lock.get("sha256"),
+            },
+            output=run / "evidence" / "gates",
+        )
+        return {"status": derived["status"], "blocked_predicates": derived["blocked_predicates"]}
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, KeyError, TypeError) as error:
+        return {"status": "BLOCKED", "blocked_predicates": {"reproducible_hash": str(error)}}
 
 
 def publish_release(run_root: str | Path, release_root: str | Path) -> dict[str, Any]:
