@@ -105,6 +105,22 @@ def read_journal(path: Path) -> tuple[Path, dict[str, Any], bytes]:
         raise AssembleError("unsupported trusted run journal")
     if journal.get("status") != "COMPLETE":
         raise AssembleError("only a COMPLETE trusted run may be assembled")
+    gate_export = journal.get("gate_records")
+    if isinstance(gate_export, dict):
+        if gate_export.get("status") != "COMPLETE":
+            missing = gate_export.get("missing_predicates")
+            raise AssembleError(
+                "trusted run has incomplete explicit P10 gate records"
+                + (f": {missing}" if isinstance(missing, list) else "")
+            )
+        export_path = gate_export.get("path")
+        export_hash = gate_export.get("sha256")
+        if not isinstance(export_path, str) or not is_hash(export_hash):
+            raise AssembleError("trusted gate-record export reference is malformed")
+        canonical_relative(export_path, "gate-record export path")
+        export_file = regular_file(run, run / export_path, "gate-record export")
+        if digest(export_file.read_bytes()) != export_hash:
+            raise AssembleError("trusted gate-record export hash mismatch")
     source = journal.get("source")
     if (not isinstance(source, dict) or not is_commit(source.get("commit"))
             or not is_commit(source.get("tree")) or source.get("dirty") is True):

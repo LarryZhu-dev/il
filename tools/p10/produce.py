@@ -579,6 +579,19 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                     atomic_json(destination / "journal.json", state)
                     return state
             state.pop("active_command", None)
+            # Export only explicit predicate records emitted by the trusted
+            # commands.  This is an observational sidecar: a missing record
+            # keeps the run complete as an execution, while the exporter
+            # remains BLOCKED and the reducer still refuses publication.
+            from gate_records import export_gate_records
+            gate_export = export_gate_records(destination, output_root=destination / "gate_records")
+            atomic_json(destination / "gate_records" / "export.json", gate_export)
+            state["gate_records"] = {
+                "path": "gate_records/export.json",
+                "sha256": digest_file(destination / "gate_records" / "export.json"),
+                "status": gate_export["status"],
+                "missing_predicates": gate_export["missing_predicates"],
+            }
             state["status"] = "COMPLETE"
             state["finished_at"] = utc_now()
             atomic_json(destination / "journal.json", state)

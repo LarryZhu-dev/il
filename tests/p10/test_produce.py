@@ -120,6 +120,28 @@ class ProducerTests(unittest.TestCase):
             self.assertEqual((output / observation["stdout"]["path"]).read_bytes(), b"stdout evidence")
             self.assertEqual((output / observation["stderr"]["path"]).read_bytes(), b"stderr evidence")
 
+    def test_complete_run_retains_fail_closed_gate_export_sidecar(self):
+        with tempfile.TemporaryDirectory(prefix="il-p10-gate-export-") as name:
+            root = Path(name)
+            script = root / "ok.py"
+            script.write_text("print('ok')\n", encoding="utf-8")
+            output = root / "run"
+            spec = produce.CommandSpec("ok", (sys.executable, str(script)), 10, "controlled success")
+            source = {
+                "repository": str(root), "commit": "a" * 40, "tree": "b" * 40,
+                "dirty": False, "status": "",
+            }
+            with mock.patch.object(produce, "source_identity", return_value=source), \
+                    mock.patch.object(produce, "_toolchain_identity", return_value={"lock": {}, "tools": {}}), \
+                    mock.patch.object(produce, "_fixed_plan", return_value=(spec,)):
+                result = produce.run_plan(output, root=root)
+            self.assertEqual(result["status"], "COMPLETE")
+            export = json.loads((output / "gate_records" / "export.json").read_text(encoding="utf-8"))
+            self.assertEqual(export["status"], "BLOCKED")
+            self.assertTrue(export["missing_predicates"])
+            journal = json.loads((output / "journal.json").read_text(encoding="utf-8"))
+            self.assertEqual(journal["gate_records"]["status"], "BLOCKED")
+
     def test_dirty_checkout_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory(prefix="il-p10-dirty-") as name:
             root = Path(name)
