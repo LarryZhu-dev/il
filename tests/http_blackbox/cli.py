@@ -252,6 +252,84 @@ def captured_process_receipt(process,command,started,stdout,stderr,directory,rec
         if item['binding'] is not None:item['binding']['process_receipt']=artifact
     save_observations()
 
+HTTP_CASE_BINDINGS={
+    'health': lambda profile: profile+'/health',
+    'hello': lambda profile: profile+'/hello/Larry',
+    'not_found': lambda profile: profile+'/unknown',
+    'method_not_allowed': lambda profile: profile+':method',
+    'malformed_percent_encoding': lambda profile: profile+':percent',
+    'fragmented_request': lambda profile: profile+':fragmented',
+    'conflicting_content_length': lambda profile: profile+':conflict',
+    'oversized_request_line': lambda profile: profile+':immediate_line_limit',
+    'oversized_headers': lambda profile: profile+':header_limit',
+    'read_timeout': lambda profile: profile+':read_timeout',
+    'absolute_deadline': lambda profile: profile+':absolute_deadline',
+    'partial_write': lambda profile: profile+':partial_write',
+    'disconnect_recovery': lambda profile: profile+':after_disconnect',
+    'path_parameter_limit': lambda profile: profile+':long_parameter',
+    'transfer_encoding_rejected': lambda profile: profile+':transfer',
+}
+
+def _json_reference(path,base):
+    path=Path(path).resolve();base=Path(base).resolve()
+    return {'path':path.relative_to(base).as_posix(),'sha256':sha(path)}
+
+def _relative_artifact_refs(value,base):
+    if isinstance(value,dict):
+        result={key:_relative_artifact_refs(item,base) for key,item in value.items()}
+        path=result.get('path')
+        if isinstance(path,str) and Path(path).is_absolute():result['path']=Path(path).resolve().relative_to(Path(base).resolve()).as_posix()
+        return result
+    if isinstance(value,list):return [_relative_artifact_refs(item,base) for item in value]
+    return value
+
+def emit_http_receipts(report, report_path=None, case_ids=None):
+    """Materialize the locked 15x2 HTTP receipt matrix from raw observations.
+
+    Every row must point to a real exchange, process receipt, and policy file
+    bound by the exchange's native executable. Missing or duplicate mappings
+    are errors; no suite count or status is used to synthesize evidence.
+    """
+    if isinstance(report,(str,Path)):
+        report_path=Path(report);report=json.loads(report_path.read_text(encoding='utf-8'))
+    if report_path is None:report_path=REPORT
+    report_path=Path(report_path)
+    contract_path=ROOT/'tools'/'p10'/'contract.json'
+    contract_cases=tuple(case_ids or json.loads(contract_path.read_text(encoding='utf-8'))['http_cases'])
+    profiles=('debug','release')
+    by_id={row['id']:row for row in RECORDS}
+    refs=[];matrix=[];seen=set()
+    destination=report_path.parent/'http-receipts'/'canonical';destination.mkdir(parents=True,exist_ok=True)
+    for profile in profiles:
+        for case_id in contract_cases:
+            key=(case_id,profile)
+            if key in seen:raise AssertionError(f'duplicate HTTP case mapping: {key}')
+            resolver=HTTP_CASE_BINDINGS.get(case_id)
+            if resolver is None:raise AssertionError(f'no explicit HTTP case mapping: {case_id}')
+            row=by_id.get(resolver(profile))
+            if row is None:raise AssertionError(f'missing HTTP exchange for {case_id}/{profile}')
+            exchange=next((item for item in EXCHANGES if item.get('id')==row.get('exchange_id')),None)
+            binding=exchange.get('binding') if exchange else None
+            if exchange is None or not isinstance(binding,dict) or not binding.get('process_receipt'):
+                raise AssertionError(f'HTTP exchange is not bound to a completed server process: {case_id}/{profile}')
+            if binding.get('profile')!=profile:raise AssertionError(f'HTTP profile mismatch: {case_id}/{profile}')
+            exchange_value=dict(exchange);exchange_value.pop('binding',None);exchange_value['schema_version']='1.0.0';exchange_value['kind']='tcp_exchange';exchange_value['exchange_id']=exchange_value.pop('id')
+            exchange_value=_relative_artifact_refs(exchange_value,report_path.parent)
+            exchange_path=destination/f'{profile}-{case_id}-exchange.json';write_json(exchange_path,exchange_value)
+            process_ref=binding['process_receipt'];policy_ref=binding['policy']
+            process_value=json.loads(Path(process_ref['path']).read_text(encoding='utf-8'))
+            process_value=_relative_artifact_refs(process_value,report_path.parent)
+            process_path=destination/f'{profile}-{case_id}-process.json';write_json(process_path,process_value)
+            assertions=exchange_value.get('assertions')
+            if not isinstance(assertions,list) or not assertions or not all(item.get('passed') is True for item in assertions):
+                raise AssertionError(f'HTTP exchange assertions are incomplete: {case_id}/{profile}')
+            receipt={'schema_version':'1.0.0','kind':'http_exchange','case_id':case_id,'client':'external_tcp','executable_role':'application_'+profile,'profile':profile,'contract_sha256':binding['contract_sha256'],'exchange':_json_reference(exchange_path,report_path.parent),'process':_json_reference(process_path,report_path.parent),'policy':_json_reference(policy_ref['path'],report_path.parent),'assertions':assertions}
+            receipt_path=destination/f'{profile}-{case_id}-receipt.json';write_json(receipt_path,receipt)
+            reference=_json_reference(receipt_path,report_path.parent);refs.append(reference);matrix.append({'id':case_id,'profile':profile,'exit_code':0,'count':1,'receipt':reference});seen.add(key)
+    required={(case,profile) for case in contract_cases for profile in profiles}
+    if seen!=required:raise AssertionError(f'HTTP case/profile matrix incomplete: {sorted(required-seen)}')
+    report['receipt_refs']=refs;report['http_receipts']=matrix;report['http']={'client':'external_tcp','cases':matrix}
+
 class HttpAcceptance(unittest.TestCase):
     def test_external_client_has_no_internal_http_imports(self):
         self.assertEqual(internal_http_imports(),[])
@@ -337,6 +415,13 @@ class HttpAcceptance(unittest.TestCase):
                             self.assertIsNone(process.poll());self.assertLess(time.monotonic()-started,write_seconds+4);time.sleep(.05)
                         self.assertGreater(time.monotonic()-started,write_seconds-.5)
                     exchange(request('/large'),mode='slow_reader',observe=wait_for_write_timeout)
+                    if LAST_EXCHANGE is None or LAST_EXCHANGE['terminal']!='client_close_without_read':
+                        raise AssertionError('Partial-write exchange did not retain the slow-reader terminal event')
+                    LAST_EXCHANGE['assertions']=[
+                        {'id':'slow_reader_closed_without_response_read','passed':LAST_EXCHANGE['response_read'] is False},
+                        {'id':'server_write_timeout_observed','passed':b'E_HTTP_WRITE_TIMEOUT' in (directory/'stderr.log').read_bytes()[before:]},
+                    ]
+                    save_observations()
                     wire,elapsed=exchange(request('/health'));self.record(profile+':after_write_timeout',wire,elapsed,health['status'])
                     logs=(directory/'stderr.log').read_text();self.assertIn('E_HTTP_REQUEST_FAILED',logs);self.assertIn('E_HTTP_WRITE_TIMEOUT',logs)
                     for line in logs.splitlines():self.assertIn('code',json.loads(line))
@@ -477,6 +562,12 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--binary',type=Path,required=True);parser.add_argument('--report',type=Path,required=True);args=parser.parse_args();REPORT=args.report.resolve();graph_cli.BINARY=args.binary.resolve()
     report={'suite':'http_external_blackbox','state':'RUNNING','passed':False,'contract_sha256':sha(ROOT/'spec/http.yaml'),'cases':[]};write_json(REPORT,report)
     result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(HttpAcceptance))
-    for row in RECORDS:row['validation']='suite_passed' if result.wasSuccessful() else 'suite_failed'
-    report.update(state='PASSED' if result.wasSuccessful() else 'FAILED',passed=result.wasSuccessful(),count=result.testsRun,cases=RECORDS,exchanges=EXCHANGES,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=[{'test':str(t),'traceback':s} for t,s in result.errors]);write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k not in ('cases','exchanges')}));return 0 if result.wasSuccessful() else 1
+    receipt_error=None
+    if result.wasSuccessful():
+        try:emit_http_receipts(REPORT)
+        except (AssertionError,KeyError,TypeError,ValueError,OSError) as error:receipt_error=str(error)
+    for row in RECORDS:row['validation']='suite_passed' if result.wasSuccessful() and receipt_error is None else 'suite_failed'
+    if receipt_error:report.setdefault('errors',[]).append({'test':'emit_http_receipts','traceback':receipt_error})
+    passed=result.wasSuccessful() and receipt_error is None
+    report.update(state='PASSED' if passed else 'FAILED',passed=passed,count=result.testsRun,cases=RECORDS,exchanges=EXCHANGES,failures=[{'test':str(t),'traceback':s} for t,s in result.failures],errors=report.get('errors',[])+[{'test':str(t),'traceback':s} for t,s in result.errors]);write_json(REPORT,report);print(json.dumps({k:v for k,v in report.items() if k not in ('cases','exchanges')}));return 0 if passed else 1
 if __name__=='__main__':raise SystemExit(main())

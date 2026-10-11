@@ -287,7 +287,12 @@ def check_http_exchange(reader: BundleReader, value: Any, *, path: str, contract
     require(type(value["response_read"]) is bool, "response_read must be boolean", path=path)
     require(value["response_read"] == (value["mode"] == "request_response"), "response_read differs from exchange mode", path=path)
     require(value["error"] is None and value["terminal"] != "error", "HTTP acceptance exchange failed", path=path)
-    require(type(value["status"]) is int and 100 <= value["status"] <= 599 and isinstance(value["headers"], dict), "invalid HTTP response metadata", path=path)
+    if value["response_read"]:
+        require(type(value["status"]) is int and 100 <= value["status"] <= 599 and isinstance(value["headers"], dict), "invalid HTTP response metadata", path=path)
+    else:
+        require(value["mode"] == "slow_reader" and value["terminal"] == "client_close_without_read"
+                and value["status"] is None and value["headers"] == {},
+                "unread HTTP response is not a locked slow-reader exchange", path=path)
     read_byte_ref(reader, value["body"], path=f"{path}.body")
     require(isinstance(value["assertions"], list) and value["assertions"], "exchange assertions are empty", path=path)
     for assertion in value["assertions"]:
@@ -436,6 +441,15 @@ def check_gate_record(
             for assertion in assertions:
                 row = exact_fields(assertion, {"id", "passed"}, path=f"{path}.http.{identity}.{profile}.assertions")
                 require(nonempty_string(row["id"], path=path) and row["passed"] is True, "HTTP receipt assertion failed", path=path)
+            if identity == "partial_write" and exchange["mode"] == "slow_reader":
+                require(exchange["mode"] == "slow_reader" and exchange["response_read"] is False
+                        and exchange["terminal"] == "client_close_without_read",
+                        "partial-write case lacks the real slow-reader exchange", path=path)
+                stderr, _ = read_byte_ref(reader, process["stderr"], path=f"{path}.http.partial_write.{profile}.process.stderr")
+                assertion_ids = {item["id"] for item in assertions}
+                require(b"E_HTTP_WRITE_TIMEOUT" in stderr
+                        and {"slow_reader_closed_without_response_read", "server_write_timeout_observed"}.issubset(assertion_ids),
+                        "partial-write receipt does not bind observed server timeout and client behavior", path=path)
             seen.add(key)
         required = {(case, profile) for case in contract["http_cases"] for profile in contract["required_http_profiles"]}
         missing_cases = sorted(required - seen)

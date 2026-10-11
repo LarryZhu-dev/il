@@ -164,5 +164,50 @@ class HttpReceiptTests(unittest.TestCase):
         self.assertEqual(CLI.RECORDS[0]['validation'],'observed_pending_suite')
         self.assertFalse(json.loads(CLI.REPORT.read_text())['passed'])
 
+    def test_p10_receipt_matrix_is_explicit_and_hash_referenced(self):
+        report=self.root/'http_report.json';CLI.REPORT=report
+        contract=json.loads((CLI.ROOT/'tools/p10/contract.json').read_text())
+        for profile in contract['required_http_profiles']:
+            policy=self.root/f'{profile}-policy.json';policy.write_text('{}')
+            process=self.root/f'{profile}-process.json';process.write_text('{}')
+            binding={'profile':profile,'contract_sha256':'sha256:'+'a'*64,
+                     'process_receipt':CLI.artifact_file(process),
+                     'policy':{'path':str(policy),'sha256':CLI.sha(policy)}}
+            for case_id,resolver in CLI.HTTP_CASE_BINDINGS.items():
+                identity=resolver(profile)
+                exchange={'id':f'exchange-{len(CLI.EXCHANGES)}','phase':'case','peer':['127.0.0.1',8080],
+                          'started_ns':1,'ended_ns':2,'elapsed_ns':1,'timeout_seconds':8,
+                          'planned_fragments':[CLI.artifact_bytes(b'x')],'requested_delays_ns':[0],
+                          'request':CLI.artifact_bytes(b'x'),'response':CLI.artifact_bytes(b'y'),
+                          'events':[{'direction':'send','fragment_index':0,'timestamp_ns':1,'bytes':CLI.artifact_bytes(b'x')},
+                                    {'direction':'receive','timestamp_ns':2,'bytes':CLI.artifact_bytes(b'y')}],
+                          'terminal':'eof','error':None,'binding':binding,'mode':'request_response',
+                          'response_read':True,'status':200,'headers':{},'body':CLI.artifact_bytes(b'y'),
+                          'assertions':[{'id':'expected_status','passed':True}]}
+                CLI.EXCHANGES.append(exchange)
+                CLI.RECORDS.append({'id':identity,'exchange_id':exchange['id']})
+        report.write_text('{}')
+        output=json.loads(report.read_text())
+        supported=[case for case in contract['http_cases'] if case in CLI.HTTP_CASE_BINDINGS]
+        CLI.emit_http_receipts(output,report,supported)
+        self.assertEqual(len(output['receipt_refs']),30)
+        self.assertEqual(len(output['http']['cases']),30)
+        receipt_ref=output['receipt_refs'][0]
+        self.assertEqual(set(receipt_ref),{'path','sha256'})
+        receipt=json.loads((report.parent/receipt_ref['path']).read_text())
+        self.assertEqual(receipt['kind'],'http_exchange')
+        exchange_ref=receipt['exchange']
+        exchange=json.loads((report.parent/exchange_ref['path']).read_text())
+        self.assertEqual(exchange['kind'],'tcp_exchange')
+        self.assertIn('exchange_id',exchange);self.assertNotIn('binding',exchange)
+        with self.assertRaisesRegex(AssertionError,'no explicit HTTP case mapping'):
+            CLI.emit_http_receipts({},report,['unknown'])
+
+    def test_p10_receipt_producer_fails_closed_on_unmapped_contract_case(self):
+        report=self.root/'http_report.json';CLI.REPORT=report
+        CLI.EXCHANGES.clear();CLI.RECORDS.clear()
+        with self.assertRaisesRegex(AssertionError,'missing HTTP exchange'):
+            CLI.emit_http_receipts({},report)
+
 
 if __name__=='__main__':unittest.main()
