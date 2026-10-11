@@ -51,6 +51,8 @@ class TextCliAcceptance(unittest.TestCase):
     setUp = graph_cli.GraphCliAcceptance.setUp
     git = graph_cli.GraphCliAcceptance.git
     invoke_raw = graph_cli.GraphCliAcceptance.invoke_raw
+    _record_raw_observation = graph_cli.GraphCliAcceptance._record_raw_observation
+    _store_snapshot_records = graph_cli.GraphCliAcceptance._store_snapshot_records
     invoke = graph_cli.GraphCliAcceptance.invoke
     assert_code = graph_cli.GraphCliAcceptance.assert_code
     head_revision = graph_cli.GraphCliAcceptance.head_revision
