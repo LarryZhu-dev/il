@@ -94,6 +94,33 @@ class DeriveRecordsTests(unittest.TestCase):
         self.assertNotIn("inspect_succeeds", result["records"])
         self.assertIn("inspect_succeeds", result["blocked_predicates"])
 
+    def test_ai_protocol_route_record_binds_raw_request_to_measured_ci_command(self):
+        route = {"entity_id": "route.hello", "method": "GET", "path": "/hello/{name}",
+                 "handler": "hello", "parameters": [{"name": "name", "type_ref": "String",
+                    "source": "path", "max_utf8_bytes": 128}]}
+        request = {"task_id": "P08-route", "base_revision": 4, "operations": [
+            {"op": "add_route", "route_table_id": "server", "route": route}]}
+        ai = {"cases": [{"id": "route-transaction", "passed": True, "steps": [{
+            "tool": "transact", "exit_code": 0, "request": request,
+            "result": {"response": {"ok": True, "result_revision": 5}},
+        }]}]}
+        ci = {"gates": [{"name": "ai-protocol-cli", "status": "PASSED", "exit_code": 0,
+                         "elapsed_seconds": 1.25, "command": ["python", "tests/ai_protocol_cli.py"]}]}
+        graph = {"raw_observations": []}
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            paths = [root / "graph.json", root / "ai.json", root / "ci.json"]
+            for path, value in zip(paths, (graph, ai, ci)):
+                path.write_text(json.dumps(value), encoding="utf-8")
+            result = derive_records.derive_records(paths[0], {
+                "source_commit": "a" * 40, "target": "x86_64-unknown-linux-gnu",
+                "toolchain_lock_sha256": "sha256:" + "b" * 64,
+            }, ai_report=paths[1], ci_report=paths[2])
+        record = result["records"]["transaction_add_route_succeeds"]
+        self.assertEqual(record["command_id"], "ai-protocol-cli")
+        self.assertEqual(record["duration_ns"], 1_250_000_000)
+        self.assertEqual(record["transaction"]["result_revision"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

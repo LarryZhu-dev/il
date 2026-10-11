@@ -592,6 +592,8 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                         {"source_commit": source["commit"], "target": contract.get("target"),
                          "toolchain_lock_sha256": state["toolchain"]["lock"]["sha256"]},
                         output=destination / "evidence" / "gates",
+                        ai_report=destination / "build" / "ai_protocol_cli_report.json",
+                        ci_report=destination / "build" / "ci" / "result.json",
                     )
                     state["predicate_records"] = {
                         "status": derived["status"],

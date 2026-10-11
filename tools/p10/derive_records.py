@@ -113,7 +113,9 @@ def _matching(rows: Iterable[dict[str, Any]], tag: str) -> list[dict[str, Any]]:
 
 
 def derive_records(report: str | Path, provenance: dict[str, Any], *, output: str | Path | None = None,
-                   graph_artifact: dict[str, Any] | None = None) -> dict[str, Any]:
+                   graph_artifact: dict[str, Any] | None = None,
+                   ai_report: str | Path | None = None,
+                   ci_report: str | Path | None = None) -> dict[str, Any]:
     """Return only predicates directly attested by ``raw_observations``.
 
     ``graph_artifact`` is optional because local graph acceptance does not
@@ -141,8 +143,18 @@ def derive_records(report: str | Path, provenance: dict[str, Any], *, output: st
     add("slice_succeeds", _matching(rows, "slice_succeeds"), lambda record, selected: None)
     add("stale_transaction_rejected", _matching(rows, "stale_transaction_rejected"),
         lambda record, selected: record.update({"transaction": _stale_binding(selected[-1])}))
-    add("transaction_add_route_succeeds", _route_rows(rows),
-        lambda record, selected: record.update({"transaction": _route_binding(selected[-1])}))
+    route_rows = _route_rows(rows)
+    if route_rows:
+        add("transaction_add_route_succeeds", route_rows,
+            lambda record, selected: record.update({"transaction": _route_binding(selected[-1])}))
+    elif ai_report is not None and ci_report is not None:
+        route = _ai_route_record(Path(ai_report), Path(ci_report), provenance)
+        if route is None:
+            blocked["transaction_add_route_succeeds"] = "AI protocol report has no successful raw /hello/{name} transaction"
+        else:
+            records["transaction_add_route_succeeds"] = route
+    else:
+        blocked["transaction_add_route_succeeds"] = "raw observations do not attest predicate"
     add("diagnostics_machine_readable", _diagnostic_rows(rows),
         lambda record, selected: record.update({"diagnostics": _diagnostics(selected)}))
     if graph_artifact is not None:
@@ -167,6 +179,62 @@ def derive_records(report: str | Path, provenance: dict[str, Any], *, output: st
             json.dumps({k: v for k, v in result.items() if k != "records"}, ensure_ascii=False,
                        sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return result
+
+
+def _ai_route_record(ai_report: Path, ci_report: Path, provenance: dict[str, Any]) -> dict[str, Any] | None:
+    """Bind the actual route request/response to the measured fixed CI subcommand."""
+    try:
+        report = json.loads(ai_report.read_text(encoding="utf-8"))
+        ci = json.loads(ci_report.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise DeriveError(f"cannot read AI route evidence: {error}") from error
+    gates = ci.get("gates") if isinstance(ci, dict) else None
+    gate = next((row for row in gates or [] if isinstance(row, dict) and row.get("name") == "ai-protocol-cli"), None)
+    if (not isinstance(gate, dict) or gate.get("status") != "PASSED" or gate.get("exit_code") != 0
+            or type(gate.get("elapsed_seconds")) not in (int, float)
+            or gate["elapsed_seconds"] <= 0 or not isinstance(gate.get("command"), list)):
+        return None
+    selected = None
+    for case in report.get("cases", []) if isinstance(report, dict) else []:
+        if not isinstance(case, dict) or case.get("passed") is not True:
+            continue
+        for step in case.get("steps", []):
+            if not isinstance(step, dict) or step.get("tool") != "transact" or step.get("exit_code") != 0:
+                continue
+            request = step.get("request")
+            response = (step.get("result") or {}).get("response")
+            if not isinstance(request, dict) or not isinstance(response, dict) or response.get("ok") is not True:
+                continue
+            operation = next((item for item in request.get("operations", [])
+                              if isinstance(item, dict) and item.get("op") == "add_route"
+                              and isinstance(item.get("route"), dict)
+                              and item["route"].get("path") == ROUTE_PATH), None)
+            if operation is not None:
+                selected = (request, response, operation["route"])
+                break
+        if selected:
+            break
+    if selected is None:
+        return None
+    request, response, route = selected
+    base, result = request.get("base_revision"), response.get("result_revision")
+    if not (type(base) is int and type(result) is int and result == base + 1):
+        return None
+    argv = gate["command"]
+    if not argv or not all(isinstance(item, str) for item in argv):
+        return None
+    predicate = "transaction_add_route_succeeds"
+    return {
+        "schema_version": "1.0.0", "kind": "p10_gate_record", "predicate": predicate,
+        "source_commit": provenance["source_commit"], "target": provenance["target"],
+        "toolchain_lock_sha256": provenance["toolchain_lock_sha256"], "status": "PASSED",
+        "command_id": "ai-protocol-cli", "argv_sha256": digest(canonical(argv)),
+        "exit_code": gate["exit_code"], "duration_ns": round(gate["elapsed_seconds"] * 1_000_000_000),
+        "test_suite": {"id": "ai_protocol_cli", "exit_code": gate["exit_code"], "count": 1},
+        "artifacts": [], "assertions": [{"id": predicate, "passed": True}],
+        "transaction": {"base_revision": base, "result_revision": result,
+                         "route_path": ROUTE_PATH, "route_sha256": digest(canonical(route))},
+    }
 
 
 def _stale_binding(row: dict[str, Any]) -> dict[str, Any]:
