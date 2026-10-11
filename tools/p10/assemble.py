@@ -273,8 +273,17 @@ class Rebasing:
         return target
 
     def resolve_reference(self, base: Path, text: str) -> Path:
-        if os.path.isabs(text):
+        if os.path.isabs(text) or PurePosixPath(text.replace("\\", "/")).is_absolute():
             candidate = Path(text)
+            # Reports are produced in a locked container and may retain its
+            # absolute `/workspace/.../<run-name>/...` spelling.  Rebase only
+            # that path form to this trusted local run; arbitrary absolute
+            # paths remain rejected by regular_file below.
+            parts = PurePosixPath(text.replace("\\", "/")).parts
+            run_name = self.run.name
+            if run_name in parts:
+                suffix = parts[parts.index(run_name) + 1:]
+                candidate = self.run.joinpath(*suffix)
         else:
             canonical_relative(text, "evidence reference path")
             candidate = base / Path(*text.split("/"))

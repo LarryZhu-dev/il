@@ -268,6 +268,19 @@ class AssembleTests(unittest.TestCase):
         self.assertFalse(Path(reference["path"]).is_absolute())
         self.assertEqual(digest((self.output / reference["path"]).read_bytes()), reference["sha256"])
 
+    def test_container_absolute_reference_rebases_by_trusted_run_name(self) -> None:
+        source = self.run / "http" / "receipt.json"
+        data = write_json(source, {"kind": "http_receipt", "passed": True})
+        manifest = self._manifest()
+        manifest["predicates"][PREDICATES[0]] = {
+            "path": f"/workspace/build/p10/{self.run.name}/http/receipt.json",
+            "sha256": digest(data),
+        }
+        self._write_manifest(manifest)
+        result = assemble.assemble(self.factory.journal_path, self.output)
+        reference = result["predicates"][PREDICATES[0]]
+        self.assertEqual(digest((self.output / reference["path"]).read_bytes()), reference["sha256"])
+
     @unittest.skipUnless(hasattr(Path, "symlink_to"), "symlink support unavailable")
     def test_symbolic_link_in_trusted_run_is_rejected(self) -> None:
         target = self.run / "real.json"
