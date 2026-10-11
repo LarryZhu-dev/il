@@ -18,6 +18,7 @@ import platform
 import socket
 import shutil
 import signal
+import signal
 import subprocess
 import sys
 import tarfile
@@ -220,6 +221,8 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
     process = None
     response = b""
     startup_error = None
+    cleanup_intent = None
+    cleanup_reaped = False
     argv = [str(executable)]
     child_env: dict[str, str] = {}
     try:
@@ -281,11 +284,14 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
                     time.sleep(0.02)
             if process.poll() is None:
                 process.send_signal(signal.SIGTERM)
+                cleanup_intent = "SIGTERM_after_health"
             try:
                 process.wait(timeout=5)
+                cleanup_reaped = process.poll() is not None
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+                cleanup_reaped = process.poll() is not None
                 startup_error = startup_error or "application required SIGKILL during cleanup"
         exit_code = process.returncode
     except OSError as error:
@@ -313,7 +319,9 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
         "started_monotonic_ns": started,
         "elapsed_ns": elapsed,
         "exit_code": exit_code,
-        "termination_signal": f"SIG{-exit_code}" if isinstance(exit_code, int) and exit_code < 0 else None,
+        "termination_signal": signal.Signals(-exit_code).name if isinstance(exit_code, int) and exit_code < 0 else None,
+        "cleanup_intent": cleanup_intent,
+        "cleanup_reaped": cleanup_reaped,
         "stdout_sha256": sha_bytes(stdout),
         "stderr_sha256": sha_bytes(stderr),
         "executable_sha256": sha_file(executable),

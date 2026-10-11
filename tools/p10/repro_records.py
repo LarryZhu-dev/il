@@ -139,7 +139,9 @@ def _root_record(root: Path, report_root: Path, row: Any, label: str, expected_t
     execution = app.get("execution")
     if (not isinstance(execution, dict) or execution.get("clean_environment") is not True
             or execution.get("health_check_passed") is not True or execution.get("error") is not None
-            or execution.get("exit_code") != 0 or execution.get("termination_signal") is not None):
+            or execution.get("termination_signal") != "SIGTERM"
+            or execution.get("cleanup_intent") != "SIGTERM_after_health"
+            or execution.get("cleanup_reaped") is not True):
         raise ReproductionRecordError(f"{label} native application did not pass its clean-environment health execution")
     exe = app["artifacts"].get("executable")
     if not isinstance(exe, dict) or execution.get("executable_sha256") != exe.get("sha256"):

@@ -48,7 +48,8 @@ class ReproRecordsTests(unittest.TestCase):
             argv = ["/locked/bin/cargo", "build", "--workspace", "--release", "--locked"]
             execution = {
                 "clean_environment": True, "health_check_passed": True, "error": None,
-                "exit_code": 0, "termination_signal": None,
+                "exit_code": -15, "termination_signal": "SIGTERM",
+                "cleanup_intent": "SIGTERM_after_health", "cleanup_reaped": True,
                 "executable_sha256": executable["sha256"],
             }
             root_hashes = {"compiler": compiler["sha256"], "runtime": runtime["sha256"],
