@@ -222,6 +222,14 @@ def main(argv: list[str] | None = None) -> int:
             environment = {"PATH": os.environ.get("PATH", ""), "CARGO_TARGET_DIR": str(target), "CARGO_NET_OFFLINE": "true", "LC_ALL": "C", "LANG": "C", "SOURCE_DATE_EPOCH": "946684800", **toolchain_environment}
             toolchain_bin = str(Path(cargo_command[0]).parent)
             environment["PATH"] = toolchain_bin + os.pathsep + environment["PATH"]
+            # Bootstrap outputs must not encode the independent checkout path or
+            # linker-generated build identity. Both roots use the same stable
+            # logical path and ELF layout so their hashes attest the same inputs.
+            environment["RUSTFLAGS"] = (
+                f"--remap-path-prefix={source}=il/source "
+                f"--remap-path-prefix={root}=il/root "
+                "-C link-arg=-Wl,--build-id=none"
+            )
             if cargo_home:
                 environment["CARGO_HOME"] = cargo_home
             build_log = root / "cargo-build.log"
