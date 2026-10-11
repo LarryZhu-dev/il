@@ -18,7 +18,8 @@ class ReproduceExecutionTests(unittest.TestCase):
             executable = root / "application.elf"
             executable.write_text(
                 "#!" + sys.executable + "\n"
-                "import signal, socket\n"
+                "import os, signal, socket\n"
+                "assert os.read(4, 16) == b'{\\\"grant\\\":true}'\n"
                 "def stop(*_): raise SystemExit(0)\n"
                 "signal.signal(signal.SIGTERM, stop)\n"
                 "with socket.socket() as server:\n"
@@ -33,7 +34,7 @@ class ReproduceExecutionTests(unittest.TestCase):
             )
             executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
             policy = root / "policy.json"
-            policy.write_text("{}\n", encoding="utf-8")
+            policy.write_text('{"grant":true}', encoding="utf-8")
 
             receipt = execute_application(executable, policy, root / "execution", timeout=3)
 

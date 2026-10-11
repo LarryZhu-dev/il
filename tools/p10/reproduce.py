@@ -9,6 +9,7 @@ caller.  A failed root keeps its logs and partial hashes for diagnosis.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -206,6 +207,7 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
     request = b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
     started = time.monotonic_ns()
     descriptor = None
+    saved_policy_slot = None
     process = None
     response = b""
     startup_error = None
@@ -217,23 +219,32 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
             probe.bind(("127.0.0.1", 8080))
         with policy.open("rb") as policy_stream:
             descriptor = fcntl.fcntl(policy_stream.fileno(), fcntl.F_DUPFD_CLOEXEC, 10)
-
-        def install_policy_fd() -> None:
-            os.dup2(descriptor, 4)
-            os.set_inheritable(4, True)
+        try:
+            saved_policy_slot = fcntl.fcntl(4, fcntl.F_DUPFD_CLOEXEC, 20)
+        except OSError as error:
+            if error.errno != errno.EBADF:
+                raise
+        os.dup2(descriptor, 4, inheritable=True)
 
         with stdout_path.open("wb") as stdout_stream, stderr_path.open("wb") as stderr_stream:
-            process = subprocess.Popen(
-                argv,
-                cwd=directory,
-                env=child_env,
-                stdin=subprocess.DEVNULL,
-                stdout=stdout_stream,
-                stderr=stderr_stream,
-                close_fds=True,
-                pass_fds=(descriptor,),
-                preexec_fn=install_policy_fd,
-            )
+            try:
+                process = subprocess.Popen(
+                    argv,
+                    cwd=directory,
+                    env=child_env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=stdout_stream,
+                    stderr=stderr_stream,
+                    close_fds=True,
+                    pass_fds=(4,),
+                )
+            finally:
+                if saved_policy_slot is None:
+                    os.close(4)
+                else:
+                    os.dup2(saved_policy_slot, 4, inheritable=False)
+                    os.close(saved_policy_slot)
+                    saved_policy_slot = None
             deadline = time.monotonic() + timeout
             while True:
                 if process.poll() is not None:
@@ -272,6 +283,9 @@ def execute_application(executable: Path, policy: Path, directory: Path, timeout
         startup_error = str(error)
         exit_code = process.returncode if process is not None else None
     finally:
+        if saved_policy_slot is not None:
+            os.dup2(saved_policy_slot, 4, inheritable=False)
+            os.close(saved_policy_slot)
         if descriptor is not None:
             os.close(descriptor)
 
