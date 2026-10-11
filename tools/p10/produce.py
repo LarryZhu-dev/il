@@ -579,6 +579,30 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                     atomic_json(destination / "journal.json", state)
                     return state
             state.pop("active_command", None)
+            # Materialize only predicate records proved by captured raw graph
+            # observations.  The adapter remains fail-closed and records
+            # skipped predicates for the gate exporter.
+            try:
+                from derive_records import derive_records
+                graph_report = destination / "build" / "graph_cli_report.json"
+                if graph_report.is_file():
+                    contract = json.loads((ROOT / "tools" / "p10" / "contract.json").read_text(encoding="utf-8"))
+                    derived = derive_records(
+                        graph_report,
+                        {"source_commit": source["commit"], "target": contract.get("target"),
+                         "toolchain_lock_sha256": state["toolchain"]["lock"]["sha256"]},
+                        output=destination / "evidence" / "gates",
+                    )
+                    state["predicate_records"] = {
+                        "status": derived["status"],
+                        "blocked_predicates": sorted(derived["blocked_predicates"]),
+                    }
+                else:
+                    state["predicate_records"] = {
+                        "status": "BLOCKED", "blocked_predicates": ["graph_observations_missing"]}
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                state["predicate_records"] = {"status": "BLOCKED", "error": str(error)}
+            atomic_json(destination / "journal.json", state)
             # Export only explicit predicate records emitted by the trusted
             # commands.  This is an observational sidecar: a missing record
             # keeps the run complete as an execution, while the exporter

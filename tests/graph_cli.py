@@ -71,7 +71,6 @@ def transaction(base=0, entity_id="app", path="app"):
         "required_checks": ["schema", "names"],
     }
 
-
 class GraphCliAcceptance(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="il-graph-blackbox-")
@@ -145,6 +144,7 @@ class GraphCliAcceptance(unittest.TestCase):
         write_json(self.bindings, journal)
 
     def invoke_raw(self, command, request_text, expect_ok=True):
+        started_ns = __import__("time").monotonic_ns()
         completed = subprocess.run(
             [str(BINARY), "--repository", str(self.repository),
              "--store", str(self.store), command],
@@ -155,7 +155,8 @@ class GraphCliAcceptance(unittest.TestCase):
             response = json.loads(completed.stdout)
         except ValueError as error:
             self.fail(f"CLI emitted non-JSON stdout: {completed.stdout!r}; stderr={completed.stderr!r}: {error}")
-        self._record_raw_observation(command, request_text, completed, response, expect_ok)
+        self._record_raw_observation(command, request_text, completed, response, expect_ok,
+                                     __import__("time").monotonic_ns() - started_ns)
         self.assertEqual(set(response), ENVELOPE)
         self.assertEqual(response["tool"], command)
         self.assertIs(response["ok"], expect_ok, response)
@@ -189,7 +190,8 @@ class GraphCliAcceptance(unittest.TestCase):
             records.append({"path": relative, "bytes": retained_bytes(data)})
         return records
 
-    def _record_raw_observation(self, command, request_text, completed, response, expect_ok):
+    def _record_raw_observation(self, command, request_text, completed, response, expect_ok,
+                                duration_ns):
         request_bytes = request_text.encode("utf-8")
         response_bytes = completed.stdout.encode("utf-8")
         result = response.get("result") if isinstance(response, dict) else None
@@ -232,6 +234,7 @@ class GraphCliAcceptance(unittest.TestCase):
                 "argv": [str(BINARY), "--repository", str(self.repository), "--store", str(self.store), command],
                 "exit_code": completed.returncode,
                 "stderr": retained_bytes(completed.stderr.encode("utf-8")),
+                "duration_ns": duration_ns,
             },
             "binding": {
                 "base_revision": response.get("base_revision"),
