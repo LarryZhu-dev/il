@@ -194,6 +194,15 @@ def build_application(root: Path, compiler: Path, directory: Path, log: Path) ->
             continue
         path = Path(artifact["path"])
         result["artifacts"][name] = {"path": str(path), "sha256": sha_file(path), "size_bytes": path.stat().st_size}
+    graph_path = store / ".il" / "revisions" / "00000000000000000001" / "graph.json"
+    if not graph_path.is_file():
+        raise ReproductionError(f"application graph artifact is missing: {graph_path}")
+    result["artifacts"]["graph"] = {"path": str(graph_path), "sha256": sha_file(graph_path), "size_bytes": graph_path.stat().st_size}
+    result["build_invocation_sha256"] = sha_bytes(json.dumps(build_request, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    result["graph_revision"] = build_request["revision"]
+    result["runtime_profile"] = build_request["runtime_profile"]
+    result["profile"] = build_request["profile"]
+    result["entry_point"] = "demo.serve"
     return result
 
 
@@ -339,6 +348,9 @@ def main(argv: list[str] | None = None) -> int:
             source = root / "source"
             materialized = materialize(ROOT, source)
             target = root / "target"
+            target_empty_before_build = not target.exists()
+            if not target_empty_before_build:
+                raise ReproductionError(f"{label} target store was not absent before build: {target}")
             cargo_home = os.environ.get("CARGO_HOME")
             cargo_command, toolchain_environment = locked_cargo_environment()
             environment = {"PATH": os.environ.get("PATH", ""), "CARGO_TARGET_DIR": str(target), "CARGO_NET_OFFLINE": "true", "LC_ALL": "C", "LANG": "C", "SOURCE_DATE_EPOCH": "946684800", **toolchain_environment}
@@ -356,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
                 environment["CARGO_HOME"] = cargo_home
             build_log = root / "cargo-build.log"
             command = run_command(cargo_command + ["build", "--workspace", "--release", "--locked"], source, environment, build_log, 1800)
+            command["target_empty_before_build"] = target_empty_before_build
             row: dict[str, Any] = {"label": label, "materialized": materialized, "build": command, "artifacts": {}}
             if command["exit_code"] != 0:
                 raise ReproductionError(f"{label} bootstrap build failed")

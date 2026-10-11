@@ -155,6 +155,7 @@ def _fixed_plan(output: Path) -> tuple[CommandSpec, ...]:
                      "build/network_cli_report.json", "build/bytes_cli_report.json",
                      "build/http_cli_report.json", "build/ai_protocol_cli_report.json",
                      "build/interpreter_profile_parity_report.json",
+                     "target/release/il", "target/release/libil_native_runtime.a", "toolchain.lock",
                      "build/ci/*.log", "build/ci/*_report.json")),
         CommandSpec("http", (python, http, "--binary", str((ROOT / "target" / "release" / "il").resolve()),
                               "--report", str((output / "http" / "http_report.json").resolve())), 1200,

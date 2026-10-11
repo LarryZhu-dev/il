@@ -248,6 +248,49 @@ class AssembleTests(unittest.TestCase):
         self.assertIn("explicit p10_acceptance_bundle manifest", str(raised.exception))
         self.assertFalse(self.output.exists())
 
+    def test_derived_ci_and_http_records_without_inventory_report_blocked_sections(self) -> None:
+        self._write_manifest({"schema_version": "1.0.0", "status": "PASSED", "gates": []})
+        record_refs = {}
+        for predicate in ("graph_schema_valid", "blackbox_tests_external"):
+            record = {
+                "schema_version": "1.0.0", "kind": "p10_gate_record", "predicate": predicate,
+                "source_commit": COMMIT, "target": assemble.TARGET,
+                "toolchain_lock_sha256": LOCK, "status": "PASSED",
+            }
+            relative = f"evidence/gates/{predicate}.json"
+            raw = write_json(self.run / relative, record)
+            record_refs[predicate] = {"path": relative, "sha256": digest(raw)}
+        export = {
+            "schema_version": "1.0.0",
+            "kind": "p10_gate_record_export",
+            "status": "BLOCKED",
+            "records": record_refs,
+            "missing_predicates": sorted(set(PREDICATES) - {"graph_schema_valid", "blackbox_tests_external"}),
+            "malformed_records": [],
+            "source_refs": [],
+        }
+        export_path = self.run / "gate_records" / "export.json"
+        export_data = write_json(export_path, export)
+        journal = json.loads(self.factory.journal_path.read_text(encoding="utf-8"))
+        journal["gate_records"] = {
+            "path": "gate_records/export.json",
+            "sha256": digest(export_data),
+            "status": "BLOCKED",
+            "missing_predicates": export["missing_predicates"],
+        }
+        write_json(self.factory.journal_path, journal)
+
+        with self.assertRaises(assemble.AssembleError) as raised:
+            assemble.assemble(self.factory.journal_path, self.output)
+
+        message = str(raised.exception)
+        self.assertIn("P10 bundle BLOCKED", message)
+        self.assertIn("missing predicates=", message)
+        self.assertIn("missing inventory sections=['executables', 'artifacts']", message)
+        self.assertIn("gate_records/export.json", message)
+        self.assertIn("http/http_report.json", message)
+        self.assertFalse(self.output.exists())
+
     def test_absent_output_inventory_entries_are_not_captured(self) -> None:
         path = self.run / "commands" / "http.json"
         observation = json.loads(path.read_text(encoding="utf-8"))

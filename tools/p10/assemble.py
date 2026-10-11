@@ -107,12 +107,8 @@ def read_journal(path: Path) -> tuple[Path, dict[str, Any], bytes]:
         raise AssembleError("only a COMPLETE trusted run may be assembled")
     gate_export = journal.get("gate_records")
     if isinstance(gate_export, dict):
-        if gate_export.get("status") != "COMPLETE":
-            missing = gate_export.get("missing_predicates")
-            raise AssembleError(
-                "trusted run has incomplete explicit P10 gate records"
-                + (f": {missing}" if isinstance(missing, list) else "")
-            )
+        if gate_export.get("status") not in {"COMPLETE", "BLOCKED"}:
+            raise AssembleError("trusted gate-record export has an invalid status")
         export_path = gate_export.get("path")
         export_hash = gate_export.get("sha256")
         if not isinstance(export_path, str) or not is_hash(export_hash):
@@ -121,6 +117,16 @@ def read_journal(path: Path) -> tuple[Path, dict[str, Any], bytes]:
         export_file = regular_file(run, run / export_path, "gate-record export")
         if digest(export_file.read_bytes()) != export_hash:
             raise AssembleError("trusted gate-record export hash mismatch")
+        export, _ = load_json(export_file)
+        if (not isinstance(export, dict) or export.get("kind") != "p10_gate_record_export"
+                or export.get("status") != gate_export["status"]
+                or not isinstance(export.get("records"), dict)
+                or not isinstance(export.get("missing_predicates"), list)):
+            raise AssembleError("trusted gate-record export contents differ from the journal")
+        if export.get("missing_predicates") != gate_export.get("missing_predicates"):
+            raise AssembleError("trusted gate-record missing-predicate list differs from the journal")
+        if gate_export["status"] == "COMPLETE" and export["missing_predicates"]:
+            raise AssembleError("complete trusted gate-record export lists missing predicates")
     source = journal.get("source")
     if (not isinstance(source, dict) or not is_commit(source.get("commit"))
             or not is_commit(source.get("tree")) or source.get("dirty") is True):
@@ -215,13 +221,69 @@ def build_manifest(run: Path, journal: dict[str, Any], rebasing: "Rebasing") -> 
         # follows the branch below.
         seed = validate_seed(ci, journal)
     else:
+        seed = ci.get("manifest") if isinstance(ci, dict) else None
+        if not isinstance(seed, dict):
+            export_ref = journal.get("gate_records")
+            exported_records: set[str] = set()
+            missing_predicates: list[str] = []
+            source_paths = [ci_path.relative_to(run).as_posix()]
+            if isinstance(export_ref, dict):
+                export_path = canonical_relative(export_ref.get("path"), "gate-record export path")
+                export_file = regular_file(run, run / export_path, "gate-record export")
+                export, _ = load_json(export_file)
+                if digest(export_file.read_bytes()) != export_ref.get("sha256"):
+                    raise AssembleError("trusted gate-record export hash mismatch")
+                records = export.get("records") if isinstance(export, dict) else None
+                missing = export.get("missing_predicates") if isinstance(export, dict) else None
+                if isinstance(records, dict):
+                    for predicate, reference in records.items():
+                        if not isinstance(predicate, str) or not isinstance(reference, dict):
+                            raise AssembleError("trusted gate-record export contains a malformed record reference")
+                        record_path = canonical_relative(reference.get("path"), f"{predicate} gate-record path")
+                        record_file = regular_file(run, run / record_path, f"{predicate} gate record")
+                        raw = record_file.read_bytes()
+                        if not is_hash(reference.get("sha256")) or digest(raw) != reference["sha256"]:
+                            raise AssembleError(f"trusted gate-record hash mismatch: {predicate}")
+                        gate_record, _ = load_json(record_file)
+                        if (not isinstance(gate_record, dict) or gate_record.get("kind") != "p10_gate_record"
+                                or gate_record.get("predicate") != predicate):
+                            raise AssembleError(f"trusted gate-record identity mismatch: {predicate}")
+                        if (gate_record.get("status") != "PASSED"
+                                or gate_record.get("source_commit") != journal["source"]["commit"]
+                                or gate_record.get("target") != TARGET
+                                or gate_record.get("toolchain_lock_sha256") != journal["toolchain"]["lock"]["sha256"]):
+                            raise AssembleError(f"trusted gate-record provenance/status mismatch: {predicate}")
+                        exported_records.add(predicate)
+                if isinstance(missing, list) and all(isinstance(item, str) for item in missing):
+                    missing_predicates = sorted(set(missing))
+                source_paths.append(export_path)
+            else:
+                missing_predicates = sorted(
+                    predicate
+                    for group in json.loads((Path(__file__).with_name("contract.json")).read_text(encoding="utf-8"))["gates"].values()
+                    for predicate in group
+                )
+
+            for command_id, names in (("http", ("http_report.json",)),
+                                      ("g4", ("comparison.json",)),
+                                      ("reproducibility", ("reproduction.json",))):
+                report_path = _find_json(run, command_id, *names)
+                source_paths.append(report_path.relative_to(run).as_posix())
+
+            contract = json.loads(Path(__file__).with_name("contract.json").read_text(encoding="utf-8"))
+            expected_predicates = {item for group in contract["gates"].values() for item in group}
+            missing_predicates = sorted(set(missing_predicates) | (expected_predicates - exported_records))
+            missing_sections = ["executables", "artifacts"]
+            if not (run / "g4" / "comparison.json").is_file():
+                missing_sections.append("comparison")
+            raise AssembleError(
+                "P10 bundle BLOCKED: no explicit p10_acceptance_bundle manifest; "
+                f"missing predicates={missing_predicates}; "
+                f"missing inventory sections={missing_sections}; "
+                f"observed raw evidence sources={sorted(set(source_paths))}"
+            )
         if not isinstance(ci, dict) or ci.get("status") not in {"PASSED", "COMPLETE"}:
             raise AssembleError("trusted CI output is not a passed report")
-        seed = ci.get("manifest")
-        if not isinstance(seed, dict):
-            raise AssembleError(
-                "trusted CI output has no explicit p10_acceptance_bundle manifest"
-            )
         validate_seed(seed, journal)
 
     http_path = _find_json(run, "http", "http_report.json")
