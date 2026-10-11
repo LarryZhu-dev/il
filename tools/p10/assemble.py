@@ -217,13 +217,11 @@ def build_manifest(run: Path, journal: dict[str, Any], rebasing: "Rebasing") -> 
     else:
         if not isinstance(ci, dict) or ci.get("status") not in {"PASSED", "COMPLETE"}:
             raise AssembleError("trusted CI output is not a passed report")
-        seed = ci.get("manifest") if isinstance(ci.get("manifest"), dict) else ci
+        seed = ci.get("manifest")
         if not isinstance(seed, dict):
-            raise AssembleError("trusted CI output has no acceptance manifest fields")
-        # Raw CI reports use the same locked fields but a different kind.
-        if seed.get("kind") != "p10_acceptance_bundle":
-            seed = dict(seed)
-            seed["kind"] = "p10_acceptance_bundle"
+            raise AssembleError(
+                "trusted CI output has no explicit p10_acceptance_bundle manifest"
+            )
         validate_seed(seed, journal)
 
     http_path = _find_json(run, "http", "http_report.json")

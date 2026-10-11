@@ -233,6 +233,42 @@ class AssembleTests(unittest.TestCase):
             assemble.assemble(self.factory.journal_path, self.output)
         self.assertFalse(self.output.exists())
 
+    def test_plain_ci_summary_is_not_promoted_to_acceptance_manifest(self) -> None:
+        summary = {
+            "schema_version": "1.0.0",
+            "status": "PASSED",
+            "scope": "ci",
+            "source_commit": COMMIT,
+            "target": assemble.TARGET,
+            "gates": [{"name": "rust-tests", "status": "PASSED", "test_count": 236}],
+        }
+        self._write_manifest(summary)
+        with self.assertRaises(assemble.AssembleError) as raised:
+            assemble.assemble(self.factory.journal_path, self.output)
+        self.assertIn("explicit p10_acceptance_bundle manifest", str(raised.exception))
+        self.assertFalse(self.output.exists())
+
+    def test_absent_output_inventory_entries_are_not_captured(self) -> None:
+        path = self.run / "commands" / "http.json"
+        observation = json.loads(path.read_text(encoding="utf-8"))
+        observation["outputs"] = [
+            {"path": "http/http_report.json", "present": False,
+             "sha256": digest((self.run / "http" / "http_report.json").read_bytes())},
+        ]
+        write_json(path, observation)
+        self.factory.command_refs = [
+            {"command_id": command_id, "path": f"commands/{command_id}.json",
+             "sha256": digest((self.run / "commands" / f"{command_id}.json").read_bytes())}
+            for command_id in ("ci", "http", "g4", "reproducibility")
+        ]
+        journal = json.loads(self.factory.journal_path.read_text(encoding="utf-8"))
+        journal["commands"] = self.factory.command_refs
+        write_json(self.factory.journal_path, journal)
+        with self.assertRaises(assemble.AssembleError) as raised:
+            assemble.assemble(self.factory.journal_path, self.output)
+        self.assertIn("trusted http output", str(raised.exception))
+        self.assertFalse(self.output.exists())
+
     def test_command_hash_tampering_is_rejected(self) -> None:
         path = self.run / "commands" / "http.json"
         path.write_text('{"kind":"command_observation","command_id":"http","status":"SUCCESS","tampered":true}\n', encoding="utf-8")

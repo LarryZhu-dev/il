@@ -141,6 +141,30 @@ class ProducerTests(unittest.TestCase):
             self.assertTrue(export["missing_predicates"])
             journal = json.loads((output / "journal.json").read_text(encoding="utf-8"))
             self.assertEqual(journal["gate_records"]["status"], "BLOCKED")
+            self.assertEqual(journal["p10_report"]["kind"], "p10_producer_report")
+            self.assertEqual(journal["p10_report"]["status"], "BLOCKED")
+            report_path = output / journal["p10_report"]["path"]
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["code"], "E_EVIDENCE_INCOMPLETE")
+            self.assertIn("CI result.json", report["error"])
+
+    def test_producer_never_promotes_ordinary_ci_summary(self):
+        with tempfile.TemporaryDirectory(prefix="il-p10-producer-summary-") as name:
+            root = Path(name)
+            run = root / "run"
+            (run / "build" / "ci").mkdir(parents=True)
+            (run / "build" / "ci" / "result.json").write_text(
+                json.dumps({"status": "PASSED", "gates": {"G0": "passed"}}),
+                encoding="utf-8",
+            )
+            (run / "journal.json").write_text(json.dumps({
+                "source": {"commit": "a" * 40, "tree": "b" * 40},
+                "toolchain": {"lock": {"sha256": "sha256:" + "c" * 64}},
+            }), encoding="utf-8")
+            report = produce._produce_p10_report(run, root=ROOT)
+            self.assertEqual(report["kind"], "p10_producer_report")
+            self.assertEqual(report["status"], "BLOCKED")
+            self.assertIn("complete p10_manifest", report["error"])
 
     def test_dirty_checkout_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory(prefix="il-p10-dirty-") as name:

@@ -618,6 +618,22 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                 "status": gate_export["status"],
                 "missing_predicates": gate_export["missing_predicates"],
             }
+            # Publish an explicit acceptance report only when the trusted CI
+            # output already contains the complete manifest and the reducer
+            # validates every referenced byte.  Ordinary summaries and gate
+            # counts remain a fail-closed producer report.
+            p10_report = _produce_p10_report(destination, root=ROOT)
+            report_path = destination / "p10" / (
+                "acceptance_bundle.json" if p10_report.get("kind") == "p10_acceptance_bundle"
+                else "producer_report.json"
+            )
+            atomic_json(report_path, p10_report)
+            state["p10_report"] = {
+                "path": report_path.relative_to(destination).as_posix(),
+                "sha256": digest_file(report_path),
+                "status": p10_report.get("status"),
+                "kind": p10_report.get("kind"),
+            }
             state["status"] = "COMPLETE"
             state["finished_at"] = utc_now()
             atomic_json(destination / "journal.json", state)
@@ -631,6 +647,59 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
     finally:
         if old_root is not None:
             ROOT = old_root
+
+
+def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
+    """Derive a publication candidate from explicit trusted evidence only.
+
+    This function deliberately does not synthesize predicates, artifacts,
+    executable inventory, HTTP receipts, or G4 trials.  A normal CI summary
+    therefore produces an actionable BLOCKED receipt until a reviewed command
+    emits the complete manifest required by ``reduce.py``.
+    """
+    contract_path = root / "tools" / "p10" / "contract.json"
+    result_path = run / "build" / "ci" / "result.json"
+    gate_path = run / "gate_records" / "export.json"
+    base: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "p10_producer_report",
+        "status": "BLOCKED",
+        "code": "E_EVIDENCE_INCOMPLETE",
+        "source": {},
+        "gate_records": {},
+    }
+    journal_path = run / "journal.json"
+    try:
+        journal = json.loads(journal_path.read_text(encoding="utf-8"))
+        base["source"] = {
+            "commit": journal.get("source", {}).get("commit"),
+            "tree": journal.get("source", {}).get("tree"),
+            "toolchain_lock_sha256": journal.get("toolchain", {}).get("lock", {}).get("sha256"),
+        }
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        base["error"] = "trusted run journal is unavailable"
+        return base
+    try:
+        if gate_path.is_file():
+            base["gate_records"] = json.loads(gate_path.read_text(encoding="utf-8"))
+        if not result_path.is_file():
+            base["error"] = "trusted CI result.json is unavailable"
+            return base
+        if not contract_path.is_file():
+            base["error"] = "locked P10 contract is unavailable"
+            return base
+        from reduce import ReductionError, reduce_report
+        report = json.loads(result_path.read_text(encoding="utf-8"))
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        manifest = reduce_report(report, contract=contract, base=result_path.parent)
+    except ReductionError as error:
+        base["error"] = str(error)
+        return base
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError) as error:
+        base["error"] = f"cannot read explicit P10 evidence: {error}"
+        return base
+    # Preserve the reducer's exact manifest.  No fields are added or inferred.
+    return manifest
 
 
 def publish_release(run_root: str | Path, release_root: str | Path) -> dict[str, Any]:
