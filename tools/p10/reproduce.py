@@ -166,7 +166,13 @@ def build_application(root: Path, compiler: Path, directory: Path, log: Path) ->
         "operations": [{"op": "import_text", "source": source}], "required_checks": [],
     }
     environment = {"LC_ALL": "C", "LANG": "C", "PATH": os.environ.get("PATH", "")}
-    transaction = subprocess.run([str(compiler), "--repository", str(repository), "--store", str(store), "transact"],
+    transaction = subprocess.run([
+        str(compiler),
+        "--repository", str(repository),
+        "--store", str(store),
+        "--host-policy", str(policy),
+        "transact",
+    ],
                                  cwd=root, input=json.dumps(request).encode(), capture_output=True, env=environment, check=False)
     log.write_bytes(transaction.stdout + b"\n--- stderr ---\n" + transaction.stderr)
     if transaction.returncode != 0:
