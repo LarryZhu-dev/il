@@ -1,0 +1,62 @@
+FROM rust:1.90.0-bookworm@sha256:3914072ca0c3b8aad871db9169a651ccfce30cf58303e5d6f2db16d1d8a7e58f AS builder
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes \
+       clang-14=1:14.0.6-12 \
+       llvm-14=1:14.0.6-12 \
+       lld-14=1:14.0.6-12 \
+       python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LLVM_CONFIG=/usr/bin/llvm-config-14 \
+    IL_CLANG=/usr/bin/clang-14 \
+    IL_LLC=/usr/bin/llc-14 \
+    CARGO_INCREMENTAL=0 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC
+
+WORKDIR /build
+
+# Copy source and build
+COPY . /build
+RUN cargo fetch --locked
+RUN cargo build --release --locked
+
+# Runtime image
+FROM python:3.11-slim-bookworm
+
+# Install runtime dependencies
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes \
+       curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 iluser
+
+WORKDIR /app
+
+# Copy il binary from builder
+COPY --from=builder /build/target/release/il /usr/local/bin/il
+RUN chmod +x /usr/local/bin/il
+
+# Copy Python server code
+COPY tools/http_server/ /app/
+COPY requirements.txt /app/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Switch to non-root user
+USER iluser
+
+# Expose HTTP port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run server
+CMD ["python", "server.py", "--host", "0.0.0.0", "--port", "8000", "--il-binary", "/usr/local/bin/il"]

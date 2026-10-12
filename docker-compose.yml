@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  il-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: il-server:latest
+    container_name: il-server
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - il-network
+
+networks:
+  il-network:
+    driver: bridge
