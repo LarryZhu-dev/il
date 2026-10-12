@@ -163,8 +163,14 @@ def derive_records(report: str | Path, provenance: dict[str, Any], *, output: st
                 "artifacts": [graph_artifact],
                 "transaction": _failure_binding(selected[-1], graph_artifact),
             }))
+        add("rollback_trial_binds_to_release_elf", _rollback_rows(rows),
+            lambda record, selected: record.update({
+                "artifacts": [graph_artifact],
+                "rollback": _rollback_binding(selected[-1], graph_artifact),
+            }))
     else:
         blocked["failure_preserves_previous_revision"] = "graph artifact binding is required"
+        blocked["rollback_trial_binds_to_release_elf"] = "graph artifact binding is required"
 
     result: dict[str, Any] = {"schema_version": "1.0.0", "kind": "p10_gate_record_derivation",
                               "status": "COMPLETE" if not blocked else "BLOCKED",
@@ -286,6 +292,40 @@ def _route_binding(row: dict[str, Any]) -> dict[str, Any]:
         raise DeriveError("route transaction revisions are not consecutive")
     return {"base_revision": base, "result_revision": result, "route_path": ROUTE_PATH,
             "route_sha256": digest(route_bytes)}
+
+
+def _rollback_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [row for row in rows if _obs_ok(row) and "rollback_trial_binds_to_release_elf" in row.get("tags", [])]
+
+
+def _rollback_binding(row: dict[str, Any], graph_artifact: dict[str, Any]) -> dict[str, Any]:
+    """Verify rollback trial binary matches release ELF and extract graph evidence."""
+    evidence = row.get("evidence", {})
+    if not isinstance(evidence, dict):
+        raise DeriveError("rollback observation has no evidence dictionary")
+
+    trial_sha256 = evidence.get("trial_binary_sha256")
+    release_sha256 = graph_artifact.get("sha256")
+
+    if not trial_sha256 or not release_sha256:
+        raise DeriveError("rollback observation or graph artifact lacks sha256")
+
+    if trial_sha256 != release_sha256:
+        raise DeriveError(f"rollback trial binary {trial_sha256} does not match release ELF {release_sha256}")
+
+    graph_evidence = evidence.get("graph_evidence")
+    if not isinstance(graph_evidence, dict):
+        raise DeriveError("rollback observation lacks graph_evidence")
+
+    required_keys = {"before_revision", "after_revision", "trial_exit_code"}
+    if not required_keys.issubset(graph_evidence):
+        raise DeriveError(f"graph_evidence missing required keys: {required_keys - set(graph_evidence.keys())}")
+
+    return {
+        "trial_binary_sha256": trial_sha256,
+        "release_elf_sha256": release_sha256,
+        "graph_evidence": graph_evidence,
+    }
 
 
 def _diagnostic_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

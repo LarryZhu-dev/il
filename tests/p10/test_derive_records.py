@@ -121,6 +121,63 @@ class DeriveRecordsTests(unittest.TestCase):
         self.assertEqual(record["duration_ns"], 1_250_000_000)
         self.assertEqual(record["transaction"]["result_revision"], 5)
 
+    def test_rollback_record_binds_trial_binary_to_release_elf(self):
+        release_sha = "sha256:" + "c" * 64
+        graph_artifact = {"sha256": release_sha, "path": "il_server_x86_64"}
+        observation = {
+            "kind": "il_graph_cli_observation",
+            "tags": ["rollback_trial_binds_to_release_elf"],
+            "evidence": {
+                "trial_binary_sha256": release_sha,
+                "graph_evidence": {
+                    "before_revision": 5,
+                    "after_revision": 4,
+                    "trial_exit_code": 0,
+                },
+            },
+            "process": {"argv": ["il", "rollback"], "exit_code": 0, "duration_ns": 100000,
+                        "stderr": _bytes("")},
+        }
+        report = {"raw_observations": [observation]}
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "report.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            result = derive_records.derive_records(path, {
+                "source_commit": "a" * 40, "target": "x86_64-unknown-linux-gnu",
+                "toolchain_lock_sha256": "sha256:" + "b" * 64,
+            }, graph_artifact=graph_artifact)
+        self.assertIn("rollback_trial_binds_to_release_elf", result["records"])
+        record = result["records"]["rollback_trial_binds_to_release_elf"]
+        rollback = record["rollback"]
+        self.assertEqual(rollback["trial_binary_sha256"], release_sha)
+        self.assertEqual(rollback["release_elf_sha256"], release_sha)
+        self.assertEqual(rollback["graph_evidence"]["before_revision"], 5)
+        self.assertEqual(rollback["graph_evidence"]["after_revision"], 4)
+
+    def test_rollback_record_blocks_when_sha256_mismatch(self):
+        graph_artifact = {"sha256": "sha256:" + "d" * 64, "path": "il_server_x86_64"}
+        observation = {
+            "kind": "il_graph_cli_observation",
+            "tags": ["rollback_trial_binds_to_release_elf"],
+            "evidence": {
+                "trial_binary_sha256": "sha256:" + "e" * 64,
+                "graph_evidence": {"before_revision": 5, "after_revision": 4, "trial_exit_code": 0},
+            },
+            "process": {"argv": ["il", "rollback"], "exit_code": 0, "duration_ns": 100000,
+                        "stderr": _bytes("")},
+        }
+        report = {"raw_observations": [observation]}
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "report.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            result = derive_records.derive_records(path, {
+                "source_commit": "a" * 40, "target": "x86_64-unknown-linux-gnu",
+                "toolchain_lock_sha256": "sha256:" + "b" * 64,
+            }, graph_artifact=graph_artifact)
+        self.assertNotIn("rollback_trial_binds_to_release_elf", result["records"])
+        self.assertIn("rollback_trial_binds_to_release_elf", result["blocked_predicates"])
+        self.assertIn("does not match", result["blocked_predicates"]["rollback_trial_binds_to_release_elf"])
+
 
 if __name__ == "__main__":
     unittest.main()
