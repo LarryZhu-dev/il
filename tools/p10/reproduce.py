@@ -155,9 +155,15 @@ def locked_cargo_environment() -> tuple[list[str], dict[str, str]]:
     toolchain_bin = next((path for path in candidates if (path / "cargo").is_file()), None)
     if toolchain_bin is None:
         raise ReproductionError(f"locked Rust toolchain is not installed: {channel}-{host}")
+    rustup_home = "/usr/local/rustup" if candidates[0].is_dir() else "/root/.rustup"
     environment = {
         "RUSTUP_TOOLCHAIN": f"{channel}-{host}",
-        "RUSTUP_HOME": "/usr/local/rustup" if candidates[0].is_dir() else "/root/.rustup",
+        "RUSTUP_HOME": rustup_home,
+        # Prevent the rustup shim from syncing channel metadata over the
+        # network before every cargo invocation.  The toolchain is already
+        # installed; a channel sync attempt in an offline container causes
+        # the independent rebuild to fail with a DNS error.
+        "RUSTUP_NO_AUTO_UPDATE": "1",
     }
     return [str(toolchain_bin / "cargo")], environment
 
