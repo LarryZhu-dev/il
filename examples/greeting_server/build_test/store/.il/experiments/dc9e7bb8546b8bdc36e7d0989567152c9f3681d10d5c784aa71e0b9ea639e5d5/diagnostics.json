@@ -1,0 +1,58 @@
+[
+  {
+    "diagnostic_id": "diag_834f0ad3f16bbaec",
+    "code": "E_CAPABILITY_MISSING",
+    "stage": "capability_check",
+    "severity": "error",
+    "entity_id": "greeting.listen",
+    "related_entities": [],
+    "expected": null,
+    "actual": null,
+    "cause": "capability declaration has no identical trusted host injection",
+    "suggested_operations": [],
+    "retryable": true,
+    "base_revision": 0
+  },
+  {
+    "diagnostic_id": "diag_14e0ffb404aa2bf9",
+    "code": "E_CAPABILITY_MISSING",
+    "stage": "capability_check",
+    "severity": "error",
+    "entity_id": "greeting.clock",
+    "related_entities": [],
+    "expected": null,
+    "actual": null,
+    "cause": "capability declaration has no identical trusted host injection",
+    "suggested_operations": [],
+    "retryable": true,
+    "base_revision": 0
+  },
+  {
+    "diagnostic_id": "diag_b1d0c642f187917a",
+    "code": "E_CAPABILITY_MISSING",
+    "stage": "capability_check",
+    "severity": "error",
+    "entity_id": "greeting.connection.new_r0_817.new_r0_821.arm.0.new_r0_823",
+    "related_entities": [],
+    "expected": null,
+    "actual": null,
+    "cause": "runtime call must explicitly select its required trusted host capability",
+    "suggested_operations": [],
+    "retryable": true,
+    "base_revision": 0
+  },
+  {
+    "diagnostic_id": "diag_99d3305b56dd8d66",
+    "code": "E_CAPABILITY_MISSING",
+    "stage": "capability_check",
+    "severity": "error",
+    "entity_id": "greeting.serve.new_r0_837.new_r0_838",
+    "related_entities": [],
+    "expected": null,
+    "actual": null,
+    "cause": "runtime call must explicitly select its required trusted host capability",
+    "suggested_operations": [],
+    "retryable": true,
+    "base_revision": 0
+  }
+]

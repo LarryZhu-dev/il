@@ -1,0 +1,13 @@
+{
+  "task_id": "greeting-init",
+  "base_revision": 0,
+  "scope": ["program"],
+  "operations": [
+    {
+      "op": "bind_git",
+      "commit": "c3225eb2cfefedc6684e385c8370eb1060ea9b2d",
+      "tree": "c3ffe625392a5e89f1e63b16f6cac1f662f3ff92"
+    }
+  ],
+  "required_checks": []
+}

@@ -32,10 +32,9 @@ $importRequest = @{
 
 $importResult = $importRequest | docker run --rm -i --platform linux/amd64 `
     --mount "type=bind,source=$dockerWorkspace,target=/workspace" `
-    --mount "type=volume,source=il-cargo-registry,target=/usr/local/cargo/registry" `
     --workdir /workspace `
     il-toolchain:1.90.0-llvm14 `
-    cargo run --locked --bin il -- --store /workspace/.il/api_server transact 2>&1
+    /workspace/target/release/il --store /workspace/.il/api_server transact 2>&1
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Import failed" -ForegroundColor Red
@@ -57,10 +56,9 @@ $buildRequest = @{
 
 $buildResult = $buildRequest | docker run --rm -i --platform linux/amd64 `
     --mount "type=bind,source=$dockerWorkspace,target=/workspace" `
-    --mount "type=volume,source=il-cargo-registry,target=/usr/local/cargo/registry" `
     --workdir /workspace `
     il-toolchain:1.90.0-llvm14 `
-    cargo run --locked --bin il -- --store /workspace/.il/api_server build 2>&1
+    /workspace/target/release/il --store /workspace/.il/api_server build 2>&1
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed" -ForegroundColor Red

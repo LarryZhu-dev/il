@@ -1,0 +1,15 @@
+{
+  "capabilities": [
+    {
+      "id": "greeting.listen",
+      "kind": "Listen",
+      "scope": "127.0.0.1:8080"
+    },
+    {
+      "id": "greeting.clock",
+      "kind": "ClockRead",
+      "scope": null
+    }
+  ],
+  "grants": []
+}

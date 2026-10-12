@@ -1,0 +1,12 @@
+{
+  "project_id": "il",
+  "graph_version": "1.0.0",
+  "revision": 0,
+  "target": "x86_64-unknown-linux-gnu",
+  "modules": [],
+  "types": [],
+  "functions": [],
+  "capabilities": [],
+  "packages": [],
+  "contracts": []
+}

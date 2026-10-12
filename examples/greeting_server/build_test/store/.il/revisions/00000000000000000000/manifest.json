@@ -1,0 +1,11 @@
+{
+  "revision": 0,
+  "parent_revision": null,
+  "parent_manifest_hash": null,
+  "graph_hash": "sha256:9acfb17678c64cf33d5a4e86ad9ef5aff5560a9cc90a482c0808b962ed1a9a05",
+  "provenance": {
+    "source_git_commit": "c9e54a2831ef72debbc1c12ec70da37421801528",
+    "source_tree_hash": "cbe9b9b8366171b160f5837e790eb0388e6c8580"
+  },
+  "reason": "initialize"
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "grants": [
+    {
+      "entity_id": "greeting.listen",
+      "kind": "Listen",
+      "scope": "127.0.0.1:8080"
+    },
+    {
+      "entity_id": "greeting.clock",
+      "kind": "ClockRead",
+      "scope": null
+    }
+  ]
+}
