@@ -284,6 +284,17 @@ def build_synthetic_bundle(root):
                     f"--- a/{task_id}.txt\n+++ b/{task_id}.txt\n@@ -1 +1 @@\n-old {index}\n+new {index}\n"
                 ).encode()
                 bundle.file(f"patches/{run_id}.patch", patch_data)
+                rollback_binary = None
+                rollback_evidence = None
+                if task_id == "rollback" and implementation == "il" and not failed:
+                    rollback_binary = bundle.ref(f"rollback/{run_id}.elf", "rollback_binary", elf_data)
+                    rollback_evidence = {
+                        "source_revision": 2, "rollback_revision": 3,
+                        "expected_graph_sha256": digest(b"historical graph"),
+                        "restored_graph_sha256": digest(b"historical graph"),
+                        "previous_binary_sha256": artifact_hash["native_elf"],
+                        "previous_binary_executed": True,
+                    }
                 trial = {
                     "schema_version": "1.0.0",
                     "kind": "g4_trial",
@@ -301,6 +312,8 @@ def build_synthetic_bundle(root):
                     "assertions": assertions,
                     "trace": {"path": f"traces/{run_id}.json", "sha256": digest((root / f"traces/{run_id}.json").read_bytes()), "role": "trace"},
                     "patch": {"path": f"patches/{run_id}.patch", "sha256": digest(patch_data), "role": "patch"},
+                    "rollback_binary": rollback_binary,
+                    "rollback_evidence": rollback_evidence,
                 }
                 trials.append(bundle.json_ref(f"trials/{run_id}.json", trial))
 

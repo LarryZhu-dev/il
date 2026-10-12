@@ -541,7 +541,12 @@ def verify_trials(reader: BundleReader, manifest: dict[str, Any], contract: dict
             "schema_version", "kind", "task_id", "implementation", "trial_index", "run_id", "workspace_id", "starting_commit",
             "task_input_sha256", "started_monotonic_ns", "finished_monotonic_ns", "experiment_exit_code", "failure_category", "assertions", "trace", "patch",
         }
-        trial = exact_fields(trial, fields, path=path)
+        require(isinstance(trial, dict) and not (set(trial) - fields - {"rollback_binary", "rollback_evidence"}),
+                "G4 trial has unsupported fields", path=path)
+        trial = exact_fields({key: trial[key] for key in fields}, fields, path=path) | {
+            "rollback_binary": trial.get("rollback_binary"),
+            "rollback_evidence": trial.get("rollback_evidence"),
+        }
         require(trial["schema_version"] == "1.0.0" and trial["kind"] == "g4_trial", "unsupported G4 trial record", path=path)
         task_id = trial["task_id"]
         implementation = trial["implementation"]
@@ -557,6 +562,27 @@ def verify_trials(reader: BundleReader, manifest: dict[str, Any], contract: dict
         workspaces.add(workspace)
         expected_commit = comparison["baseline_commit"] if implementation == "rust" else manifest["source_commit"]
         require(trial["starting_commit"] == expected_commit, "trial started from the wrong pinned source revision", path=path)
+        if task_id == "rollback" and implementation == "il" and trial["experiment_exit_code"] == 0:
+            rollback_ref = trial.get("rollback_binary")
+            require(isinstance(rollback_ref, dict), "il rollback trial omits previous binary bytes", path=path)
+            binary, _ = reader.read_ref(rollback_ref, role="rollback_binary")
+            require(binary.startswith(b"\x7fELF"), "rollback previous binary is not retained ELF bytes", path=path)
+            evidence = exact_fields(trial.get("rollback_evidence"), {
+                "source_revision", "rollback_revision", "expected_graph_sha256",
+                "restored_graph_sha256", "previous_binary_sha256", "previous_binary_executed",
+            }, path=f"{path}.rollback_evidence")
+            require(evidence["source_revision"] == 2 and evidence["rollback_revision"] == 3
+                    and evidence["rollback_revision"] > evidence["source_revision"],
+                    "rollback revision evidence is invalid", path=path)
+            require(is_sha256(evidence["expected_graph_sha256"])
+                    and evidence["restored_graph_sha256"] == evidence["expected_graph_sha256"],
+                    "rollback graph evidence differs", path=path)
+            require(evidence["previous_binary_sha256"] == sha256(binary)
+                    and evidence["previous_binary_executed"] is True,
+                    "rollback execution is not bound to retained previous binary bytes", path=path)
+        else:
+            require(trial.get("rollback_binary") is None and trial.get("rollback_evidence") is None,
+                    "non-rollback trial carries rollback evidence", path=path)
         require(is_sha256(trial["task_input_sha256"]), "trial task input hash is invalid", path=path)
         prior_input = task_inputs.setdefault(task_id, trial["task_input_sha256"])
         require(prior_input == trial["task_input_sha256"], "paired trials used different task inputs", path=path)

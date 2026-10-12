@@ -59,9 +59,19 @@ class CiRecordTests(unittest.TestCase):
             ("rust-tests", ["cargo", "test", "--workspace", "--locked"], "rust-tests.log"),
             ("graph-cli", ["python", "tests/graph_cli.py"], "graph-cli.log"),
             ("semantic-cli", ["python", "tests/semantic_cli.py"], "semantic-cli.log"),
+            ("native-cli", ["python", "tests/native_cli.py"], "native-cli.log"),
         ):
             if log_name != "rust-tests.log":
-                (root / "build" / "ci" / log_name).write_text("gate invocation\n", encoding="utf-8")
+                contents = "gate invocation\n"
+                if name == "native-cli":
+                    contents = "".join(
+                        f"{test} (native_cli.NativeAcceptance.{test}) ... ok\n"
+                        for test in sorted({
+                            "test_two_clean_stores_reproduce_native_artifacts",
+                            "test_application_entrypoint_and_rejected_build_preserve_artifacts",
+                        })
+                    )
+                (root / "build" / "ci" / log_name).write_text(contents, encoding="utf-8")
             raw = (root / "build" / "ci" / log_name).read_bytes()
             gates.append({"name": name, "status": "PASSED", "exit_code": 0,
                           "elapsed_seconds": 1.5, "command": command,
@@ -79,11 +89,14 @@ class CiRecordTests(unittest.TestCase):
         self.assertEqual(set(result["records"]), {
             "graph_schema_valid", "type_checker_verified", "ownership_checker_verified",
             "MIR_verifier_verified", "interpreter_semantic_suite_passed",
+            "no_high_level_target_source",
         })
         for predicate, record in result["records"].items():
             self.assertEqual(record["predicate"], predicate)
             self.assertEqual(record["status"], "PASSED")
             self.assertEqual(record["assertions"], [{"id": predicate, "passed": True}])
+        self.assertEqual(result["records"]["no_high_level_target_source"]["target_generated_sources"], [])
+        self.assertEqual(result["records"]["no_high_level_target_source"]["test_suite"]["count"], 2)
 
     def test_missing_named_test_blocks_only_its_predicate(self):
         missing = next(iter(ci_records.G0_RUST_TESTS["ownership_checker_verified"]))

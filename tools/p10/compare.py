@@ -302,7 +302,8 @@ def graph_has_hello_route(graph):
 
 def write_g4_record(directory, output_root, trace, *, task, implementation, index,
                     starting_commit, task_input_sha256, started, finished,
-                    assertions, success, failure_category, patch):
+                    assertions, success, failure_category, patch,
+                    rollback_binary=None, rollback_evidence=None):
     trace_events = {
         "schema_version": "1.0.0",
         "kind": "g4_trace",
@@ -351,6 +352,8 @@ def write_g4_record(directory, output_root, trace, *, task, implementation, inde
             "path": patch_path.relative_to(output_root).as_posix(),
             "sha256": digest(patch),
         },
+        "rollback_binary": rollback_binary,
+        "rollback_evidence": rollback_evidence,
     }
     record_path = directory / "g4_trial.json"
     save(record_path, record)
@@ -375,6 +378,8 @@ def trial(directory, implementation, task, index, binary, contract, acceptance_c
     before = after = b""
     started = None
     assertions = {identity: 0 for identity in acceptance_contract["g4"]["tasks"][task]}
+    rollback_binary = None
+    rollback_evidence = None
 
     def passed(identity, count=1):
         assertions[identity] += count
@@ -384,8 +389,8 @@ def trial(directory, implementation, task, index, binary, contract, acceptance_c
             app = IlTrial(trace, binary)
             old = None
             if task == "rollback":
+                old = app.build(1)
                 app.add()
-                old = app.build(2)
                 before = app.snapshot(2)
             else:
                 before = app.snapshot(1)
@@ -435,6 +440,15 @@ def trial(directory, implementation, task, index, binary, contract, acceptance_c
                 exe = app.build(3)
                 test_service(trace, contract, exe, app.policy, implementation, False)
                 passed("previous_binary_runs", test_service(trace, contract, old, app.policy, implementation, True))
+                rollback_binary = trace.blob(old.read_bytes())
+                rollback_binary["role"] = "rollback_binary"
+                rollback_evidence = {
+                    "source_revision": 2, "rollback_revision": 3,
+                    "expected_graph_sha256": digest(encoded(a)),
+                    "restored_graph_sha256": digest(encoded(b)),
+                    "previous_binary_sha256": digest(old.read_bytes()),
+                    "previous_binary_executed": True,
+                }
         else:
             baseline = ROOT / "tests/p10/baseline"
             source = directory / "main.rs"
@@ -546,6 +560,8 @@ def trial(directory, implementation, task, index, binary, contract, acceptance_c
             success=row["success"],
             failure_category=row["failure_category"],
             patch=patch,
+            rollback_binary=rollback_binary,
+            rollback_evidence=rollback_evidence,
         )
         save(directory / "trial.json", row)
     return row

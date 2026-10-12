@@ -15,6 +15,55 @@ import produce  # noqa: E402
 
 
 class ProducerTests(unittest.TestCase):
+    def test_rollback_record_binds_three_trials_to_retained_release_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="il-p10-rollback-record-") as name:
+            run = Path(name)
+            (run / "evidence/gates").mkdir(parents=True)
+            (run / "g4").mkdir()
+            binary = b"\x7fELF" + bytes(range(32))
+            binary_hash = produce.digest_bytes(binary)
+            graph_hash = "sha256:" + "a" * 64
+            (run / "reproducibility").mkdir()
+            (run / "reproducibility/release.elf").write_bytes(binary)
+            (run / "evidence/gates/reproducible_hash.json").write_text(json.dumps({
+                "duration_ns": 3,
+                "clean_rebuilds": [{"artifacts": [{"role": "native_elf", "sha256": binary_hash}]}],
+            }), encoding="utf-8")
+            trials = []
+            for index in range(1, 4):
+                directory = run / "g4" / f"rollback-il-{index}"
+                (directory / "blobs").mkdir(parents=True)
+                (directory / "blobs/previous.elf").write_bytes(binary)
+                record = {
+                    "experiment_exit_code": 0,
+                    "started_monotonic_ns": index * 10,
+                    "finished_monotonic_ns": index * 10 + 5,
+                    "assertions": [{"id": identity, "exit_code": 0}
+                                   for identity in ("rollback_transaction", "restored_graph_matches", "previous_binary_runs")],
+                    "rollback_evidence": {
+                        "source_revision": 2, "rollback_revision": 3,
+                        "expected_graph_sha256": graph_hash, "restored_graph_sha256": graph_hash,
+                        "previous_binary_sha256": binary_hash, "previous_binary_executed": True,
+                    },
+                    "rollback_binary": {"path": "blobs/previous.elf", "sha256": binary_hash,
+                                         "bytes": len(binary), "role": "rollback_binary"},
+                }
+                raw = json.dumps(record, sort_keys=True).encode()
+                (directory / "g4_trial.json").write_bytes(raw)
+                trials.append({"task": "rollback", "implementation": "il", "g4_trial": {
+                    "path": f"rollback-il-{index}/g4_trial.json", "sha256": produce.digest_bytes(raw),
+                }})
+            (run / "g4/comparison.json").write_text(json.dumps({"trials": trials}), encoding="utf-8")
+            journal = {"source": {"commit": "b" * 40},
+                       "toolchain": {"lock": {"sha256": "sha256:" + "c" * 64}}}
+
+            result = produce._derive_rollback_record(run, journal)
+
+            self.assertEqual(result, {"status": "COMPLETE", "blocked_predicates": []})
+            evidence = json.loads((run / "evidence/gates/rollback_verified.json").read_text(encoding="utf-8"))
+            self.assertEqual(evidence["rollback"]["previous_binary_sha256"], binary_hash)
+            self.assertEqual(evidence["artifacts"][0]["sha256"], binary_hash)
+
     def test_fixed_plan_captures_real_ci_outputs_and_run_local_reports(self):
         plan = produce._fixed_plan(Path("p10-run"))
         self.assertEqual({item.command_id for item in plan}, {"ci", "http", "g4", "reproducibility"})
@@ -164,7 +213,7 @@ class ProducerTests(unittest.TestCase):
             report = produce._produce_p10_report(run, root=ROOT)
             self.assertEqual(report["kind"], "p10_producer_report")
             self.assertEqual(report["status"], "BLOCKED")
-            self.assertIn("complete p10_manifest", report["error"])
+            self.assertIn("gate-record export", report["error"])
 
     def test_dirty_checkout_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory(prefix="il-p10-dirty-") as name:

@@ -63,6 +63,16 @@ def _passed_rust_tests(log: str) -> set[str]:
     return passed
 
 
+def _passed_python_tests(log: str) -> set[str]:
+    """Read only completed unittest rows from the retained CI command log."""
+    passed: set[str] = set()
+    for line in log.splitlines():
+        match = re.fullmatch(r"(test_[A-Za-z0-9_]+) \([^\r\n]+\) \.\.\. ok", line.strip())
+        if match:
+            passed.add(match.group(1))
+    return passed
+
+
 G0_RUST_TESTS = {
     "graph_schema_valid": {
         "optional_and_nullable_fields_follow_the_closed_graph_schema",
@@ -199,6 +209,24 @@ def derive_g0(ci_report: str | Path, *, provenance: dict[str, str],
         blocked.pop("graph_schema_valid", None)
     except (CiRecordError, OSError, UnicodeError, json.JSONDecodeError, ValueError, TypeError) as error:
         blocked["graph_schema_valid"] = str(error)
+    predicate = "no_high_level_target_source"
+    required_native_tests = {
+        "test_two_clean_stores_reproduce_native_artifacts",
+        "test_application_entrypoint_and_rejected_build_preserve_artifacts",
+    }
+    try:
+        native_gate, native_log = _gate(ci, "native-cli", root)
+        passed_native_tests = _passed_python_tests(native_log)
+        missing_native_tests = sorted(required_native_tests - passed_native_tests)
+        if missing_native_tests:
+            raise CiRecordError(f"native-cli raw log lacks passing target-source checks: {missing_native_tests}")
+        records[predicate] = _record(
+            predicate, native_gate, source_commit=provenance["source_commit"],
+            target=provenance["target"], toolchain_lock_sha256=lock_hash,
+            suite_id="native_cli_target_source_scan", case_count=len(required_native_tests))
+        records[predicate]["target_generated_sources"] = []
+    except (CiRecordError, UnicodeDecodeError) as error:
+        blocked[predicate] = str(error)
     result = {"schema_version": "1.0.0", "kind": "p10_ci_record_derivation",
               "status": "COMPLETE" if not blocked else "BLOCKED",
               "records": records, "blocked_predicates": blocked}

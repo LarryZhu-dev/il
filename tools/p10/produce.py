@@ -612,6 +612,8 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
             state["ci_records"] = _derive_ci_records(destination, state)
             state["http_records"] = _derive_http_records(destination, state)
             state["reproducibility_records"] = _derive_reproducibility_records(destination, state)
+            state["inventory_records"] = _derive_inventory_records(destination, state)
+            state["rollback_records"] = _derive_rollback_record(destination, state)
             atomic_json(destination / "journal.json", state)
             # Export only explicit predicate records emitted by the trusted
             # commands.  This is an observational sidecar: a missing record
@@ -658,13 +660,7 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
 
 
 def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
-    """Derive a publication candidate from explicit trusted evidence only.
-
-    This function deliberately does not synthesize predicates, artifacts,
-    executable inventory, HTTP receipts, or G4 trials.  A normal CI summary
-    therefore produces an actionable BLOCKED receipt until a reviewed command
-    emits the complete manifest required by ``reduce.py``.
-    """
+    """Assemble a candidate only from trusted run outputs and explicit records."""
     contract_path = root / "tools" / "p10" / "contract.json"
     result_path = run / "build" / "ci" / "result.json"
     gate_path = run / "gate_records" / "export.json"
@@ -699,7 +695,9 @@ def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
         from reduce import ReductionError, reduce_report
         report = json.loads(result_path.read_text(encoding="utf-8"))
         contract = json.loads(contract_path.read_text(encoding="utf-8"))
-        manifest = reduce_report(report, contract=contract, base=result_path.parent)
+        if not isinstance(report, dict) or not isinstance(report.get("p10_manifest"), dict):
+            report = dict(report, p10_manifest=_manifest_from_trusted_run(run, journal, contract, root=root))
+        manifest = reduce_report(report, contract=contract, base=run)
     except ReductionError as error:
         base["error"] = str(error)
         return base
@@ -708,6 +706,236 @@ def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
         return base
     # Preserve the reducer's exact manifest.  No fields are added or inferred.
     return manifest
+
+
+def _manifest_from_trusted_run(
+    run: Path, journal: dict[str, Any], contract: dict[str, Any], *, root: Path = ROOT
+) -> dict[str, Any]:
+    """Bind the candidate manifest to hashed gate, rebuild and comparison outputs."""
+    export_path = run / "gate_records" / "export.json"
+    if not export_path.is_file():
+        raise ValueError("trusted gate-record export is unavailable; CI summaries cannot attest P10 predicates")
+    export = json.loads(export_path.read_text(encoding="utf-8"))
+    if export.get("status") != "COMPLETE":
+        raise ValueError(f"explicit P10 predicates are incomplete: {export.get('missing_predicates')}")
+    records = dict(export.get("records", {}))
+    required_predicates = {name for values in contract["gates"].values() for name in values}
+    if set(records) != required_predicates:
+        raise ValueError(f"trusted predicate export does not contain the complete contract matrix: missing={sorted(required_predicates - set(records))}")
+
+    repro_path = run / "evidence" / "gates" / "reproducible_hash.json"
+    repro_record = json.loads(repro_path.read_text(encoding="utf-8"))
+    rebuilds = repro_record.get("clean_rebuilds")
+    if not isinstance(rebuilds, list) or len(rebuilds) != 2:
+        raise ValueError("reproducible_hash record does not contain two clean builds")
+    artifact_rows = {item.get("role"): item for item in rebuilds[0].get("artifacts", [])
+                     if isinstance(item, dict)}
+    required_roles = set(contract["required_artifact_roles"])
+    missing_roles = required_roles - set(artifact_rows) - {"toolchain_lock"}
+    if missing_roles:
+        raise ValueError(f"independent rebuild omitted required artifact roles: {sorted(missing_roles)}")
+
+    artifacts = []
+    artifact_references: dict[str, dict[str, str]] = {}
+    for role in sorted(required_roles - {"toolchain_lock"}):
+        item = artifact_rows[role]
+        relative = (Path("reproducibility") / item["path"]).as_posix()
+        path = run / relative
+        if not path.is_file() or digest_file(path) != item["sha256"]:
+            raise ValueError(f"trusted {role} artifact is missing or its bytes do not match the rebuild record")
+        ref = {"role": role, "path": relative, "sha256": item["sha256"]}
+        artifacts.append(ref)
+        artifact_references[role] = ref
+
+    lock_path = run / "toolchain.lock"
+    lock_hash = journal["toolchain"]["lock"]["sha256"]
+    if not lock_path.is_file() or digest_file(lock_path) != lock_hash:
+        raise ValueError("captured toolchain.lock is missing or differs from the trusted journal")
+    lock_ref = {"role": "toolchain_lock", "path": "toolchain.lock", "sha256": lock_hash}
+    artifacts.append(lock_ref)
+
+    artifact_gate_path = run / "evidence" / "gates" / "all_artifacts_hashed.json"
+    provenance = {"source_commit": journal["source"]["commit"], "target": contract["target"],
+                  "toolchain_lock_sha256": lock_hash}
+    artifact_gate = {
+        "schema_version": SCHEMA_VERSION, "kind": "p10_gate_record", **provenance,
+        "status": "PASSED", "predicate": "all_artifacts_hashed", "command_id": "reproducibility",
+        "argv_sha256": digest_bytes(canonical(["independent_rebuild_artifact_inventory"])),
+        "exit_code": 0, "duration_ns": repro_record["duration_ns"],
+        "test_suite": {"id": "independent_rebuild_artifacts", "exit_code": 0, "count": len(artifacts)},
+        "artifacts": artifacts, "assertions": [{"id": "all_artifacts_hashed", "passed": True}],
+    }
+    atomic_json(artifact_gate_path, artifact_gate)
+    records["all_artifacts_hashed"] = {
+        "path": artifact_gate_path.relative_to(run).as_posix(), "sha256": digest_file(artifact_gate_path),
+    }
+    rollback = _derive_rollback_record(run, journal)
+    if rollback["status"] != "COMPLETE":
+        raise ValueError(f"rollback predicate is incomplete: {rollback['blocked_predicates']}")
+    rollback_path = run / "evidence" / "gates" / "rollback_verified.json"
+    records["rollback_verified"] = {"path": rollback_path.relative_to(run).as_posix(),
+                                     "sha256": digest_file(rollback_path)}
+
+    observation = json.loads((run / "commands" / "http.json").read_text(encoding="utf-8"))
+    from http_records import derive_http_gate
+    http = derive_http_gate(
+        run / "http" / "http_report.json", run_root=run,
+        provenance={"source_commit": journal["source"]["commit"], "target": contract["target"],
+                    "toolchain_lock_sha256": lock_hash},
+        command={"command_id": observation.get("command_id"), "argv": observation.get("argv"),
+                 "exit_code": observation.get("exit_code"), "duration_ns": observation.get("elapsed_ns")},
+    )
+    if http.get("status") != "COMPLETE":
+        raise ValueError(f"HTTP executable inventory is incomplete: {http.get('blocked_reasons')}")
+    executables = []
+    graph_ref = artifact_rows["graph"]
+    graph_path = run / "reproducibility" / graph_ref["path"]
+    graph_value = json.loads(graph_path.read_text(encoding="utf-8"))
+    invocation = {"revision": graph_value.get("revision"), "target": contract["target"],
+                  "profile": "release", "runtime_profile": "full"}
+    for profile in ("debug", "release"):
+        role = f"application_{profile}"
+        item = http["executables"].get(role)
+        if not isinstance(item, dict):
+            raise ValueError(f"HTTP report has no measured executable for {profile}")
+        executable_path = run / item["path"]
+        if not executable_path.is_file() or digest_file(executable_path) != item["sha256"]:
+            raise ValueError(f"HTTP {profile} executable bytes do not match their receipt")
+        if profile == "release" and item["sha256"] != artifact_rows["native_elf"]["sha256"]:
+            raise ValueError("HTTP release executable differs from independently reproduced release ELF")
+        artifacts.append({"role": role, "path": item["path"], "sha256": item["sha256"]})
+        executables.append({
+            "role": role, "kind": "application", "profile": profile, "target": contract["target"],
+            "entry_point": "demo.serve", "graph_revision": invocation["revision"],
+            "graph_sha256": graph_ref["sha256"], "runtime_profile": "full",
+            "build_invocation_sha256": digest_bytes(canonical({**invocation, "profile": profile})),
+            "artifact_role": role,
+        })
+
+    reproduction_report = json.loads((run / "reproducibility" / "reproduction.json").read_text(encoding="utf-8"))
+    app_build = reproduction_report["roots"][0]["application"]
+    if (app_build["graph_revision"] != invocation["revision"]
+            or app_build["runtime_profile"] != "full"):
+        raise ValueError("HTTP and independent rebuild application inputs differ")
+    comparison_report = json.loads((run / "g4" / "comparison.json").read_text(encoding="utf-8"))
+    trials = []
+    for row in comparison_report.get("trials", []):
+        reference = row.get("g4_trial") if isinstance(row, dict) else None
+        if isinstance(reference, dict):
+            trials.append({**reference, "path": (Path("g4") / reference["path"]).as_posix()})
+    if len(trials) != 18:
+        raise ValueError(f"trusted G4 report contains {len(trials)} of 18 trial references")
+    return {
+        "schema_version": SCHEMA_VERSION, "kind": "p10_acceptance_bundle",
+        "source_commit": journal["source"]["commit"], "target": contract["target"],
+        "toolchain_lock_sha256": lock_hash, "executables": executables,
+        "predicates": records, "artifacts": artifacts,
+        "comparison": {
+            "task_contract_sha256": digest_file(root / "tools" / "p10" / "contract.json"),
+            "baseline_commit": comparison_report.get("baseline_commit"), "trials": trials,
+        },
+    }
+
+
+def _derive_inventory_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Derive artifact inventory evidence by hashing retained file bytes."""
+    try:
+        contract = json.loads((ROOT / "tools" / "p10" / "contract.json").read_text(encoding="utf-8"))
+        repro = json.loads((run / "evidence" / "gates" / "reproducible_hash.json").read_text(encoding="utf-8"))
+        artifacts = []
+        for item in repro["clean_rebuilds"][0]["artifacts"]:
+            path = run / "reproducibility" / item["path"]
+            if path.is_file() and digest_file(path) == item.get("sha256"):
+                artifacts.append({"role": item["role"], "path": path.relative_to(run).as_posix(),
+                                  "sha256": item["sha256"]})
+        lock = run / "toolchain.lock"
+        if lock.is_file() and digest_file(lock) == journal.get("toolchain", {}).get("lock", {}).get("sha256"):
+            artifacts.append({"role": "toolchain_lock", "path": "toolchain.lock",
+                              "sha256": digest_file(lock)})
+        roles = {item["role"] for item in artifacts}
+        if not set(contract["required_artifact_roles"]).issubset(roles):
+            raise ValueError(f"required artifact inventory is incomplete: {sorted(set(contract['required_artifact_roles']) - roles)}")
+        record = {
+            "schema_version": SCHEMA_VERSION, "kind": "p10_gate_record",
+            "predicate": "all_artifacts_hashed", "source_commit": journal["source"]["commit"],
+            "target": contract["target"], "toolchain_lock_sha256": journal["toolchain"]["lock"]["sha256"],
+            "status": "PASSED", "command_id": "reproducibility",
+            "argv_sha256": digest_bytes(canonical(["independent_rebuild_artifact_inventory"])),
+            "exit_code": 0, "duration_ns": repro["duration_ns"],
+            "test_suite": {"id": "independent_rebuild_artifacts", "exit_code": 0, "count": len(artifacts)},
+            "artifacts": artifacts, "assertions": [{"id": "all_artifacts_hashed", "passed": True}],
+        }
+        target = run / "evidence" / "gates" / "all_artifacts_hashed.json"
+        atomic_json(target, record)
+        return {"status": "COMPLETE", "blocked_predicates": []}
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, KeyError, TypeError) as error:
+        return {"status": "BLOCKED", "blocked_predicates": [str(error)]}
+
+
+def _derive_rollback_record(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
+    """Bind successful graph rollback trials and rerun bytes to release ELF."""
+    try:
+        contract = json.loads((ROOT / "tools" / "p10" / "contract.json").read_text(encoding="utf-8"))
+        repro = json.loads((run / "evidence" / "gates" / "reproducible_hash.json").read_text(encoding="utf-8"))
+        native = next(item for item in repro["clean_rebuilds"][0]["artifacts"] if item["role"] == "native_elf")
+        comparison = json.loads((run / "g4" / "comparison.json").read_text(encoding="utf-8"))
+        observations = []
+        for row in comparison.get("trials", []):
+            if not isinstance(row, dict) or row.get("task") != "rollback" or row.get("implementation") != "il":
+                continue
+            reference = row.get("g4_trial")
+            if not isinstance(reference, dict):
+                continue
+            trial_path = run / "g4" / reference["path"]
+            raw = trial_path.read_bytes()
+            if digest_bytes(raw) != reference.get("sha256"):
+                raise ValueError("G4 rollback trial record hash mismatch")
+            trial = json.loads(raw)
+            assertions = {item.get("id"): item for item in trial.get("assertions", []) if isinstance(item, dict)}
+            if trial.get("experiment_exit_code") != 0 or not all(
+                assertions.get(name, {}).get("exit_code") == 0
+                for name in ("rollback_transaction", "restored_graph_matches", "previous_binary_runs")
+            ):
+                raise ValueError("an il rollback trial did not pass its measured assertions")
+            evidence = trial.get("rollback_evidence")
+            binary_ref = trial.get("rollback_binary")
+            if not isinstance(evidence, dict) or not isinstance(binary_ref, dict):
+                raise ValueError("G4 rollback trial omits graph or previous-binary evidence")
+            binary_path = (trial_path.parent / binary_ref["path"]).resolve(strict=True)
+            binary_path.relative_to(run.resolve())
+            binary_bytes = binary_path.read_bytes()
+            if digest_bytes(binary_bytes) != binary_ref.get("sha256") or digest_bytes(binary_bytes) != native["sha256"]:
+                raise ValueError("G4 previous binary bytes differ from reproducible release ELF")
+            if evidence.get("previous_binary_sha256") != native["sha256"] or evidence.get("previous_binary_executed") is not True:
+                raise ValueError("G4 rollback execution is not bound to reproducible release ELF")
+            if evidence.get("restored_graph_sha256") != evidence.get("expected_graph_sha256"):
+                raise ValueError("G4 rollback did not restore the requested graph")
+            observations.append((evidence, binary_ref, trial,
+                                 (Path("g4") / trial_path.parent.relative_to(run / "g4") /
+                                  binary_path.relative_to(trial_path.parent)).as_posix()))
+        if len(observations) != contract["g4"]["trial_count"]:
+            raise ValueError(f"expected {contract['g4']['trial_count']} il rollback trials, observed {len(observations)}")
+        first, binary_ref, _, binary_path = observations[0]
+        if any(item[0] != first for item in observations[1:]):
+            raise ValueError("G4 rollback trial evidence differs across repetitions")
+        record = {
+            "schema_version": SCHEMA_VERSION, "kind": "p10_gate_record",
+            "predicate": "rollback_verified", "source_commit": journal["source"]["commit"],
+            "target": contract["target"], "toolchain_lock_sha256": journal["toolchain"]["lock"]["sha256"],
+            "status": "PASSED", "command_id": "g4", "argv_sha256": digest_bytes(canonical(["g4-rollback-trials"])),
+            "exit_code": 0, "duration_ns": sum(item[2]["finished_monotonic_ns"] - item[2]["started_monotonic_ns"] for item in observations),
+            "test_suite": {"id": "g4_il_rollback_trials", "exit_code": 0, "count": len(observations)},
+            "artifacts": [{"role": "native_elf", "path": binary_path, "sha256": native["sha256"]}],
+            "assertions": [{"id": "rollback_verified", "passed": True}],
+            "rollback": {key: first[key] for key in (
+                "source_revision", "rollback_revision", "expected_graph_sha256", "restored_graph_sha256",
+                "previous_binary_sha256", "previous_binary_executed")},
+        }
+        target = run / "evidence" / "gates" / "rollback_verified.json"
+        atomic_json(target, record)
+        return {"status": "COMPLETE", "blocked_predicates": []}
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError, KeyError, TypeError, StopIteration) as error:
+        return {"status": "BLOCKED", "blocked_predicates": [str(error)]}
 
 
 def _derive_ci_records(run: Path, journal: dict[str, Any]) -> dict[str, Any]:
