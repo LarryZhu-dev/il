@@ -6,7 +6,9 @@ $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 # Convert Windows path to Docker-compatible format for bind mounts
 # D:\me\project\il -> /d/me/project/il
-$dockerWorkspace = $workspace -replace '\\', '/' -replace '^([A-Z]):', { '/'+$_.Groups[1].Value.ToLower() }
+$dockerWorkspace = $workspace -replace '\\', '/'
+$driveLetter = $dockerWorkspace.Substring(0, 1).ToLower()
+$dockerWorkspace = '/' + $driveLetter + $dockerWorkspace.Substring(2)
 
 Write-Host "Compiling il API server..." -ForegroundColor Cyan
 Write-Host "  Source: examples/api_server.il" -ForegroundColor Gray

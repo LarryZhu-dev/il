@@ -4,6 +4,11 @@
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
+# Convert Windows path to Docker format
+$dockerWorkspace = $workspace -replace '\\', '/'
+$driveLetter = $dockerWorkspace.Substring(0, 1).ToLower()
+$dockerWorkspace = '/' + $driveLetter + $dockerWorkspace.Substring(2)
+
 $executablePath = "$workspace/.il/api_server/build/x86_64-unknown-linux-gnu/release/executable"
 
 if (-not (Test-Path $executablePath)) {
@@ -31,7 +36,7 @@ Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
 docker run --rm -it --platform linux/amd64 `
-    --mount "type=bind,source=$workspace,target=/workspace" `
+    --mount "type=bind,source=$dockerWorkspace,target=/workspace" `
     --workdir /workspace `
     --publish 8080:8080 `
     il-toolchain:1.90.0-llvm14 `
