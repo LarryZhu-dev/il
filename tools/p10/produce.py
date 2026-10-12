@@ -644,6 +644,13 @@ def run_plan(output: str | Path, *, root: Path = ROOT) -> dict[str, Any]:
                 "status": p10_report.get("status"),
                 "kind": p10_report.get("kind"),
             }
+            # Generate final release manifests if the bundle is complete
+            if p10_report.get("kind") == "p10_acceptance_bundle":
+                release_output = ROOT / "release"
+                release_result = emit_release_manifests(destination, release_output, root=ROOT)
+                state["release_manifests"] = release_result
+                if release_result.get("ok"):
+                    atomic_json(destination / "release_status.json", release_result)
             state["status"] = "COMPLETE"
             state["finished_at"] = utc_now()
             atomic_json(destination / "journal.json", state)
@@ -706,6 +713,94 @@ def _produce_p10_report(run: Path, *, root: Path) -> dict[str, Any]:
         return base
     # Preserve the reducer's exact manifest.  No fields are added or inferred.
     return manifest
+
+
+def emit_release_manifests(run: Path, output_dir: Path, *, root: Path = ROOT) -> dict[str, Any]:
+    """Generate and emit final MVP release manifests from a complete trusted run.
+
+    This function is called after a successful P10 run to generate the release
+    artifacts specified in the execution spec:
+    - release/mvp_manifest.json
+    - release/mvp_binary_hashes.json
+    - release/known_limits.json
+    - eval/mvp_comparison.json
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        # Import release module from the tools/p10 directory
+        import sys
+        tools_p10 = root / "tools" / "p10"
+        if str(tools_p10) not in sys.path:
+            sys.path.insert(0, str(tools_p10))
+
+        from release import (
+            generate_mvp_manifest,
+            generate_binary_hashes,
+            generate_known_limits,
+            save_json,
+            ReleaseError,
+        )
+
+        # Load the acceptance bundle from the run
+        bundle_paths = list(run.glob("p10/acceptance_bundle.json"))
+        if not bundle_paths:
+            return {
+                "ok": False,
+                "status": "BLOCKED",
+                "error": "acceptance bundle not found in run directory",
+            }
+        bundle_path = bundle_paths[0]
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+
+        # Load the contract
+        contract_path = root / "tools" / "p10" / "contract.json"
+        if not contract_path.is_file():
+            return {
+                "ok": False,
+                "status": "BLOCKED",
+                "error": f"contract.json not found at {contract_path}",
+            }
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+
+        # Generate release manifests
+        mvp_manifest = generate_mvp_manifest(bundle, contract)
+        binary_hashes = generate_binary_hashes(bundle, contract)
+        known_limits = generate_known_limits(contract)
+
+        # Write manifests
+        save_json(output_dir / "mvp_manifest.json", mvp_manifest)
+        save_json(output_dir / "mvp_binary_hashes.json", binary_hashes)
+        save_json(output_dir / "known_limits.json", known_limits)
+
+        # Link comparison report
+        g4_comparison = run / "g4" / "comparison.json"
+        if g4_comparison.is_file():
+            eval_dir = root / "eval"
+            eval_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(g4_comparison, eval_dir / "mvp_comparison.json")
+        else:
+            return {
+                "ok": False,
+                "status": "BLOCKED",
+                "error": "G4 comparison report not found",
+            }
+
+        return {
+            "ok": True,
+            "status": "COMPLETE",
+            "outputs": {
+                "mvp_manifest": str(output_dir / "mvp_manifest.json"),
+                "mvp_binary_hashes": str(output_dir / "mvp_binary_hashes.json"),
+                "known_limits": str(output_dir / "known_limits.json"),
+                "mvp_comparison": str(root / "eval" / "mvp_comparison.json"),
+            },
+        }
+    except Exception as error:
+        return {
+            "ok": False,
+            "status": "BLOCKED",
+            "error": f"{error.__class__.__name__}: {error}",
+        }
 
 
 def _manifest_from_trusted_run(
