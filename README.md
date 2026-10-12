@@ -107,6 +107,13 @@ enforce scope for the generated changes. Clean local and hosted acceptance passe
 scope is Linux x86-64; dedicated real connect-timeout and socket-EINTR tests are
 not claimed. P08 AI protocol integration is verified for the recorded target.
 
+A complete working example is in `examples/api_server.il`: a JSON REST API server
+with health checks, time endpoints and capability reporting. Build it with
+`python examples/build_api_server.py` and test with `python examples/test_api_server.py`.
+The example demonstrates il's capability system, effect tracking, JSON handling,
+HTTP protocol implementation and error handling patterns. See `examples/API_SERVER_README.md`
+for full documentation and usage examples.
+
 The P08 implementation adds exact-scoped `add_route` transactions, immutable
 tool receipts, `explain`, `blackbox` and `evidence`. Each admitted call returns a
 `result.run_id`; diagnostic lookup requires that run ID and the original
